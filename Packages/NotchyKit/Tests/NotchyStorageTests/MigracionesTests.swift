@@ -10,7 +10,7 @@ import Testing
         let base = try BaseDeDatos.enMemoria()
         let creada = try #require(try RepositorioDeMeta(base).leer("creada_en"))
         #expect(try Date(creada, strategy: .iso8601) <= Date())
-        #expect(try base.salud().migraciones == ["v1-meta"])
+        #expect(try base.salud().migraciones == ["v1-meta", "v2-portapapeles-y-bandeja"])
     }
 
     @Test func reabrirNoRepiteMigracionesNiPierdeDatos() throws {
@@ -29,7 +29,7 @@ import Testing
         let base = try BaseDeDatos.abrir(en: ruta)
         #expect(try RepositorioDeMeta(base).leer("creada_en") == creada)
         #expect(try RepositorioDeMeta(base).leer("marca") == "1")
-        #expect(try base.salud().migraciones == ["v1-meta"])
+        #expect(try base.salud().migraciones == ["v1-meta", "v2-portapapeles-y-bandeja"])
     }
 
     @Test func noTocaUnaBaseDeUnaVersionMasNueva() throws {

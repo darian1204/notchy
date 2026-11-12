@@ -31,6 +31,18 @@ public final class Ajustes {
     public var iconoEnBarraDeMenus: Bool {
         didSet { alCambiar(iconoEnBarraDeMenus, oldValue, .iconoEnBarraDeMenus) }
     }
+    /// Días de retención del portapapeles (CLP-5). Por defecto 30 días.
+    public var diasRetencionPortapapeles: Int {
+        didSet { alCambiar(diasRetencionPortapapeles, oldValue, .diasRetencionPortapapeles) }
+    }
+    /// Límite de elementos guardados en el portapapeles (CLP-5). Por defecto 2000 elementos.
+    public var limiteElementosPortapapeles: Int {
+        didSet { alCambiar(limiteElementosPortapapeles, oldValue, .limiteElementosPortapapeles) }
+    }
+    /// Identificadores de apps excluidas del portapapeles (CLP-2).
+    public var appsExcluidasPortapapeles: Set<String> {
+        didSet { alCambiar(appsExcluidasPortapapeles, oldValue, .appsExcluidasPortapapeles) }
+    }
 
     @ObservationIgnored private let almacen: any AlmacenDeAjustes
     @ObservationIgnored private var observadores: [@MainActor () -> Void] = []
@@ -43,6 +55,9 @@ public final class Ajustes {
         pantalla = Self.leer(.pantalla, de: almacen) ?? .conNotch
         atajo = Self.leer(.atajo, de: almacen) ?? .controlOpcionEspacio
         iconoEnBarraDeMenus = Self.leer(.iconoEnBarraDeMenus, de: almacen) ?? false
+        diasRetencionPortapapeles = Self.leer(.diasRetencionPortapapeles, de: almacen) ?? 30
+        limiteElementosPortapapeles = Self.leer(.limiteElementosPortapapeles, de: almacen) ?? 2000
+        appsExcluidasPortapapeles = Self.leer(.appsExcluidasPortapapeles, de: almacen) ?? []
     }
 
     /// Llama a `accion` después de cada cambio guardado. Para quien no es una vista de SwiftUI.
@@ -74,6 +89,7 @@ public final class Ajustes {
 
     enum Clave: String {
         case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus
+        case diasRetencionPortapapeles, limiteElementosPortapapeles, appsExcluidasPortapapeles
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {

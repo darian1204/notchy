@@ -19,8 +19,13 @@ public struct RutasDeDatos: Sendable, Equatable {
     }
 
     public var baseDeDatos: URL { raiz.appending(path: "notchy.sqlite") }
+    public var portapapeles: URL { raiz.appending(path: "clipboard", directoryHint: .isDirectory) }
+    public var bandeja: URL { raiz.appending(path: "tray", directoryHint: .isDirectory) }
+    public var audio: URL { raiz.appending(path: "audio", directoryHint: .isDirectory) }
 
     public func crearCarpetas() throws {
-        try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        for carpeta in [raiz, portapapeles, bandeja, audio] {
+            try FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
+        }
     }
 }

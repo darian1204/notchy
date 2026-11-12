@@ -38,7 +38,10 @@ import Testing
 
 @Suite struct MedidasTests {
     @Test func todoEstadoCabeEnElPanelFijo() {
-        for estado in [Medidas.notch, Medidas.pildora, Medidas.compacto, Medidas.aviso, Medidas.inicio] {
+        for estado in [
+            Medidas.notch, Medidas.pildora, Medidas.compacto, Medidas.aviso,
+            Medidas.inicio, Medidas.portapapeles, Medidas.bandeja,
+        ] {
             #expect(estado.width + 2 * Medidas.hombro <= Medidas.panel.width)
             #expect(estado.height <= Medidas.panel.height)
         }

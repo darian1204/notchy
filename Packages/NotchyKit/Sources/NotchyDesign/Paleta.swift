@@ -11,13 +11,21 @@ public enum Paleta {
     public static let superficie = Color.white.opacity(0.075)
     public static let superficieAlta = Color.white.opacity(0.14)
 
-    public static let agenda = Color(hex: 0x5AA9FF)
-    public static let grabadora = Color(hex: 0xFF5D55)
-    public static let musica = Color(hex: 0x3DDC97)
-    public static let bandeja = Color(hex: 0xA58BFF)
-    public static let portapapeles = Color(hex: 0xFFB84D)
-    public static let espejo = Color(hex: 0xFF8FB8)
-    public static let airdrop = Color(hex: 0x35C3FF)
+    public static let hexAgenda: UInt32 = 0x5AA9FF
+    public static let hexGrabadora: UInt32 = 0xFF5D55
+    public static let hexMusica: UInt32 = 0x3DDC97
+    public static let hexBandeja: UInt32 = 0xA58BFF
+    public static let hexPortapapeles: UInt32 = 0xFFB84D
+    public static let hexEspejo: UInt32 = 0xFF8FB8
+    public static let hexAirdrop: UInt32 = 0x35C3FF
+
+    public static let agenda = Color(hex: hexAgenda)
+    public static let grabadora = Color(hex: hexGrabadora)
+    public static let musica = Color(hex: hexMusica)
+    public static let bandeja = Color(hex: hexBandeja)
+    public static let portapapeles = Color(hex: hexPortapapeles)
+    public static let espejo = Color(hex: hexEspejo)
+    public static let airdrop = Color(hex: hexAirdrop)
     public static let agente = Color.white
 }
 
