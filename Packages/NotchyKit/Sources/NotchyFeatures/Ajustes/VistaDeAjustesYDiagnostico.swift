@@ -6,15 +6,18 @@ import SwiftUI
 public struct VistaDeAjustesYDiagnostico: View {
     private let modelo: ModeloDeAjustesYDiagnostico
     private let alAbrirEnlace: (@MainActor (URL) -> Void)?
+    private let alBorrarHistorialPortapapeles: (@MainActor () -> Void)?
     private let alSalir: (@MainActor () -> Void)?
 
     public init(
         modelo: ModeloDeAjustesYDiagnostico,
         alAbrirEnlace: (@MainActor (URL) -> Void)? = nil,
+        alBorrarHistorialPortapapeles: (@MainActor () -> Void)? = nil,
         alSalir: (@MainActor () -> Void)? = nil
     ) {
         self.modelo = modelo
         self.alAbrirEnlace = alAbrirEnlace
+        self.alBorrarHistorialPortapapeles = alBorrarHistorialPortapapeles
         self.alSalir = alSalir
     }
 
@@ -31,7 +34,7 @@ public struct VistaDeAjustesYDiagnostico: View {
                 pestanaDiagnostico()
             }
         }
-        .frame(width: 520, height: 420)
+        .frame(width: 520, height: 460)
         .onAppear {
             modelo.refrescar()
         }
@@ -52,6 +55,34 @@ public struct VistaDeAjustesYDiagnostico: View {
                     }
                 }
                 .accessibilityLabel("Atajo global para abrir o cerrar")
+            }
+
+            Section("Portapapeles") {
+                Picker("Retención por antigüedad", selection: ajustes.diasRetencionPortapapeles) {
+                    Text("7 días").tag(7)
+                    Text("30 días").tag(30)
+                    Text("90 días").tag(90)
+                }
+                .accessibilityLabel("Retención por antigüedad del portapapeles")
+
+                Picker("Límite de elementos", selection: ajustes.limiteElementosPortapapeles) {
+                    Text("500 elementos").tag(500)
+                    Text("2000 elementos").tag(2000)
+                    Text("5000 elementos").tag(5000)
+                }
+                .accessibilityLabel("Límite de elementos del portapapeles")
+
+                if let alBorrarHistorialPortapapeles {
+                    HStack {
+                        Text("Los elementos fijados no se borran por retención.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Borrar todo el portapapeles", role: .destructive, action: alBorrarHistorialPortapapeles)
+                            .controlSize(.small)
+                            .accessibilityLabel("Borrar todo el portapapeles")
+                    }
+                }
             }
 
             Section("Barra de menús") {

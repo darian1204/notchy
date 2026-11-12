@@ -12,23 +12,51 @@ import SwiftUI
 final class Ensamblado {
     let ajustes: Ajustes
     let bus = BusDeEventos()
+    let rutas: RutasDeDatos?
     let base: BaseDeDatos?
     let registro: RegistroDeModulos
     let coordinador: CoordinadorDeIsla
     let panel: ControladorDePanel
     let atajo: ControladorDeAtajo
+    let modeloDePortapapeles: ModeloDePortapapeles
+    let modeloDeBandeja: ModeloDeBandeja
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
     private var ventanaDeAjustes: ControladorDeVentanaDeAjustes?
     private var barraDeMenus: ControladorDeBarraDeMenus?
     private let registradorCarbon = RegistradorDeAtajosCarbon()
+    private let adaptadorDePortapapeles = AdaptadorDePortapapeles()
     private let log = Registro.de(.arranque)
 
     init() {
         ajustes = Ajustes(almacen: AlmacenUserDefaults())
-        base = Self.abrirBase(log: log)
+        let (rutasAbiertas, baseAbierta) = Self.abrirRutasYBase(log: log)
+        rutas = rutasAbiertas
+        base = baseAbierta
+
+        modeloDePortapapeles = ModeloDePortapapeles(
+            puerto: adaptadorDePortapapeles,
+            repositorio: baseAbierta.map(RepositorioDePortapapeles.init),
+            carpetaImagenes: rutasAbiertas?.portapapeles,
+            ajustes: ajustes,
+            bus: bus
+        )
+        modeloDeBandeja = ModeloDeBandeja(
+            repositorio: baseAbierta.map(RepositorioDeBandeja.init),
+            carpetaBandeja: rutasAbiertas?.bandeja
+        )
+
         registro = RegistroDeModulos(ajustes: ajustes)
-        registro.registrar(ModuloDeInicio())
         coordinador = CoordinadorDeIsla(registro: registro, bus: bus)
+
+        let coordinadorCapturado = coordinador
+        registro.registrar(
+            ModuloDeInicio(
+                portapapeles: modeloDePortapapeles,
+                alAbrirModulo: { id in coordinadorCapturado.recibir(.elegirModulo(id)) }
+            ))
+        registro.registrar(ModuloDeBandeja(modelo: modeloDeBandeja))
+        registro.registrar(ModuloDePortapapeles(modelo: modeloDePortapapeles))
+
         panel = ControladorDePanel(coordinador: coordinador, ajustes: ajustes)
         atajo = ControladorDeAtajo(coordinador: coordinador, ajustes: ajustes, registrador: registradorCarbon)
 
@@ -55,11 +83,13 @@ final class Ensamblado {
         )
 
         let modeloCapturado = modeloDeAjustes
+        let portapapelesCapturado = modeloDePortapapeles
         let salir: @MainActor () -> Void = { NSApp.terminate(nil) }
         let ventana = ControladorDeVentanaDeAjustes {
             VistaDeAjustesYDiagnostico(
                 modelo: modeloCapturado,
                 alAbrirEnlace: { NSWorkspace.shared.open($0) },
+                alBorrarHistorialPortapapeles: { portapapelesCapturado.borrarTodo() },
                 alSalir: salir
             )
         }
@@ -93,14 +123,15 @@ final class Ensamblado {
         registro.detenerTodo()
     }
 
-    private static func abrirBase(log: Logger) -> BaseDeDatos? {
+    private static func abrirRutasYBase(log: Logger) -> (RutasDeDatos?, BaseDeDatos?) {
         do {
             let rutas = try RutasDeDatos.porDefecto()
             try rutas.crearCarpetas()
-            return try BaseDeDatos.abrir(en: rutas.baseDeDatos)
+            let base = try BaseDeDatos.abrir(en: rutas.baseDeDatos)
+            return (rutas, base)
         } catch {
             log.error("No se pudo abrir la base de datos: \(error.localizedDescription, privacy: .public)")
-            return nil
+            return (nil, nil)
         }
     }
 }
