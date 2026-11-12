@@ -1,14 +1,16 @@
+import AppKit
 import Foundation
 import NotchyCore
 import NotchyStorage
 import Observation
 
-/// Modelo de vista de la Bandeja de archivos (BND-1 a BND-3).
-/// Copia los archivos soltados dentro de la carpeta `tray/` de Application Support y nunca borra los originales.
 @MainActor
 @Observable
 public final class ModeloDeBandeja {
     public private(set) var elementos: [ElementoDeBandeja] = []
+    public var formatoConversion: String = "PNG"
+    public var mostrarSegundaFila = false
+    public private(set) var mensajeEstado: String?
 
     @ObservationIgnored private let repositorio: RepositorioDeBandeja?
     @ObservationIgnored private let carpetaBandeja: URL?
@@ -61,6 +63,9 @@ public final class ModeloDeBandeja {
             }
         }
         recargar()
+        if agregados > 0 {
+            mostrarAvisoTemporal("Guardado en Shelf (\(agregados))")
+        }
         return agregados
     }
 
@@ -81,6 +86,143 @@ public final class ModeloDeBandeja {
             borrarCopiaInterna(rutaCopia)
         }
         recargar()
+    }
+
+    // MARK: - Acciones de Drop Actions sobre archivos soltados o en la bandeja
+
+    public var urlsEnBandeja: [URL] {
+        elementos.map(\.urlParaArrastrar).filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    public func guardarEnICloud(_ urls: [URL]) {
+        let archivos = urls.isEmpty ? urlsEnBandeja : urls
+        guard !archivos.isEmpty else {
+            elegirArchivosYEjecutar { self.guardarEnICloud($0) }
+            return
+        }
+        let carpetaICloud = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Mobile Documents/com~apple~CloudDocs")
+        let destinoBase =
+            FileManager.default.fileExists(atPath: carpetaICloud.path)
+            ? carpetaICloud
+            : FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads")
+
+        var copiados = 0
+        for url in archivos {
+            let destino = destinoBase.appending(path: url.lastPathComponent)
+            try? FileManager.default.removeItem(at: destino)
+            if (try? FileManager.default.copyItem(at: url, to: destino)) != nil {
+                copiados += 1
+            }
+        }
+        mostrarAvisoTemporal(copiados > 0 ? "Guardado en iCloud Drive (\(copiados))" : "No se pudo copiar a iCloud")
+    }
+
+    public func enviarPorAirDrop(_ urls: [URL]) {
+        let archivos = urls.isEmpty ? urlsEnBandeja : urls
+        guard !archivos.isEmpty else {
+            elegirArchivosYEjecutar { self.enviarPorAirDrop($0) }
+            return
+        }
+        if let servicio = NSSharingService(named: .sendViaAirDrop) {
+            servicio.perform(withItems: archivos)
+            mostrarAvisoTemporal("Enviando por AirDrop…")
+        }
+    }
+
+    public func abrirConAppPredeterminada(_ urls: [URL]) {
+        let archivos = urls.isEmpty ? urlsEnBandeja : urls
+        guard !archivos.isEmpty else {
+            elegirArchivosYEjecutar { self.abrirConAppPredeterminada($0) }
+            return
+        }
+        for url in archivos {
+            NSWorkspace.shared.open(url)
+        }
+        mostrarAvisoTemporal("Abierto (\(archivos.count))")
+    }
+
+    public func convertirImagenes(_ urls: [URL]) {
+        let archivos = urls.isEmpty ? urlsEnBandeja : urls
+        guard !archivos.isEmpty else {
+            elegirArchivosYEjecutar { self.convertirImagenes($0) }
+            return
+        }
+        let descargas = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads")
+        var convertidas = 0
+        for url in archivos {
+            guard let img = NSImage(contentsOf: url),
+                let tiff = img.tiffRepresentation,
+                let rep = NSBitmapImageRep(data: tiff)
+            else { continue }
+
+            let ext = formatoConversion.lowercased()
+            let tipo: NSBitmapImageRep.FileType = (ext == "jpg" || ext == "jpeg") ? .jpeg : .png
+            guard let datos = rep.representation(using: tipo, properties: [:]) else { continue }
+            let base = url.deletingPathExtension().lastPathComponent
+            let salida = descargas.appending(path: "\(base)-converted.\(ext)")
+            if (try? datos.write(to: salida, options: .atomic)) != nil {
+                convertidas += 1
+                _ = agregarArchivos([salida])
+            }
+        }
+        mostrarAvisoTemporal(
+            convertidas > 0 ? "Convertidas a \(formatoConversion) (\(convertidas))" : "Suelta una imagen para convertir"
+        )
+    }
+
+    public func comprimirEnZip(_ urls: [URL]) {
+        let archivos = urls.isEmpty ? urlsEnBandeja : urls
+        guard let primero = archivos.first else {
+            elegirArchivosYEjecutar { self.comprimirEnZip($0) }
+            return
+        }
+        let descargas = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads")
+        let nombreZip = "\(primero.deletingPathExtension().lastPathComponent).zip"
+        let salidaZip = descargas.appending(path: nombreZip)
+        try? FileManager.default.removeItem(at: salidaZip)
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        proc.arguments = ["-j", salidaZip.path] + archivos.map(\.path)
+        try? proc.run()
+        proc.waitUntilExit()
+        if FileManager.default.fileExists(atPath: salidaZip.path) {
+            _ = agregarArchivos([salidaZip])
+            mostrarAvisoTemporal("Creado \(nombreZip)")
+        }
+    }
+
+    public func moverAPapelera(_ urls: [URL]) {
+        if urls.isEmpty {
+            vaciar()
+            mostrarAvisoTemporal("Shelf vaciado")
+            return
+        }
+        for url in urls {
+            try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        }
+        mostrarAvisoTemporal("Movido a la Papelera")
+    }
+
+    private func elegirArchivosYEjecutar(_ accion: @escaping @MainActor ([URL]) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        if panel.runModal() == .OK, !panel.urls.isEmpty {
+            accion(panel.urls)
+        }
+    }
+
+    private func mostrarAvisoTemporal(_ texto: String) {
+        mensajeEstado = texto
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2.2))
+            if self?.mensajeEstado == texto {
+                self?.mensajeEstado = nil
+            }
+        }
     }
 
     private func borrarCopiaInterna(_ rutaCopia: String) {

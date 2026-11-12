@@ -273,6 +273,36 @@ public final class AdaptadorDeAhoraSuena: PuertoDeAhoraSuena {
         }
     }
 
+    public func saltarA(segundos: Double) {
+        let destinoSegundos = max(0, segundos)
+        // 1. Intentar vía MediaRemote privado (MRMediaRemoteSetElapsedTime)
+        if let handle = dlopen("/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote", RTLD_LAZY),
+            let sym = dlsym(handle, "MRMediaRemoteSetElapsedTime")
+        {
+            typealias SetElapsedFn = @convention(c) (Double) -> Void
+            let fn = unsafeBitCast(sym, to: SetElapsedFn.self)
+            fn(destinoSegundos)
+        }
+        // 2. Respaldo directo AppleScript para Spotify y Music (garantiza salto exacto en macOS 27)
+        let abiertas = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let destinoApp: String? =
+            if abiertas.contains("com.spotify.client") {
+                "Spotify"
+            } else if abiertas.contains("com.apple.Music") {
+                "Music"
+            } else {
+                nil
+            }
+        if let destinoApp {
+            let valorTexto = String(format: "%.1f", destinoSegundos)
+            let fuente = "tell application \"\(destinoApp)\" to set player position to \(valorTexto)"
+            Task.detached {
+                var error: NSDictionary?
+                _ = NSAppleScript(source: fuente)?.executeAndReturnError(&error)
+            }
+        }
+    }
+
     public func probarAdaptador() async -> Bool {
         guard let rutas, let cliente = rutas.clienteDePrueba else { return false }
         let script = rutas.scriptPerl

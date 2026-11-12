@@ -202,18 +202,24 @@ struct BarraDeModulos: View {
     var body: some View {
         let modulos = coordinador.registro.activos.map(\.identidad)
         HStack(spacing: 0) {
-            HStack(spacing: 3) {
-                if modulos.count > 1 {
-                    ForEach(modulos.filter { $0.lado == .izquierda }) { boton($0) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 2) {
+                    if modulos.count > 1 {
+                        ForEach(modulos.filter { $0.lado == .izquierda }) { boton($0) }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Color.clear.frame(width: coordinador.geometria.pantalla.notch?.width ?? 0)
 
-            HStack(spacing: 3) {
-                if modulos.count > 1 {
-                    ForEach(modulos.filter { $0.lado == .derecha }) { boton($0) }
+            HStack(spacing: 2) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 2) {
+                        if modulos.count > 1 {
+                            ForEach(modulos.filter { $0.lado == .derecha }) { boton($0) }
+                        }
+                    }
                 }
                 engrane
             }
@@ -241,7 +247,7 @@ struct BarraDeModulos: View {
             Image(systemName: modulo.icono)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(abierto ? colorParaIcono(modulo) : Paleta.textoDeApoyo)
-                .frame(width: 24, height: 22)
+                .frame(width: 21, height: 22)
                 .background(
                     abierto ? Paleta.superficieAlta : Color.clear,
                     in: RoundedRectangle(cornerRadius: 6)

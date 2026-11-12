@@ -21,6 +21,12 @@ public enum Paleta {
     public static let hexAirdrop: UInt32 = 0x35C3FF
     public static let hexColorPicker: UInt32 = 0xD97D98
     public static let hexScreenTime: UInt32 = 0x5AA9FF
+    public static let hexClima: UInt32 = 0x4FC3F7
+    public static let hexNotificaciones: UInt32 = 0xFF9F0A
+    public static let hexAgente: UInt32 = 0xBF5AF2
+    public static let hexTraductor: UInt32 = 0x64D2FF
+    public static let hexWindowSnap: UInt32 = 0x30D158
+    public static let hexMonitorSistema: UInt32 = 0x32D74B
 
     public static let agenda = Color(hex: hexAgenda)
     public static let grabadora = Color(hex: hexGrabadora)
@@ -31,7 +37,12 @@ public enum Paleta {
     public static let airdrop = Color(hex: hexAirdrop)
     public static let colorPicker = Color(hex: hexColorPicker)
     public static let screenTime = Color(hex: hexScreenTime)
-    public static let agente = Color.white
+    public static let clima = Color(hex: hexClima)
+    public static let notificaciones = Color(hex: hexNotificaciones)
+    public static let agente = Color(hex: hexAgente)
+    public static let traductor = Color(hex: hexTraductor)
+    public static let windowSnap = Color(hex: hexWindowSnap)
+    public static let monitorSistema = Color(hex: hexMonitorSistema)
 }
 
 extension Color {

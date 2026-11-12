@@ -262,3 +262,368 @@ public struct UsoDeAppScreenTime: Sendable, Equatable, Codable, Identifiable {
         self.cambiosDeApp = cambiosDeApp
     }
 }
+
+// MARK: - Clima (Open-Meteo)
+
+public struct PronosticoPorHora: Sendable, Equatable, Codable, Identifiable {
+    public let id: String
+    public let etiquetaHora: String
+    public let codigoWMO: Int
+    public let esDeDia: Bool
+    public let temperaturaC: Double
+
+    public init(
+        id: String,
+        etiquetaHora: String,
+        codigoWMO: Int,
+        esDeDia: Bool,
+        temperaturaC: Double
+    ) {
+        self.id = id
+        self.etiquetaHora = etiquetaHora
+        self.codigoWMO = codigoWMO
+        self.esDeDia = esDeDia
+        self.temperaturaC = temperaturaC
+    }
+}
+
+public struct EstadoDelClima: Sendable, Equatable, Codable {
+    public let ciudad: String
+    public let latitud: Double
+    public let longitud: Double
+    public let temperaturaC: Double
+    public let sensacionC: Double
+    public let maximaC: Double
+    public let minimaC: Double
+    public let humedadPorcentaje: Int
+    public let vientoKmH: Double
+    public let indiceUV: Double
+    public let probabilidadLluvia: Int
+    public let presionHPa: Int
+    public let amanecer: String
+    public let atardecer: String
+    public let codigoWMO: Int
+    public let esDeDia: Bool
+    public let porHora: [PronosticoPorHora]
+    public let fechaActualizacion: Date
+
+    public init(
+        ciudad: String,
+        latitud: Double,
+        longitud: Double,
+        temperaturaC: Double,
+        sensacionC: Double,
+        maximaC: Double,
+        minimaC: Double,
+        humedadPorcentaje: Int,
+        vientoKmH: Double,
+        indiceUV: Double,
+        probabilidadLluvia: Int,
+        presionHPa: Int,
+        amanecer: String,
+        atardecer: String,
+        codigoWMO: Int,
+        esDeDia: Bool,
+        porHora: [PronosticoPorHora],
+        fechaActualizacion: Date = .now
+    ) {
+        self.ciudad = ciudad
+        self.latitud = latitud
+        self.longitud = longitud
+        self.temperaturaC = temperaturaC
+        self.sensacionC = sensacionC
+        self.maximaC = maximaC
+        self.minimaC = minimaC
+        self.humedadPorcentaje = humedadPorcentaje
+        self.vientoKmH = vientoKmH
+        self.indiceUV = indiceUV
+        self.probabilidadLluvia = probabilidadLluvia
+        self.presionHPa = presionHPa
+        self.amanecer = amanecer
+        self.atardecer = atardecer
+        self.codigoWMO = codigoWMO
+        self.esDeDia = esDeDia
+        self.porHora = porHora
+        self.fechaActualizacion = fechaActualizacion
+    }
+
+    public static func iconoWMO(codigo: Int, esDeDia: Bool) -> String {
+        switch codigo {
+        case 0:
+            return esDeDia ? "sun.max.fill" : "moon.stars.fill"
+        case 1, 2:
+            return esDeDia ? "cloud.sun.fill" : "cloud.moon.fill"
+        case 3:
+            return "cloud.fill"
+        case 45, 48:
+            return "cloud.fog.fill"
+        case 51, 53, 55, 56, 57:
+            return "cloud.drizzle.fill"
+        case 61, 63, 65, 66, 67, 80, 81, 82:
+            return "cloud.rain.fill"
+        case 71, 73, 75, 77, 85, 86:
+            return "cloud.snow.fill"
+        case 95, 96, 99:
+            return "cloud.bolt.rain.fill"
+        default:
+            return esDeDia ? "cloud.sun.fill" : "cloud.moon.fill"
+        }
+    }
+
+    public static func descripcionWMO(codigo: Int) -> String {
+        switch codigo {
+        case 0: "Clear sky"
+        case 1: "Mainly clear"
+        case 2: "Partly cloudy"
+        case 3: "Overcast"
+        case 45, 48: "Foggy"
+        case 51, 53, 55: "Light drizzle"
+        case 61, 63, 65: "Rain"
+        case 71, 73, 75: "Snow"
+        case 80, 81, 82: "Rain showers"
+        case 95, 96, 99: "Thunderstorm"
+        default: "Clear sky"
+        }
+    }
+}
+
+// MARK: - Notificaciones Recientes
+
+public struct NotificacionReciente: Sendable, Equatable, Codable, Identifiable {
+    public let id: String
+    public let bundleId: String
+    public let nombreApp: String
+    public let titulo: String
+    public let subtitulo: String?
+    public let cuerpo: String
+    public let fecha: Date
+    public var leida: Bool
+
+    public init(
+        id: String = UUID().uuidString,
+        bundleId: String,
+        nombreApp: String,
+        titulo: String,
+        subtitulo: String? = nil,
+        cuerpo: String,
+        fecha: Date = .now,
+        leida: Bool = false
+    ) {
+        self.id = id
+        self.bundleId = bundleId
+        self.nombreApp = nombreApp
+        self.titulo = titulo
+        self.subtitulo = subtitulo
+        self.cuerpo = cuerpo
+        self.fecha = fecha
+        self.leida = leida
+    }
+}
+
+// MARK: - Minichatbot Agéntico (OpenCode)
+
+public struct MensajeDeAgente: Sendable, Equatable, Codable, Identifiable {
+    public enum Rol: String, Sendable, Equatable, Codable {
+        case usuario
+        case asistente
+        case herramienta
+    }
+
+    public let id: String
+    public let rol: Rol
+    public var texto: String
+    public let fecha: Date
+
+    public init(
+        id: String = UUID().uuidString,
+        rol: Rol,
+        texto: String,
+        fecha: Date = .now
+    ) {
+        self.id = id
+        self.rol = rol
+        self.texto = texto
+        self.fecha = fecha
+    }
+}
+
+@MainActor
+public protocol PuertoAgenteOpenCode: AnyObject {
+    func estaDisponible() -> Bool
+    func modelosDisponibles() async -> [String]
+    func enviarMensaje(
+        prompt: String,
+        modelo: String?,
+        sesionID: String?,
+        directorio: String?,
+        alRecibirFragmento: @escaping @MainActor (String, String?) -> Void
+    ) async throws -> (textoFinal: String, sesionID: String?)
+}
+
+// MARK: - Traductor (Translate)
+
+public enum IdiomaDeTraduccion: String, Sendable, CaseIterable, Codable, Identifiable {
+    case espanol = "es"
+    case ingles = "en"
+    case aleman = "de"
+    case frances = "fr"
+    case portugues = "pt"
+    case italiano = "it"
+    case japones = "ja"
+    case chino = "zh"
+
+    public var id: String { rawValue }
+
+    public var etiqueta: String {
+        switch self {
+        case .espanol: "SPANISH"
+        case .ingles: "ENGLISH"
+        case .aleman: "GERMAN"
+        case .frances: "FRENCH"
+        case .portugues: "PORTUGUESE"
+        case .italiano: "ITALIAN"
+        case .japones: "JAPANESE"
+        case .chino: "CHINESE"
+        }
+    }
+
+    public var nombreCompleto: String {
+        switch self {
+        case .espanol: "Español"
+        case .ingles: "English"
+        case .aleman: "Deutsch"
+        case .frances: "Français"
+        case .portugues: "Português"
+        case .italiano: "Italiano"
+        case .japones: "日本語"
+        case .chino: "中文"
+        }
+    }
+}
+
+// MARK: - Window Snap
+
+public enum DisposicionDeVentana: String, Sendable, CaseIterable, Codable, Identifiable {
+    case mitadIzquierda
+    case mitadDerecha
+    case mitadSuperior
+    case mitadInferior
+    case cuartoSupIzq
+    case cuartoSupDer
+    case cuartoInfIzq
+    case cuartoInfDer
+    case maximizar
+    case centrar
+    case tercioIzquierdo
+    case tercioCentral
+    case tercioDerecho
+
+    public var id: String { rawValue }
+
+    public var titulo: String {
+        switch self {
+        case .mitadIzquierda: "Left Half"
+        case .mitadDerecha: "Right Half"
+        case .mitadSuperior: "Top Half"
+        case .mitadInferior: "Bottom Half"
+        case .cuartoSupIzq: "Top Left"
+        case .cuartoSupDer: "Top Right"
+        case .cuartoInfIzq: "Bottom Left"
+        case .cuartoInfDer: "Bottom Right"
+        case .maximizar: "Maximize"
+        case .centrar: "Center"
+        case .tercioIzquierdo: "Left Third"
+        case .tercioCentral: "Center Third"
+        case .tercioDerecho: "Right Third"
+        }
+    }
+
+    /// Rectángulo normalizado (0...1) en coordenadas con origen arriba-izquierda de la pantalla visible.
+    public var rectanguloNormalizado: (x: Double, y: Double, ancho: Double, alto: Double) {
+        switch self {
+        case .mitadIzquierda: (0.0, 0.0, 0.5, 1.0)
+        case .mitadDerecha: (0.5, 0.0, 0.5, 1.0)
+        case .mitadSuperior: (0.0, 0.0, 1.0, 0.5)
+        case .mitadInferior: (0.0, 0.5, 1.0, 0.5)
+        case .cuartoSupIzq: (0.0, 0.0, 0.5, 0.5)
+        case .cuartoSupDer: (0.5, 0.0, 0.5, 0.5)
+        case .cuartoInfIzq: (0.0, 0.5, 0.5, 0.5)
+        case .cuartoInfDer: (0.5, 0.5, 0.5, 0.5)
+        case .maximizar: (0.0, 0.0, 1.0, 1.0)
+        case .centrar: (0.12, 0.10, 0.76, 0.80)
+        case .tercioIzquierdo: (0.0, 0.0, 0.3333, 1.0)
+        case .tercioCentral: (0.3333, 0.0, 0.3334, 1.0)
+        case .tercioDerecho: (0.6667, 0.0, 0.3333, 1.0)
+        }
+    }
+}
+
+@MainActor
+public protocol PuertoWindowSnap: AnyObject {
+    var nombreAppObjetivo: String { get }
+    var bundleIdObjetivo: String? { get }
+    var tienePermisoAccesibilidad: Bool { get }
+    func pedirPermisoAccesibilidad()
+    func aplicar(_ disposicion: DisposicionDeVentana) -> Bool
+}
+
+// MARK: - System Monitor (System Analytics)
+
+public struct MetricasDelSistema: Sendable, Equatable {
+    public let usoCPUPorcentaje: Double
+    public let memoriaUsadaGB: Double
+    public let memoriaTotalGB: Double
+    public let almacenamientoUsadoPorcentaje: Double
+    public let discoLibreGB: Double
+    public let discoTotalGB: Double
+    public let redBytesPorSegundo: Double
+    public let bateriaPorcentaje: Int
+    public let bateriaCargando: Bool
+
+    public init(
+        usoCPUPorcentaje: Double,
+        memoriaUsadaGB: Double,
+        memoriaTotalGB: Double,
+        almacenamientoUsadoPorcentaje: Double,
+        discoLibreGB: Double,
+        discoTotalGB: Double,
+        redBytesPorSegundo: Double,
+        bateriaPorcentaje: Int,
+        bateriaCargando: Bool
+    ) {
+        self.usoCPUPorcentaje = usoCPUPorcentaje
+        self.memoriaUsadaGB = memoriaUsadaGB
+        self.memoriaTotalGB = memoriaTotalGB
+        self.almacenamientoUsadoPorcentaje = almacenamientoUsadoPorcentaje
+        self.discoLibreGB = discoLibreGB
+        self.discoTotalGB = discoTotalGB
+        self.redBytesPorSegundo = redBytesPorSegundo
+        self.bateriaPorcentaje = bateriaPorcentaje
+        self.bateriaCargando = bateriaCargando
+    }
+
+    public var memoriaPorcentaje: Double {
+        guard memoriaTotalGB > 0 else { return 0 }
+        return min(max((memoriaUsadaGB / memoriaTotalGB) * 100.0, 0), 100)
+    }
+
+    public var discoLibrePorcentaje: Double {
+        guard discoTotalGB > 0 else { return 0 }
+        return min(max((discoLibreGB / discoTotalGB) * 100.0, 0), 100)
+    }
+
+    public static func formatearVelocidadRed(_ bytesPorSegundo: Double) -> String {
+        if bytesPorSegundo >= 1_048_576 {
+            return String(format: "%.2f MB/s", bytesPorSegundo / 1_048_576.0)
+        }
+        if bytesPorSegundo >= 1024 {
+            return String(format: "%.2f KB/s", bytesPorSegundo / 1024.0)
+        }
+        return String(format: "%.0f B/s", max(0, bytesPorSegundo))
+    }
+}
+
+@MainActor
+public protocol PuertoMonitorDelSistema: AnyObject {
+    func leerMetricas() -> MetricasDelSistema
+}

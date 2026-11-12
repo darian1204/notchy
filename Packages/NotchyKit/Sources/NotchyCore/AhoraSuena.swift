@@ -77,7 +77,12 @@ public protocol PuertoDeAhoraSuena: AnyObject {
     func iniciar(alCambiar: @escaping @MainActor (EstadoDeAhoraSuena?) -> Void)
     func detener()
     func enviar(_ comando: ComandoDeReproduccion)
+    func saltarA(segundos: Double)
     func probarAdaptador() async -> Bool
+}
+
+extension PuertoDeAhoraSuena {
+    public func saltarA(segundos: Double) {}
 }
 
 /// Evento publicado cuando cambia la canción o el estado de reproducción.

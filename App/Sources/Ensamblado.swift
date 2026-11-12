@@ -26,6 +26,12 @@ final class Ensamblado {
     let modeloDeAirDrop: ModeloDeAirDrop
     let modeloDeColorPicker: ModeloDeColorPicker
     let modeloDeScreenTime: ModeloDeScreenTime
+    let modeloDeClima: ModeloDeClima
+    let modeloDeNotificaciones: ModeloDeNotificaciones
+    let modeloDeAgente: ModeloDeAgente
+    let modeloDeTraductor: ModeloDeTraductor
+    let modeloDeWindowSnap: ModeloDeWindowSnap
+    let modeloDeMonitorSistema: ModeloDeMonitorSistema
     let vigilanteDeHUD: VigilanteDeHUDSistema
     let gestorDeInbox: GestorDeInboxObsidian
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
@@ -39,6 +45,9 @@ final class Ensamblado {
     private let adaptadorDePortapapeles = AdaptadorDePortapapeles()
     private let adaptadorDeAirDrop = AdaptadorDeAirDrop()
     private let adaptadorDeColor = AdaptadorMuestreadorDeColor()
+    private let adaptadorDeAgente = AdaptadorAgenteOpenCode()
+    private let adaptadorDeWindowSnap = AdaptadorWindowSnap()
+    private let adaptadorDeMonitor = AdaptadorMonitorDelSistema()
     private let log = Registro.de(.arranque)
 
     init() {
@@ -96,7 +105,15 @@ final class Ensamblado {
             muestreador: adaptadorDeColor
         )
         modeloDeScreenTime = ModeloDeScreenTime()
-
+        modeloDeClima = ModeloDeClima()
+        modeloDeNotificaciones = ModeloDeNotificaciones(bus: bus)
+        modeloDeAgente = ModeloDeAgente(
+            puerto: adaptadorDeAgente,
+            ajustes: ajustes
+        )
+        modeloDeTraductor = ModeloDeTraductor(agente: adaptadorDeAgente)
+        modeloDeWindowSnap = ModeloDeWindowSnap(puerto: adaptadorDeWindowSnap)
+        modeloDeMonitorSistema = ModeloDeMonitorSistema(puerto: adaptadorDeMonitor)
         gestorDeInbox = GestorDeInboxObsidian(
             ajustes: ajustes,
             alAbrirURL: abrirURL
@@ -124,12 +141,18 @@ final class Ensamblado {
             ))
         registro.registrar(ModuloDeAgenda(modelo: modeloDeAgenda))
         registro.registrar(ModuloDeAhoraSuena(modelo: modeloDeAhoraSuena))
+        registro.registrar(ModuloDeClima(modelo: modeloDeClima))
+        registro.registrar(ModuloDeNotificaciones(modelo: modeloDeNotificaciones))
+        registro.registrar(ModuloDeAgente(modelo: modeloDeAgente))
         registro.registrar(ModuloDeEspejo(modelo: modeloDeEspejo))
         registro.registrar(ModuloDeBandeja(modelo: modeloDeBandeja))
         registro.registrar(ModuloDePortapapeles(modelo: modeloDePortapapeles))
         registro.registrar(ModuloDeAirDrop(modelo: modeloDeAirDrop))
+        registro.registrar(ModuloDeTraductor(modelo: modeloDeTraductor))
+        registro.registrar(ModuloDeWindowSnap(modelo: modeloDeWindowSnap))
         registro.registrar(ModuloDeColorPicker(modelo: modeloDeColorPicker))
         registro.registrar(ModuloDeScreenTime(modelo: modeloDeScreenTime))
+        registro.registrar(ModuloDeMonitorSistema(modelo: modeloDeMonitorSistema))
 
         panel = ControladorDePanel(coordinador: coordinador, ajustes: ajustes)
         atajo = ControladorDeAtajo(coordinador: coordinador, ajustes: ajustes, registrador: registradorCarbon)

@@ -71,6 +71,32 @@ public final class ModeloDeAhoraSuena {
         puerto.enviar(.anterior)
     }
 
+    public func saltarA(segundos: Double) {
+        guard let actual = estadoActual else { return }
+        let duracion = actual.duracionSegundos ?? max(segundos, 0)
+        let destino = min(max(0, segundos), max(duracion, 0))
+        estadoActual = EstadoDeAhoraSuena(
+            titulo: actual.titulo,
+            artista: actual.artista,
+            album: actual.album,
+            appOrigen: actual.appOrigen,
+            bundleIdentifier: actual.bundleIdentifier,
+            reproduciendo: actual.reproduciendo,
+            duracionSegundos: actual.duracionSegundos,
+            transcurridoSegundos: destino,
+            fechaDeMuestra: .now,
+            caratulaPNG: actual.caratulaPNG,
+            usandoRespaldoAppleScript: actual.usandoRespaldoAppleScript
+        )
+        puerto.saltarA(segundos: destino)
+    }
+
+    public func saltarAFraccion(_ fraccion: Double) {
+        guard let duracion = estadoActual?.duracionSegundos, duracion > 0 else { return }
+        let acotada = min(max(fraccion, 0), 1)
+        saltarA(segundos: duracion * acotada)
+    }
+
     private func aplicar(_ nuevo: EstadoDeAhoraSuena?) {
         let anterior = estadoActual
         estadoActual = nuevo

@@ -204,3 +204,115 @@ extension EspejoYAirDropFeaturesTests {
         #expect(ajustes.temaBarra == .caratula)
     }
 }
+
+@MainActor
+private final class AgenteOpenCodeFalso: PuertoAgenteOpenCode {
+    var disponible = true
+    var respuestaSimulada = "Respuesta desde OpenCode"
+
+    func estaDisponible() -> Bool { disponible }
+
+    func modelosDisponibles() async -> [String] {
+        ["openai/gpt-5.4-fast", "opencode/glm-5.3-flash-free"]
+    }
+
+    func enviarMensaje(
+        prompt: String,
+        modelo: String?,
+        sesionID: String?,
+        directorio: String?,
+        alRecibirFragmento: @escaping @MainActor (String, String?) -> Void
+    ) async throws -> (textoFinal: String, sesionID: String?) {
+        alRecibirFragmento(respuestaSimulada, "ses_prueba_123")
+        return (respuestaSimulada, "ses_prueba_123")
+    }
+}
+
+@MainActor
+private final class WindowSnapFalso: PuertoWindowSnap {
+    var nombreAppObjetivo: String = "Safari"
+    var bundleIdObjetivo: String? = "com.apple.Safari"
+    var tienePermisoAccesibilidad: Bool = true
+    var disposicionesAplicadas: [DisposicionDeVentana] = []
+
+    func pedirPermisoAccesibilidad() {}
+
+    func aplicar(_ disposicion: DisposicionDeVentana) -> Bool {
+        disposicionesAplicadas.append(disposicion)
+        return true
+    }
+}
+
+@MainActor
+private final class MonitorSistemaFalso: PuertoMonitorDelSistema {
+    func leerMetricas() -> MetricasDelSistema {
+        MetricasDelSistema(
+            usoCPUPorcentaje: 12.0,
+            memoriaUsadaGB: 14.0,
+            memoriaTotalGB: 24.0,
+            almacenamientoUsadoPorcentaje: 25.0,
+            discoLibreGB: 384.0,
+            discoTotalGB: 512.0,
+            redBytesPorSegundo: 15_360,
+            bateriaPorcentaje: 82,
+            bateriaCargando: true
+        )
+    }
+}
+
+extension EspejoYAirDropFeaturesTests {
+    @Test func climaFormateaCelsiusYFahrenheit() {
+        let suite = "notchy.clima.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let modelo = ModeloDeClima(defaults: defaults)
+        #expect(modelo.formatearTemp(20) == "20°C")
+        modelo.usarFahrenheit = true
+        #expect(modelo.formatearTemp(20) == "68°F")
+        #expect(EstadoDelClima.iconoWMO(codigo: 0, esDeDia: false) == "moon.stars.fill")
+    }
+
+    @Test func notificacionesFiltraDescartaYMarcaLeidas() {
+        let suite = "notchy.notif.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let modelo = ModeloDeNotificaciones(defaults: defaults)
+        let nueva = NotificacionReciente(
+            id: "n-1",
+            bundleId: "com.tinyspeck.slackmacgap",
+            nombreApp: "Slack",
+            titulo: "#eng-notchy: 12 new messages",
+            cuerpo: "Morgan: Quick heads up"
+        )
+        modelo.registrar(nueva)
+        #expect(modelo.notificaciones.first?.id == "n-1")
+        modelo.marcarLeida("n-1")
+        #expect(modelo.notificaciones.first?.leida == true)
+        modelo.descartar("n-1")
+        #expect(!modelo.notificaciones.contains(where: { $0.id == "n-1" }))
+    }
+
+    @Test func agenteOpenCodeEnviaYRecibeRespuestaConSesion() async throws {
+        let puerto = AgenteOpenCodeFalso()
+        let modelo = ModeloDeAgente(puerto: puerto)
+        modelo.enviarPrompt("Hola OpenCode")
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(modelo.mensajes.last?.texto == "Respuesta desde OpenCode")
+        #expect(modelo.sesionID == "ses_prueba_123")
+    }
+
+    @Test func windowSnapYMonitorSistemaAplicanDisposicionYLeenMetricas() {
+        let snap = WindowSnapFalso()
+        let modeloSnap = ModeloDeWindowSnap(puerto: snap)
+        modeloSnap.aplicar(.mitadIzquierda)
+        #expect(snap.disposicionesAplicadas == [.mitadIzquierda])
+        #expect(modeloSnap.ultimaDisposicion == .mitadIzquierda)
+
+        let monitor = MonitorSistemaFalso()
+        let modeloMonitor = ModeloDeMonitorSistema(puerto: monitor)
+        #expect(modeloMonitor.metricas.bateriaPorcentaje == 82)
+        #expect(MetricasDelSistema.formatearVelocidadRed(15_360) == "15.00 KB/s")
+    }
+}

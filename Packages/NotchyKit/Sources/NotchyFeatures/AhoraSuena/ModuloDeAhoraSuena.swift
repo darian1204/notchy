@@ -3,7 +3,7 @@ import NotchyCore
 import NotchyDesign
 import SwiftUI
 
-/// Módulo Ahora suena (`620 × 224 pt`): carátula, controles, letra sincronizada (LYRICS) y espectro dinámico (MUS-1, MUS-2).
+/// Módulo Ahora suena (`620 × 224 pt`): carátula, controles con scrubbing, letra sincronizada animada (LYRICS) y espectro dinámico (MUS-1, MUS-2).
 @MainActor
 public final class ModuloDeAhoraSuena: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
@@ -62,7 +62,7 @@ struct VistaDeAhoraSuena: View {
     var body: some View {
         if let estado = modelo.estadoActual {
             HStack(spacing: 16) {
-                // Izquierda: carátula + título + barra + controles
+                // Izquierda: carátula + título + barra interactiva + controles
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
                         CaratulaDeCancion(datos: estado.caratulaPNG, tamano: 76, radio: 14)
@@ -87,7 +87,12 @@ struct VistaDeAhoraSuena: View {
                         }
                     }
 
-                    BarraDeProgresoMusical(estado: estado)
+                    BarraDeProgresoMusical(
+                        estado: estado,
+                        alSaltarAFraccion: { fraccion in
+                            modelo.saltarAFraccion(fraccion)
+                        }
+                    )
 
                     HStack(spacing: 16) {
                         Button {
@@ -141,9 +146,16 @@ struct VistaDeAhoraSuena: View {
                     .frame(width: 1)
                     .padding(.vertical, 6)
 
-                // Derecha: panel de LYRICS sincronizado en tiempo real
-                PanelDeLetraMusical(estado: estado, letra: modelo.letraActual, cargando: modelo.cargandoLetra)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Derecha: panel de LYRICS sincronizado y animado en tiempo real
+                PanelDeLetraMusical(
+                    estado: estado,
+                    letra: modelo.letraActual,
+                    cargando: modelo.cargandoLetra,
+                    alSaltarASegundo: { seg in
+                        modelo.saltarA(segundos: seg)
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -171,20 +183,27 @@ struct VistaDeAhoraSuena: View {
     }
 }
 
-/// Panel de letra sincronizada inspirado en el diseño de referencia (línea anterior tenue, actual resaltada, siguientes debajo).
+/// Panel de letra en vivo con animaciones de resorte, brillo karaoke y salto al hacer clic en cualquier verso.
 struct PanelDeLetraMusical: View {
     let estado: EstadoDeAhoraSuena
     let letra: LetraDeCancion?
     let cargando: Bool
+    var alSaltarASegundo: ((Double) -> Void)?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: estado.reproduciendo ? 0.4 : 60.0)) { contexto in
+        TimelineView(.periodic(from: .now, by: estado.reproduciendo ? 0.25 : 60.0)) { contexto in
             let seg = estado.transcurridoActual(en: contexto.date) ?? 0
             VStack(alignment: .leading, spacing: 6) {
-                Text("LYRICS")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Paleta.textoDeApoyo)
-                    .tracking(0.8)
+                HStack(spacing: 5) {
+                    Image(systemName: "quote.bubble.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Paleta.musica)
+                    Text("LYRICS")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Paleta.textoDeApoyo)
+                        .tracking(0.8)
+                    Spacer(minLength: 0)
+                }
 
                 if cargando {
                     Spacer(minLength: 0)
@@ -193,36 +212,75 @@ struct PanelDeLetraMusical: View {
                     Spacer(minLength: 0)
                 } else if let letra, !letra.lineas.isEmpty {
                     let idx = letra.indiceActivo(en: seg)
-                    let anterior = idx > 0 ? letra.lineas[idx - 1].texto : " "
-                    let actual = letra.lineas[idx].texto
-                    let siguiente = (idx + 1 < letra.lineas.count) ? letra.lineas[idx + 1].texto : " "
-                    let siguiente2 = (idx + 2 < letra.lineas.count) ? letra.lineas[idx + 2].texto : ""
+                    let ventana = indicesVisibles(actual: idx, total: letra.lineas.count)
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(anterior)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.32))
-                            .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(ventana, id: \.self) { i in
+                            let linea = letra.lineas[i]
+                            let distancia = i - idx
+                            let esActiva = distancia == 0
+                            let progresoVerso = progresoDeLinea(
+                                indice: i,
+                                lineas: letra.lineas,
+                                segundoActual: seg
+                            )
 
-                        Text(actual)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Paleta.texto)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            Button {
+                                if let t = linea.tiempoSegundos {
+                                    alSaltarASegundo?(t)
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(linea.texto)
+                                        .font(
+                                            .system(
+                                                size: esActiva ? 14 : (abs(distancia) == 1 ? 11.5 : 10.5),
+                                                weight: esActiva ? .bold : .semibold
+                                            )
+                                        )
+                                        .foregroundStyle(colorParaDistancia(distancia))
+                                        .shadow(
+                                            color: esActiva ? Paleta.musica.opacity(0.45) : .clear,
+                                            radius: esActiva ? 6 : 0
+                                        )
+                                        .lineLimit(esActiva ? 2 : 1)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .scaleEffect(esActiva ? 1.02 : 0.96, anchor: .leading)
+                                        .blur(radius: esActiva ? 0 : (abs(distancia) >= 2 ? 0.6 : 0.2))
 
-                        Text(siguiente)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                            .lineLimit(1)
-
-                        if !siguiente2.isEmpty {
-                            Text(siguiente2)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.28))
-                                .lineLimit(1)
+                                    if esActiva, linea.tiempoSegundos != nil {
+                                        GeometryReader { geo in
+                                            ZStack(alignment: .leading) {
+                                                Capsule()
+                                                    .fill(Color.white.opacity(0.14))
+                                                Capsule()
+                                                    .fill(
+                                                        LinearGradient(
+                                                            colors: [Paleta.musica, Color.white],
+                                                            startPoint: .leading,
+                                                            endPoint: .trailing
+                                                        )
+                                                    )
+                                                    .frame(width: max(6, geo.size.width * progresoVerso))
+                                            }
+                                        }
+                                        .frame(height: 2.5)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .id(linea.id)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .move(edge: .top).combined(with: .opacity)
+                                )
+                            )
                         }
                     }
-                    .animation(.easeOut(duration: 0.22), value: idx)
+                    .animation(.spring(response: 0.42, dampingFraction: 0.78), value: idx)
                     Spacer(minLength: 0)
                 } else {
                     Spacer(minLength: 0)
@@ -232,39 +290,119 @@ struct PanelDeLetraMusical: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
         }
+    }
+
+    private func indicesVisibles(actual: Int, total: Int) -> [Int] {
+        guard total > 0 else { return [] }
+        let inicio = max(0, actual - 1)
+        let fin = min(total - 1, inicio + 3)
+        return Array(inicio...fin)
+    }
+
+    private func colorParaDistancia(_ distancia: Int) -> Color {
+        switch distancia {
+        case 0:
+            return Paleta.texto
+        case -1:
+            return Color.white.opacity(0.32)
+        case 1:
+            return Color.white.opacity(0.54)
+        default:
+            return Color.white.opacity(0.28)
+        }
+    }
+
+    private func progresoDeLinea(
+        indice: Int,
+        lineas: [LineaDeLetra],
+        segundoActual: Double
+    ) -> CGFloat {
+        guard let inicio = lineas[indice].tiempoSegundos else { return 0 }
+        let fin: Double
+        if indice + 1 < lineas.count, let siguiente = lineas[indice + 1].tiempoSegundos, siguiente > inicio {
+            fin = siguiente
+        } else {
+            fin = inicio + 4.0
+        }
+        let fraccion = (segundoActual - inicio) / max(0.2, fin - inicio)
+        return CGFloat(min(max(fraccion, 0), 1))
     }
 }
 
-/// Barra de progreso que estima el avance segundo a segundo mientras suena sin sondear al sistema.
+/// Barra de progreso interactiva: permite hacer clic o arrastrar para cambiar el minuto/segundo de la canción.
 struct BarraDeProgresoMusical: View {
     let estado: EstadoDeAhoraSuena
+    var alSaltarAFraccion: ((Double) -> Void)?
+
+    @State private var fraccionArrastre: Double?
+    @State private var cursorEncima = false
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: estado.reproduciendo ? 1.0 : 60.0)) { contexto in
+        TimelineView(.periodic(from: .now, by: estado.reproduciendo ? 0.5 : 60.0)) { contexto in
             let ahora = contexto.date
-            let transcurrido = estado.transcurridoActual(en: ahora) ?? 0
             let duracion = estado.duracionSegundos ?? 0
-            let fraccion = estado.fraccionDeProgreso(en: ahora)
+            let fraccionReal = estado.fraccionDeProgreso(en: ahora)
+            let fraccionMostrada = fraccionArrastre ?? fraccionReal
+            let transcurridoMostrado =
+                fraccionArrastre != nil
+                ? duracion * (fraccionArrastre ?? 0) : (estado.transcurridoActual(en: ahora) ?? 0)
+
             HStack(spacing: 8) {
-                Text(formatearSegundos(transcurrido))
+                Text(formatearSegundos(transcurridoMostrado))
                     .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(Paleta.textoDeApoyo)
+                    .foregroundStyle(fraccionArrastre != nil ? Paleta.musica : Paleta.textoDeApoyo)
+                    .frame(width: 32, alignment: .leading)
+
                 GeometryReader { geo in
+                    let ancho = max(1, geo.size.width)
+                    let xThumb = max(0, min(ancho, ancho * fraccionMostrada))
+                    let altoBarra: CGFloat = (cursorEncima || fraccionArrastre != nil) ? 6 : 4
+
                     ZStack(alignment: .leading) {
                         Capsule()
                             .fill(Paleta.superficieAlta)
-                            .frame(height: 4)
+                            .frame(height: altoBarra)
+
                         Capsule()
-                            .fill(Paleta.texto)
-                            .frame(width: max(0, geo.size.width * fraccion), height: 4)
+                            .fill(fraccionArrastre != nil ? Paleta.musica : Paleta.texto)
+                            .frame(width: xThumb, height: altoBarra)
+
+                        if cursorEncima || fraccionArrastre != nil {
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 10, height: 10)
+                                .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+                                .offset(x: max(0, min(ancho - 10, xThumb - 5)))
+                        }
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
+                    .contentShape(Rectangle())
+                    .onHover { encima in
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            cursorEncima = encima
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { valor in
+                                let f = min(max(Double(valor.location.x / ancho), 0), 1)
+                                fraccionArrastre = f
+                            }
+                            .onEnded { valor in
+                                let f = min(max(Double(valor.location.x / ancho), 0), 1)
+                                fraccionArrastre = nil
+                                alSaltarAFraccion?(f)
+                            }
+                    )
                 }
-                .frame(height: 12)
+                .frame(height: 14)
+
                 Text(formatearSegundos(duracion))
                     .font(.system(size: 10, weight: .semibold).monospacedDigit())
                     .foregroundStyle(Paleta.textoDeApoyo)
+                    .frame(width: 32, alignment: .trailing)
             }
         }
     }
