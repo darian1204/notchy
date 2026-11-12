@@ -9,7 +9,7 @@ struct NotchyApp: App {
     @NSApplicationDelegateAdaptor(Arranque.self) private var arranque
 
     var body: some Scene {
-        // Sin ventana propia: en M1 aquí se monta el panel del notch.
+        // Sin ventana propia: la isla es un panel que crea el ensamblado.
         Settings {
             EmptyView()
         }
@@ -17,10 +17,18 @@ struct NotchyApp: App {
 }
 
 final class Arranque: NSObject, NSApplicationDelegate {
-    private let log = Logger(subsystem: NotchyInfo.identificador, category: "arranque")
+    private let log = Registro.de(.arranque)
+    private var ensamblado: Ensamblado?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let ensamblado = Ensamblado()
+        ensamblado.arrancar()
+        self.ensamblado = ensamblado
         let carpeta = NotchyInfo.carpetaDeDatos(NotchyInfo.compilacionActual)
         log.info("Notchy arrancó. Carpeta de datos: \(carpeta, privacy: .public)")
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        ensamblado?.detener()
     }
 }
