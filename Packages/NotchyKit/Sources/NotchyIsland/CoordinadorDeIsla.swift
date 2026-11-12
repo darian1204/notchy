@@ -19,6 +19,7 @@ public final class CoordinadorDeIsla {
 
     @ObservationIgnored private var maquina = MaquinaDeIsla()
     @ObservationIgnored private var temporizadores: [MaquinaDeIsla.Temporizador: Task<Void, Never>] = [:]
+    @ObservationIgnored private var tareasDeBus: [Task<Void, Never>] = []
     @ObservationIgnored private let bus: BusDeEventos?
     @ObservationIgnored private let dormir: @Sendable (Duration) async throws -> Void
 
@@ -32,10 +33,21 @@ public final class CoordinadorDeIsla {
         self.dormir = dormir
         registro.alCambiar = { [weak self] in self?.sincronizarModulos() }
         sincronizarModulos()
+        suscribirAlBus()
     }
 
     public var moduloAbierto: (any ModuloDeIsla)? {
         guard case .expandido(let id) = estado else { return nil }
+        return registro.modulo(id)
+    }
+
+    public var moduloCompacto: (any ModuloDeIsla)? {
+        guard case .compacto(let peticion) = estado else { return nil }
+        return registro.modulo(peticion.modulo)
+    }
+
+    public var moduloEnAviso: (any ModuloDeIsla)? {
+        guard case .aviso(let id) = estado else { return nil }
         return registro.modulo(id)
     }
 
@@ -78,5 +90,29 @@ public final class CoordinadorDeIsla {
 
     private func sincronizarModulos() {
         recibir(.modulosDisponibles(registro.activos.map(\.identidad.id)))
+    }
+
+    private func suscribirAlBus() {
+        guard let bus else { return }
+        let tareaCompacto = Task { [weak self] in
+            let flujo = await bus.suscribir(a: PeticionDeEstadoCompacto.self)
+            for await peticion in flujo {
+                guard let self else { break }
+                if let prioridad = peticion.prioridad {
+                    self.recibir(
+                        .pedirCompacto(PeticionCompacta(modulo: peticion.modulo, prioridad: prioridad)))
+                } else {
+                    self.recibir(.retirarCompacto(modulo: peticion.modulo))
+                }
+            }
+        }
+        let tareaAviso = Task { [weak self] in
+            let flujo = await bus.suscribir(a: PeticionDeAvisoDeIsla.self)
+            for await aviso in flujo {
+                guard let self else { break }
+                self.recibir(.mostrarAviso(modulo: aviso.modulo))
+            }
+        }
+        tareasDeBus = [tareaCompacto, tareaAviso]
     }
 }

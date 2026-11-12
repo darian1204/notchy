@@ -4,7 +4,7 @@ import OSLog
 /// Regla: los logs dicen qué pasó, nunca el texto copiado, transcrito o dictado.
 public enum Registro {
     public enum Categoria: String, Sendable, CaseIterable {
-        case arranque, isla, ajustes, datos, modulos, permisos
+        case arranque, isla, ajustes, datos, modulos, permisos, agenda, musica
     }
 
     public static func de(_ categoria: Categoria) -> Logger {

@@ -18,12 +18,17 @@ final class Ensamblado {
     let coordinador: CoordinadorDeIsla
     let panel: ControladorDePanel
     let atajo: ControladorDeAtajo
+    let modeloDeAgenda: ModeloDeAgenda
+    let modeloDeAhoraSuena: ModeloDeAhoraSuena
     let modeloDePortapapeles: ModeloDePortapapeles
     let modeloDeBandeja: ModeloDeBandeja
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
     private var ventanaDeAjustes: ControladorDeVentanaDeAjustes?
     private var barraDeMenus: ControladorDeBarraDeMenus?
     private let registradorCarbon = RegistradorDeAtajosCarbon()
+    private let adaptadorDeCalendario = AdaptadorDeCalendarioEventKit()
+    private let adaptadorDeRecordatorios = AdaptadorDeRecordatoriosEventKit()
+    private let adaptadorDeAhoraSuena = AdaptadorDeAhoraSuena()
     private let adaptadorDePortapapeles = AdaptadorDePortapapeles()
     private let log = Registro.de(.arranque)
 
@@ -33,6 +38,16 @@ final class Ensamblado {
         rutas = rutasAbiertas
         base = baseAbierta
 
+        modeloDeAgenda = ModeloDeAgenda(
+            calendario: adaptadorDeCalendario,
+            recordatorios: adaptadorDeRecordatorios,
+            bus: bus,
+            alAbrirURL: { NSWorkspace.shared.open($0) }
+        )
+        modeloDeAhoraSuena = ModeloDeAhoraSuena(
+            puerto: adaptadorDeAhoraSuena,
+            bus: bus
+        )
         modeloDePortapapeles = ModeloDePortapapeles(
             puerto: adaptadorDePortapapeles,
             repositorio: baseAbierta.map(RepositorioDePortapapeles.init),
@@ -51,9 +66,13 @@ final class Ensamblado {
         let coordinadorCapturado = coordinador
         registro.registrar(
             ModuloDeInicio(
+                agenda: modeloDeAgenda,
+                ahoraSuena: modeloDeAhoraSuena,
                 portapapeles: modeloDePortapapeles,
                 alAbrirModulo: { id in coordinadorCapturado.recibir(.elegirModulo(id)) }
             ))
+        registro.registrar(ModuloDeAgenda(modelo: modeloDeAgenda))
+        registro.registrar(ModuloDeAhoraSuena(modelo: modeloDeAhoraSuena))
         registro.registrar(ModuloDeBandeja(modelo: modeloDeBandeja))
         registro.registrar(ModuloDePortapapeles(modelo: modeloDePortapapeles))
 

@@ -62,6 +62,12 @@ public protocol ModuloDeIsla: AnyObject {
     var tamanoExpandido: CGSize { get }
     /// Contenido que va debajo de la franja del notch.
     var vistaExpandida: AnyView { get }
+    /// Oreja izquierda cuando el módulo gana el estado compacto (`283 × 32`).
+    var orejaIzquierdaCompacta: AnyView? { get }
+    /// Oreja derecha cuando el módulo gana el estado compacto (`283 × 32`).
+    var orejaDerechaCompacta: AnyView? { get }
+    /// Vista completa cuando el módulo muestra un aviso temporal (`440 × 82`).
+    var vistaDeAviso: AnyView? { get }
     var salud: SaludDeModulo { get }
     /// Empieza a trabajar. Lo llama el registro al activarse el módulo; no debe bloquear.
     func arrancar()
@@ -70,6 +76,9 @@ public protocol ModuloDeIsla: AnyObject {
 }
 
 extension ModuloDeIsla {
+    public var orejaIzquierdaCompacta: AnyView? { nil }
+    public var orejaDerechaCompacta: AnyView? { nil }
+    public var vistaDeAviso: AnyView? { nil }
     public var salud: SaludDeModulo { .listo }
     public func arrancar() {}
     public func detener() {}
@@ -87,5 +96,25 @@ public struct IslaCambioDeEstado: Evento, Equatable {
 
     public init(moduloAbierto: String?) {
         self.moduloAbierto = moduloAbierto
+    }
+}
+
+/// Petición de un módulo para mostrarse o retirarse del estado compacto sin importar `NotchyIsland`.
+public struct PeticionDeEstadoCompacto: Evento, Equatable {
+    public let modulo: String
+    public let prioridad: PrioridadCompacta?
+
+    public init(modulo: String, prioridad: PrioridadCompacta?) {
+        self.modulo = modulo
+        self.prioridad = prioridad
+    }
+}
+
+/// Petición de un módulo para abrir un aviso temporal de 6 s en la isla (AGD-4).
+public struct PeticionDeAvisoDeIsla: Evento, Equatable {
+    public let modulo: String
+
+    public init(modulo: String) {
+        self.modulo = modulo
     }
 }

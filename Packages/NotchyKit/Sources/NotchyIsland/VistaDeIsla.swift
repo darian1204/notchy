@@ -22,6 +22,14 @@ public struct VistaDeIsla: View {
                     contenido(de: modulo)
                         .frame(width: tamano.width, height: tamano.height)
                         .transition(entrada)
+                } else if let modulo = coordinador.moduloEnAviso, let vistaAviso = modulo.vistaDeAviso {
+                    vistaAviso
+                        .frame(width: tamano.width, height: tamano.height)
+                        .transition(entrada)
+                } else if let modulo = coordinador.moduloCompacto {
+                    contenidoCompacto(de: modulo)
+                        .frame(width: tamano.width, height: tamano.height)
+                        .transition(.opacity)
                 }
             }
             .frame(width: tamano.width + 2 * hombro, height: tamano.height)
@@ -62,6 +70,34 @@ public struct VistaDeIsla: View {
                 .padding(.bottom, Medidas.margenInferior)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func contenidoCompacto(de modulo: any ModuloDeIsla) -> some View {
+        Button {
+            coordinador.recibir(.elegirModulo(modulo.identidad.id))
+        } label: {
+            HStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    if let orejaIzquierda = modulo.orejaIzquierdaCompacta {
+                        orejaIzquierda
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+                Color.clear.frame(width: coordinador.geometria.pantalla.notch?.width ?? 0)
+
+                HStack(spacing: 4) {
+                    if let orejaDerecha = modulo.orejaDerechaCompacta {
+                        orejaDerecha
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(modulo.identidad.nombre)
     }
 
     /// Primero crece la forma; el contenido entra después con fundido y desenfoque.

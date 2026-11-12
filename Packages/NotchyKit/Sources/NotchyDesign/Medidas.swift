@@ -11,6 +11,8 @@ public enum Medidas {
     public static let inicio = CGSize(width: 620, height: 208)
     public static let portapapeles = CGSize(width: 620, height: 240)
     public static let bandeja = CGSize(width: 560, height: 168)
+    public static let agenda = CGSize(width: 620, height: 232)
+    public static let ahoraSuena = CGSize(width: 560, height: 176)
 
     /// Tamaño del panel fijo (D-04): cabe el estado más grande del diseño más los hombros.
     public static let panel = CGSize(width: 640 + 2 * hombro, height: 244)
