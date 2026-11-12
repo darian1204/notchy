@@ -1,0 +1,14 @@
+#!/bin/zsh
+# Compila, firma y abre la app de depuración. Cierra antes la que esté abierta.
+set -u
+source ${0:A:h}/comun.zsh
+
+if ! compilar_app; then
+    /usr/bin/grep -E "error:" $REGISTROS/app.log | sort -u | head -20
+    print -- "No compiló. Registro: build/logs/app.log"
+    exit 1
+fi
+pkill -x Isla 2> /dev/null && sleep 1
+open -n $APP --args "$@"
+sleep 1
+print -- "Isla abierta (pid $(pgrep -x Isla | head -1)). Para cerrarla: pkill -x Isla"

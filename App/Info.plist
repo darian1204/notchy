@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Isla usa el micrófono para grabar y transcribir reuniones.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Isla graba el audio del sistema para transcribir reuniones.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Isla transcribe en este Mac lo que se dice en tus reuniones y notas de voz.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Isla usa la cámara para el espejo del notch.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Isla muestra tu agenda del día en el notch.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Isla muestra y completa tus pendientes de la lista Obsidian.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Isla lee qué suena en Música y Spotify cuando falla el método principal.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Isla vigila Descargas para avisarte de lo que llega por AirDrop.</string>
+</dict>
+</plist>

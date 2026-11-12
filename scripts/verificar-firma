@@ -1,0 +1,38 @@
+#!/bin/zsh
+# Muestra identidad, equipo y entitlements de la app compilada.
+# Con --estricto compara contra Config/Base.xcconfig y App/Isla.entitlements y sale con 1 si algo no coincide.
+set -u
+source ${0:A:h}/comun.zsh
+
+[[ -d $APP ]] || { print -- "No hay app compilada en $APP. Corre scripts/run o scripts/check."; exit 1 }
+
+datos=$(codesign -dvv $APP 2>&1)
+identificador=$(print -- $datos | sed -nE 's/^Identifier=(.*)$/\1/p')
+equipo=$(print -- $datos | sed -nE 's/^TeamIdentifier=(.*)$/\1/p')
+autoridad=$(print -- $datos | sed -nE 's/^Authority=(.*)$/\1/p' | head -1)
+banderas=$(print -- $datos | sed -nE 's/^CodeDirectory.*flags=([^ ]*).*$/\1/p')
+permisos=$(codesign -d --entitlements - --xml $APP 2> /dev/null | plutil -convert json -o - - 2> /dev/null | tr ',' '\n' | sed -nE 's/.*"(com\.apple\.[^"]*)".*true.*/\1/p' | sort)
+
+print -- "Identificador: $identificador"
+print -- "Equipo:        $equipo"
+print -- "Autoridad:     $autoridad"
+print -- "Banderas:      $banderas"
+print -- "Entitlements:"
+print -- $permisos | sed 's/^/  /'
+
+[[ ${1:-} == --estricto ]] || exit 0
+
+fallos=0
+falla() { print -- "   FALLA: $1"; fallos=$((fallos + 1)) }
+esperados=$(plutil -convert json -o - $RAIZ/App/Isla.entitlements | tr ',' '\n' | sed -nE 's/.*"(com\.apple\.[^"]*)".*true.*/\1/p' | sort)
+
+codesign --verify --strict $APP 2> /dev/null || falla "la firma no verifica"
+[[ $identificador == $(ajuste PRODUCT_BUNDLE_IDENTIFIER) ]] || falla "identificador distinto al de Base.xcconfig"
+[[ $equipo == $(ajuste DEVELOPMENT_TEAM) ]] || falla "equipo distinto al de Base.xcconfig"
+[[ $autoridad == "Apple Development:"* ]] || falla "no está firmada con Apple Development"
+[[ $banderas == *runtime* ]] || falla "sin Hardened Runtime"
+# Xcode agrega get-task-allow en Debug para poder depurar; no cuenta como diferencia.
+[[ $(print -- $permisos | /usr/bin/grep -v get-task-allow) == $esperados ]] || falla "los entitlements no coinciden con App/Isla.entitlements"
+[[ $(plutil -extract LSUIElement raw $APP/Contents/Info.plist 2> /dev/null) == true ]] || falla "el plist compilado no trae LSUIElement"
+[[ $(plutil -extract CFBundleIdentifier raw $APP/Contents/Info.plist 2> /dev/null) == $identificador ]] || falla "el plist compilado trae otro identificador"
+(( fallos == 0 ))

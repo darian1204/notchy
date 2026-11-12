@@ -1,0 +1,37 @@
+// Ajustes comunes de la app. Debug y Release incluyen este archivo.
+// El identificador y el equipo no se cambian: hacerlo reinicia los permisos del sistema.
+
+PRODUCT_NAME = Isla
+PRODUCT_BUNDLE_IDENTIFIER = dev.darian.isla
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+MACOSX_DEPLOYMENT_TARGET = 27.0
+ARCHS = arm64
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor
+SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES
+
+// Firma igual en Debug y Release para que los permisos persistan.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = 3GB89AS998
+ENABLE_HARDENED_RUNTIME = YES
+ENABLE_APP_SANDBOX = NO
+CODE_SIGN_ENTITLEMENTS = App/Isla.entitlements
+
+// El Info.plist se escribe a mano; scripts/check lo revisa.
+GENERATE_INFOPLIST_FILE = NO
+INFOPLIST_FILE = App/Info.plist
+
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+COMBINE_HIDPI_IMAGES = YES
+ENABLE_PREVIEWS = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/../Frameworks
+
+// scripts/check compila con ISLA_ESTRICTO=YES: las advertencias de la app son errores.
+ISLA_ESTRICTO = NO
+SWIFT_TREAT_WARNINGS_AS_ERRORS = $(ISLA_ESTRICTO)
+GCC_TREAT_WARNINGS_AS_ERRORS = $(ISLA_ESTRICTO)

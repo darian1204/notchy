@@ -1,0 +1,88 @@
+#!/bin/zsh
+# Verificación completa: formato, capas, plist, secretos, paquete, app y firma.
+# Sale con 0 solo si todo pasa. Los registros largos quedan en build/logs.
+set -u
+source ${0:A:h}/comun.zsh
+cd $RAIZ
+
+fallos=0
+paso() { print -- "== $1" }
+falla() { print -- "   FALLA: $1"; fallos=$((fallos + 1)) }
+
+paso "Formato"
+fuentes=(App Packages/IslaKit/Sources Packages/IslaKit/Tests Packages/IslaKit/Package.swift)
+xcrun swift-format lint --strict --recursive $fuentes || falla "swift-format (arregla con: xcrun swift-format format -i -r $fuentes)"
+
+paso "Capas"
+typeset -A permitido
+permitido=(
+    IslaCore ""
+    IslaDesign ""
+    IslaStorage "IslaCore GRDB"
+    IslaPlatform "IslaCore"
+    IslaIsland "IslaCore IslaDesign"
+    IslaFeatures "IslaCore IslaStorage IslaDesign"
+    IslaAgent "IslaCore IslaStorage MCP"
+    IslaTestSupport "IslaCore"
+)
+for carpeta in Packages/IslaKit/Sources/*(/); do
+    capa=${carpeta:t}
+    if (( ! ${+permitido[$capa]} )); then
+        falla "la capa $capa no está en la regla de scripts/check"
+        continue
+    fi
+    /usr/bin/grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(Isla[A-Za-z]*|GRDB|MCP)' $carpeta |
+        while IFS= read -r linea; do
+            modulo=$(print -- $linea | sed -E 's/.*import[[:space:]]+([A-Za-z]+).*/\1/')
+            [[ " ${permitido[$capa]} " == *" $modulo "* ]] || falla "$capa no puede importar $modulo ($linea)"
+        done
+done
+for capa in ${(k)permitido}; do
+    [[ -d Packages/IslaKit/Sources/$capa ]] || falla "falta la capa $capa"
+done
+
+paso "Info.plist y entitlements"
+plutil -lint -s App/Info.plist || falla "App/Info.plist no es un plist válido"
+plutil -lint -s App/Isla.entitlements || falla "App/Isla.entitlements no es un plist válido"
+claves=(
+    LSUIElement NSMicrophoneUsageDescription NSAudioCaptureUsageDescription NSSpeechRecognitionUsageDescription
+    NSCameraUsageDescription NSCalendarsFullAccessUsageDescription NSRemindersFullAccessUsageDescription
+    NSAppleEventsUsageDescription NSDownloadsFolderUsageDescription
+)
+for clave in $claves; do
+    plutil -extract $clave raw App/Info.plist > /dev/null 2>&1 || falla "falta $clave en App/Info.plist"
+done
+
+paso "Secretos"
+patrones='((^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})'
+if git ls-files -co --exclude-standard -z | xargs -0 /usr/bin/grep -IEn -- $patrones; then
+    falla "hay algo con forma de secreto en el repo"
+fi
+
+paso "Paquete: compilación estricta y pruebas"
+if ISLA_ESTRICTO=1 swift build --package-path Packages/IslaKit --build-tests > $REGISTROS/paquete.log 2>&1; then
+    if ISLA_ESTRICTO=1 swift test --package-path Packages/IslaKit > $REGISTROS/pruebas.log 2>&1; then
+        print -- "   $(/usr/bin/grep -cE 'Test .*\(\) passed after' $REGISTROS/pruebas.log) pruebas pasan"
+    else
+        /usr/bin/grep -E "error|failed|Expectation" $REGISTROS/pruebas.log | head -20
+        falla "pruebas (build/logs/pruebas.log)"
+    fi
+else
+    /usr/bin/grep -E "error|warning:" $REGISTROS/paquete.log | head -20
+    falla "compilación del paquete (build/logs/paquete.log)"
+fi
+
+paso "App: compilación estricta"
+if compilar_app ISLA_ESTRICTO=YES; then
+    paso "Firma y plist compilado"
+    $RAIZ/scripts/verificar-firma --estricto || falla "firma"
+else
+    /usr/bin/grep -E "error:|warning: .*(App|IslaKit)/" $REGISTROS/app.log | sort -u | head -20
+    falla "compilación de la app (build/logs/app.log)"
+fi
+
+if (( fallos > 0 )); then
+    print -- "\ncheck: $fallos fallo(s)"
+    exit 1
+fi
+print -- "\ncheck: todo en verde"
