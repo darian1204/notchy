@@ -12,6 +12,7 @@ public final class CamaraFalsa: PuertoDeCamara {
     public private(set) var encendidos = 0
     public private(set) var apagados = 0
     public private(set) var peticionesDePermiso = 0
+    public var datosFotoFalsa = Data([0x89, 0x50, 0x4E, 0x47])
 
     public init(permiso: EstadoDePermiso = .concedido, fallaAlEncender: String? = nil) {
         self.permiso = permiso
@@ -44,6 +45,13 @@ public final class CamaraFalsa: PuertoDeCamara {
             encendida = false
             apagados += 1
         }
+    }
+
+    public func capturarFotoPNG() async throws -> Data {
+        guard encendida else {
+            throw NotchyError.noDisponible("Cámara apagada")
+        }
+        return datosFotoFalsa
     }
 }
 

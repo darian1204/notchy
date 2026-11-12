@@ -1,9 +1,10 @@
+import AppKit
 import NotchyCore
 import NotchyDesign
 import SwiftUI
 
 /// Módulo de Portapapeles en la isla (CLP-1 a CLP-7): búsqueda sin acentos, filtros por tipo,
-/// copiar con clic o ↵, fijar y borrar individual o total.
+/// copiar con clic o ↵, abrir archivo/imagen/enlace, arrastrar como en Finder, fijar y borrar.
 @MainActor
 public final class ModuloDePortapapeles: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
@@ -121,7 +122,7 @@ struct VistaDePortapapeles: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(modelo.elementos) { elemento in
                         fila(elemento)
                     }
@@ -137,10 +138,7 @@ struct VistaDePortapapeles: View {
                 modelo.copiarAlSistema(elemento)
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: elemento.tipo.icono)
-                        .font(.system(size: 12))
-                        .foregroundStyle(color(de: elemento.tipo))
-                        .frame(width: 16)
+                    iconoOVistaPrevia(de: elemento)
                     Text(elemento.texto.replacingOccurrences(of: "\n", with: " "))
                         .textoDeCuerpo()
                         .lineLimit(1)
@@ -155,6 +153,20 @@ struct VistaDePortapapeles: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            if puedeAbrirse(elemento) {
+                Button {
+                    modelo.abrir(elemento)
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Paleta.textoDeApoyo)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help("Abrir archivo o enlace")
+                .accessibilityLabel("Abrir \(elemento.texto)")
+            }
 
             Button {
                 modelo.alternarFijado(elemento.id)
@@ -186,6 +198,38 @@ struct VistaDePortapapeles: View {
             seleccionado ? Paleta.superficieAlta : Color.clear,
             in: RoundedRectangle(cornerRadius: 8)
         )
+        .onDrag {
+            proveedorDeArrastre(para: elemento)
+        }
+    }
+
+    @ViewBuilder
+    private func iconoOVistaPrevia(de elemento: ElementoDePortapapeles) -> some View {
+        if let ruta = elemento.rutaArchivo {
+            MiniaturaDeArchivo(url: URL(fileURLWithPath: ruta), tamano: 18)
+        } else {
+            Image(systemName: elemento.tipo.icono)
+                .font(.system(size: 12))
+                .foregroundStyle(color(de: elemento.tipo))
+                .frame(width: 18)
+        }
+    }
+
+    private func puedeAbrirse(_ elemento: ElementoDePortapapeles) -> Bool {
+        if let ruta = elemento.rutaArchivo {
+            return FileManager.default.fileExists(atPath: ruta)
+        }
+        return elemento.tipo == .enlace
+    }
+
+    private func proveedorDeArrastre(para elemento: ElementoDePortapapeles) -> NSItemProvider {
+        if let ruta = elemento.rutaArchivo {
+            return NSItemProvider(object: URL(fileURLWithPath: ruta) as NSURL)
+        }
+        if elemento.tipo == .enlace, let url = URL(string: elemento.texto) {
+            return NSItemProvider(object: url as NSURL)
+        }
+        return NSItemProvider(object: elemento.texto as NSString)
     }
 
     private func color(de tipo: TipoDePortapapeles) -> Color {

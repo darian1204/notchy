@@ -57,4 +57,6 @@ public protocol PuertoDeCamara: AnyObject {
     func pedirPermiso() async -> EstadoDePermiso
     func encender() async throws
     func apagar() async
+    /// Captura un cuadro espejado en PNG.
+    func capturarFotoPNG() async throws -> Data
 }

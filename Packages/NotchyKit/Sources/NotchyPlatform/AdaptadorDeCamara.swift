@@ -1,17 +1,60 @@
 import AVFoundation
 import AppKit
+import CoreImage
 import NotchyCore
 import SwiftUI
 
 nonisolated private final class CajaDeSesion: @unchecked Sendable {
     let sesion = AVCaptureSession()
+    let salidaVideo = AVCaptureVideoDataOutput()
+}
+
+nonisolated private final class CapturadorDeCuadro: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate,
+    @unchecked Sendable
+{
+    private let candado = NSLock()
+    private var ultimaImagen: CIImage?
+
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        candado.lock()
+        ultimaImagen = ciImage
+        candado.unlock()
+    }
+
+    func renderizarUltimaFotoEspejadaPNG() -> Data? {
+        candado.lock()
+        let copia = ultimaImagen
+        candado.unlock()
+        guard let original = copia else { return nil }
+
+        let extensionRect = original.extent
+        let espejada =
+            original
+            .transformed(by: CGAffineTransform(scaleX: -1, y: 1))
+            .transformed(by: CGAffineTransform(translationX: extensionRect.width, y: 0))
+
+        let contexto = CIContext(options: nil)
+        guard let cgImage = contexto.createCGImage(espejada, from: espejada.extent) else {
+            return nil
+        }
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        return rep.representation(using: .png, properties: [:])
+    }
 }
 
 /// Adaptador real de la cámara del Mac para el módulo de Espejo (ESP-1, S11).
 @MainActor
 public final class AdaptadorDeCamara: PuertoDeCamara {
     private let caja = CajaDeSesion()
+    private let capturador = CapturadorDeCuadro()
     private let cola = DispatchQueue(label: "dev.darian.notchy.camara")
+    private let colaCuadros = DispatchQueue(label: "dev.darian.notchy.camara.cuadros")
     public private(set) var encendida = false
     public private(set) var nombreDispositivo = "MacBook Air Camera"
     private var configurada = false
@@ -42,6 +85,7 @@ public final class AdaptadorDeCamara: PuertoDeCamara {
             throw NotchyError.noDisponible("Falta permiso de Cámara")
         }
         let sesion = caja.sesion
+        let salidaVideo = caja.salidaVideo
         if !configurada {
             guard let camara = AVCaptureDevice.default(for: .video) else {
                 throw NotchyError.noDisponible("No se encontró cámara en el Mac")
@@ -58,9 +102,15 @@ public final class AdaptadorDeCamara: PuertoDeCamara {
             guard sesion.canAddInput(entrada) else {
                 throw NotchyError.noDisponible("La cámara está ocupada")
             }
+            salidaVideo.alwaysDiscardsLateVideoFrames = true
+            salidaVideo.setSampleBufferDelegate(capturador, queue: colaCuadros)
+
             sesion.beginConfiguration()
-            sesion.sessionPreset = .medium
+            sesion.sessionPreset = .high
             sesion.addInput(entrada)
+            if sesion.canAddOutput(salidaVideo) {
+                sesion.addOutput(salidaVideo)
+            }
             sesion.commitConfiguration()
             configurada = true
             nombreDispositivo = camara.localizedName
@@ -92,6 +142,22 @@ public final class AdaptadorDeCamara: PuertoDeCamara {
             }
         }
         encendida = false
+    }
+
+    public func capturarFotoPNG() async throws -> Data {
+        guard encendida else {
+            throw NotchyError.noDisponible("La cámara no está encendida")
+        }
+        let capturadorLocal = capturador
+        let datos: Data? = await withCheckedContinuation { continuacion in
+            colaCuadros.async {
+                continuacion.resume(returning: capturadorLocal.renderizarUltimaFotoEspejadaPNG())
+            }
+        }
+        guard let datos else {
+            throw NotchyError.noDisponible("Aún no hay cuadro listo para capturar")
+        }
+        return datos
     }
 }
 

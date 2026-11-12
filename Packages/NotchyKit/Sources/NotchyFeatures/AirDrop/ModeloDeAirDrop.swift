@@ -12,6 +12,7 @@ public final class ModeloDeAirDrop {
 
     @ObservationIgnored private let puerto: any PuertoDeAirDrop
     @ObservationIgnored private let bus: BusDeEventos?
+    @ObservationIgnored private let alAbrirArchivo: (@MainActor (URL) -> Void)?
     @ObservationIgnored private let alRevelarArchivo: (@MainActor (URL) -> Void)?
     @ObservationIgnored private var rutasConocidas: Set<String> = []
     @ObservationIgnored private var inicializado = false
@@ -20,10 +21,12 @@ public final class ModeloDeAirDrop {
     public init(
         puerto: any PuertoDeAirDrop,
         bus: BusDeEventos? = nil,
+        alAbrirArchivo: (@MainActor (URL) -> Void)? = nil,
         alRevelarArchivo: (@MainActor (URL) -> Void)? = nil
     ) {
         self.puerto = puerto
         self.bus = bus
+        self.alAbrirArchivo = alAbrirArchivo
         self.alRevelarArchivo = alRevelarArchivo
     }
 
@@ -84,11 +87,24 @@ public final class ModeloDeAirDrop {
         }
     }
 
+    /// Abre el archivo con su aplicación predeterminada (Preview para imágenes/PDFs, etc.).
     public func abrirRecibido(_ archivo: ArchivoRecibidoAirDrop) {
+        if let alAbrirArchivo {
+            alAbrirArchivo(archivo.url)
+        } else {
+            alRevelarArchivo?(archivo.url)
+        }
+    }
+
+    public func revelarRecibido(_ archivo: ArchivoRecibidoAirDrop) {
         alRevelarArchivo?(archivo.url)
     }
 
     public func abrirCarpetaDescargas() {
-        alRevelarArchivo?(URL(fileURLWithPath: puerto.rutaDescargas))
+        if let alAbrirArchivo {
+            alAbrirArchivo(URL(fileURLWithPath: puerto.rutaDescargas))
+        } else {
+            alRevelarArchivo?(URL(fileURLWithPath: puerto.rutaDescargas))
+        }
     }
 }

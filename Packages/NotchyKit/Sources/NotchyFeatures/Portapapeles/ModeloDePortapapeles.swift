@@ -29,6 +29,7 @@ public final class ModeloDePortapapeles {
     @ObservationIgnored private let carpetaImagenes: URL?
     @ObservationIgnored private let ajustes: Ajustes
     @ObservationIgnored private let bus: BusDeEventos?
+    @ObservationIgnored private let alAbrirURL: (@MainActor (URL) -> Void)?
     @ObservationIgnored private let dormir: @Sendable (Duration) async throws -> Void
     @ObservationIgnored private var tareaVigilancia: Task<Void, Never>?
     @ObservationIgnored private var ultimoConteo: Int
@@ -40,6 +41,7 @@ public final class ModeloDePortapapeles {
         carpetaImagenes: URL?,
         ajustes: Ajustes,
         bus: BusDeEventos? = nil,
+        alAbrirURL: (@MainActor (URL) -> Void)? = nil,
         dormir: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.puerto = puerto
@@ -47,6 +49,7 @@ public final class ModeloDePortapapeles {
         self.carpetaImagenes = carpetaImagenes
         self.ajustes = ajustes
         self.bus = bus
+        self.alAbrirURL = alAbrirURL
         self.dormir = dormir
         self.ultimoConteo = puerto.conteoDeCambios
 
@@ -115,6 +118,15 @@ public final class ModeloDePortapapeles {
     public func copiarSeleccionado() {
         guard let id = idSeleccionado, let elemento = elementos.first(where: { $0.id == id }) else { return }
         copiarAlSistema(elemento)
+    }
+
+    /// Abre el archivo, imagen o enlace copiado en su aplicación predeterminada.
+    public func abrir(_ elemento: ElementoDePortapapeles) {
+        if let ruta = elemento.rutaArchivo {
+            alAbrirURL?(URL(fileURLWithPath: ruta))
+        } else if elemento.tipo == .enlace, let url = URL(string: elemento.texto) {
+            alAbrirURL?(url)
+        }
     }
 
     /// Fija o desfija un elemento para que no lo borre la retención (CLP-6).

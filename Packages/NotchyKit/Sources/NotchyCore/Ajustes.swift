@@ -15,6 +15,16 @@ public final class Ajustes {
     /// Versión del formato guardado. Sube cuando una preferencia cambia de forma y necesita migrarse.
     public static let esquemaActual = 1
 
+    public static var rutaDescargasPorDefecto: String {
+        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads").path
+    }
+
+    public static var rutaVaultPorDefecto: String {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Documents/Personal Darian")
+            .path
+    }
+
     /// Orden elegido de los módulos. Un módulo que no aparece aquí va al final.
     public var ordenDeModulos: [String] {
         didSet { alCambiar(ordenDeModulos, oldValue, .ordenDeModulos) }
@@ -43,6 +53,14 @@ public final class Ajustes {
     public var appsExcluidasPortapapeles: Set<String> {
         didSet { alCambiar(appsExcluidasPortapapeles, oldValue, .appsExcluidasPortapapeles) }
     }
+    /// Carpeta donde el Espejo guarda las fotos capturadas. Por defecto `~/Downloads`.
+    public var carpetaFotosEspejo: String {
+        didSet { alCambiar(carpetaFotosEspejo, oldValue, .carpetaFotosEspejo) }
+    }
+    /// Carpeta raíz del vault de Obsidian donde vive `00-inbox/inbox.md`.
+    public var rutaVaultObsidian: String {
+        didSet { alCambiar(rutaVaultObsidian, oldValue, .rutaVaultObsidian) }
+    }
 
     @ObservationIgnored private let almacen: any AlmacenDeAjustes
     @ObservationIgnored private var observadores: [@MainActor () -> Void] = []
@@ -58,6 +76,16 @@ public final class Ajustes {
         diasRetencionPortapapeles = Self.leer(.diasRetencionPortapapeles, de: almacen) ?? 30
         limiteElementosPortapapeles = Self.leer(.limiteElementosPortapapeles, de: almacen) ?? 2000
         appsExcluidasPortapapeles = Self.leer(.appsExcluidasPortapapeles, de: almacen) ?? []
+        carpetaFotosEspejo = Self.leer(.carpetaFotosEspejo, de: almacen) ?? Self.rutaDescargasPorDefecto
+        rutaVaultObsidian = Self.leer(.rutaVaultObsidian, de: almacen) ?? Self.rutaVaultPorDefecto
+    }
+
+    public var urlCarpetaInboxObsidian: URL {
+        URL(fileURLWithPath: rutaVaultObsidian).appending(path: "00-inbox")
+    }
+
+    public var urlNotaInboxObsidian: URL {
+        urlCarpetaInboxObsidian.appending(path: "inbox.md")
     }
 
     /// Llama a `accion` después de cada cambio guardado. Para quien no es una vista de SwiftUI.
@@ -90,6 +118,7 @@ public final class Ajustes {
     enum Clave: String {
         case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus
         case diasRetencionPortapapeles, limiteElementosPortapapeles, appsExcluidasPortapapeles
+        case carpetaFotosEspejo, rutaVaultObsidian
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {
@@ -102,7 +131,6 @@ public final class Ajustes {
 
     private static func leer<Valor: Codable>(_ clave: Clave, de almacen: any AlmacenDeAjustes) -> Valor? {
         guard let dato = almacen.leer(clave.rawValue) else { return nil }
-        // Un valor que ya no se puede leer (por ejemplo un caso de enum que se quitó) cae al valor por defecto.
         return try? JSONDecoder().decode(Valor.self, from: dato)
     }
 
@@ -110,7 +138,6 @@ public final class Ajustes {
     static func migrar(_ almacen: any AlmacenDeAjustes) {
         let guardado: Int? = leer(.esquema, de: almacen)
         guard (guardado ?? 0) < esquemaActual else { return }
-        // Aquí van los pasos de migración cuando exista un esquema 2.
         almacen.guardar(try? JSONEncoder().encode(esquemaActual), en: Clave.esquema.rawValue)
     }
 }

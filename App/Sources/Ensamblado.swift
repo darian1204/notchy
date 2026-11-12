@@ -24,6 +24,7 @@ final class Ensamblado {
     let modeloDePortapapeles: ModeloDePortapapeles
     let modeloDeBandeja: ModeloDeBandeja
     let modeloDeAirDrop: ModeloDeAirDrop
+    let gestorDeInbox: GestorDeInboxObsidian
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
     private var ventanaDeAjustes: ControladorDeVentanaDeAjustes?
     private var barraDeMenus: ControladorDeBarraDeMenus?
@@ -42,11 +43,13 @@ final class Ensamblado {
         rutas = rutasAbiertas
         base = baseAbierta
 
+        let abrirURL: @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }
+
         modeloDeAgenda = ModeloDeAgenda(
             calendario: adaptadorDeCalendario,
             recordatorios: adaptadorDeRecordatorios,
             bus: bus,
-            alAbrirURL: { NSWorkspace.shared.open($0) }
+            alAbrirURL: abrirURL
         )
         modeloDeAhoraSuena = ModeloDeAhoraSuena(
             puerto: adaptadorDeAhoraSuena,
@@ -54,15 +57,17 @@ final class Ensamblado {
         )
         modeloDeEspejo = ModeloDeEspejo(
             puerto: adaptadorDeCamara,
+            ajustes: ajustes,
             bus: bus,
-            alAbrirURL: { NSWorkspace.shared.open($0) }
+            alAbrirURL: abrirURL
         )
         modeloDePortapapeles = ModeloDePortapapeles(
             puerto: adaptadorDePortapapeles,
             repositorio: baseAbierta.map(RepositorioDePortapapeles.init),
             carpetaImagenes: rutasAbiertas?.portapapeles,
             ajustes: ajustes,
-            bus: bus
+            bus: bus,
+            alAbrirURL: abrirURL
         )
         modeloDeBandeja = ModeloDeBandeja(
             repositorio: baseAbierta.map(RepositorioDeBandeja.init),
@@ -71,6 +76,7 @@ final class Ensamblado {
         modeloDeAirDrop = ModeloDeAirDrop(
             puerto: adaptadorDeAirDrop,
             bus: bus,
+            alAbrirArchivo: abrirURL,
             alRevelarArchivo: { url in
                 var esCarpeta: ObjCBool = false
                 if FileManager.default.fileExists(atPath: url.path, isDirectory: &esCarpeta),
@@ -82,6 +88,10 @@ final class Ensamblado {
                 }
             }
         )
+        gestorDeInbox = GestorDeInboxObsidian(
+            ajustes: ajustes,
+            alAbrirURL: abrirURL
+        )
 
         registro = RegistroDeModulos(ajustes: ajustes)
         coordinador = CoordinadorDeIsla(registro: registro, bus: bus)
@@ -92,6 +102,9 @@ final class Ensamblado {
                 agenda: modeloDeAgenda,
                 ahoraSuena: modeloDeAhoraSuena,
                 portapapeles: modeloDePortapapeles,
+                bandeja: modeloDeBandeja,
+                airdrop: modeloDeAirDrop,
+                inbox: gestorDeInbox,
                 alAbrirModulo: { id in coordinadorCapturado.recibir(.elegirModulo(id)) }
             ))
         registro.registrar(ModuloDeAgenda(modelo: modeloDeAgenda))
@@ -132,7 +145,7 @@ final class Ensamblado {
         let ventana = ControladorDeVentanaDeAjustes {
             VistaDeAjustesYDiagnostico(
                 modelo: modeloCapturado,
-                alAbrirEnlace: { NSWorkspace.shared.open($0) },
+                alAbrirEnlace: abrirURL,
                 alBorrarHistorialPortapapeles: { portapapelesCapturado.borrarTodo() },
                 alSalir: salir
             )

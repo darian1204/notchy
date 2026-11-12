@@ -41,6 +41,8 @@ public struct MaquinaDeIsla: Sendable {
 
     public static let retardoAlAbrir: Duration = .milliseconds(120)
     public static let retardoAlCerrar: Duration = .milliseconds(350)
+    /// Retardo especial para el espejo: permanece 2 segundos abierto al perder el cursor.
+    public static let retardoAlCerrarEspejo: Duration = .seconds(2)
     public static let duracionDelAviso: Duration = .seconds(6)
     /// El módulo que abre el hover cuando está activo.
     public static let moduloDeInicio = ModulosBase.inicio
@@ -80,8 +82,11 @@ public struct MaquinaDeIsla: Sendable {
 
         case .cursorSalio:
             cursorDentro = false
-            return expandido == nil
-                ? [.cancelar(.abrir)] : [.cancelar(.abrir), .programar(.cerrar, Self.retardoAlCerrar)]
+            guard let expandido else {
+                return [.cancelar(.abrir)]
+            }
+            let espera = expandido == "espejo" ? Self.retardoAlCerrarEspejo : Self.retardoAlCerrar
+            return [.cancelar(.abrir), .programar(.cerrar, espera)]
 
         case .vencio(.abrir):
             guard cursorDentro, expandido == nil else { return [] }

@@ -39,6 +39,17 @@ import Testing
         #expect(maquina.estado == .reposo)
     }
 
+    @Test func espejoSeQuedaAbiertoDosSegundosAlPerderElCursor() {
+        var maquina = maquina(["inicio", "espejo"])
+        _ = maquina.recibir(.cursorEntro)
+        _ = maquina.recibir(.vencio(.abrir))
+        _ = maquina.recibir(.elegirModulo("espejo"))
+        #expect(maquina.recibir(.cursorSalio).contains(.programar(.cerrar, .seconds(2))))
+        #expect(maquina.estado == .expandido(modulo: "espejo"))
+        _ = maquina.recibir(.vencio(.cerrar))
+        #expect(maquina.estado == .reposo)
+    }
+
     @Test func volverAEntrarCancelaElCierre() {
         var maquina = maquina()
         _ = maquina.recibir(.cursorEntro)
