@@ -20,8 +20,10 @@ final class Ensamblado {
     let atajo: ControladorDeAtajo
     let modeloDeAgenda: ModeloDeAgenda
     let modeloDeAhoraSuena: ModeloDeAhoraSuena
+    let modeloDeEspejo: ModeloDeEspejo
     let modeloDePortapapeles: ModeloDePortapapeles
     let modeloDeBandeja: ModeloDeBandeja
+    let modeloDeAirDrop: ModeloDeAirDrop
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
     private var ventanaDeAjustes: ControladorDeVentanaDeAjustes?
     private var barraDeMenus: ControladorDeBarraDeMenus?
@@ -29,7 +31,9 @@ final class Ensamblado {
     private let adaptadorDeCalendario = AdaptadorDeCalendarioEventKit()
     private let adaptadorDeRecordatorios = AdaptadorDeRecordatoriosEventKit()
     private let adaptadorDeAhoraSuena = AdaptadorDeAhoraSuena()
+    private let adaptadorDeCamara = AdaptadorDeCamara()
     private let adaptadorDePortapapeles = AdaptadorDePortapapeles()
+    private let adaptadorDeAirDrop = AdaptadorDeAirDrop()
     private let log = Registro.de(.arranque)
 
     init() {
@@ -48,6 +52,11 @@ final class Ensamblado {
             puerto: adaptadorDeAhoraSuena,
             bus: bus
         )
+        modeloDeEspejo = ModeloDeEspejo(
+            puerto: adaptadorDeCamara,
+            bus: bus,
+            alAbrirURL: { NSWorkspace.shared.open($0) }
+        )
         modeloDePortapapeles = ModeloDePortapapeles(
             puerto: adaptadorDePortapapeles,
             repositorio: baseAbierta.map(RepositorioDePortapapeles.init),
@@ -58,6 +67,20 @@ final class Ensamblado {
         modeloDeBandeja = ModeloDeBandeja(
             repositorio: baseAbierta.map(RepositorioDeBandeja.init),
             carpetaBandeja: rutasAbiertas?.bandeja
+        )
+        modeloDeAirDrop = ModeloDeAirDrop(
+            puerto: adaptadorDeAirDrop,
+            bus: bus,
+            alRevelarArchivo: { url in
+                var esCarpeta: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &esCarpeta),
+                    esCarpeta.boolValue
+                {
+                    NSWorkspace.shared.open(url)
+                } else {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                }
+            }
         )
 
         registro = RegistroDeModulos(ajustes: ajustes)
@@ -73,8 +96,10 @@ final class Ensamblado {
             ))
         registro.registrar(ModuloDeAgenda(modelo: modeloDeAgenda))
         registro.registrar(ModuloDeAhoraSuena(modelo: modeloDeAhoraSuena))
+        registro.registrar(ModuloDeEspejo(modelo: modeloDeEspejo))
         registro.registrar(ModuloDeBandeja(modelo: modeloDeBandeja))
         registro.registrar(ModuloDePortapapeles(modelo: modeloDePortapapeles))
+        registro.registrar(ModuloDeAirDrop(modelo: modeloDeAirDrop))
 
         panel = ControladorDePanel(coordinador: coordinador, ajustes: ajustes)
         atajo = ControladorDeAtajo(coordinador: coordinador, ajustes: ajustes, registrador: registradorCarbon)
