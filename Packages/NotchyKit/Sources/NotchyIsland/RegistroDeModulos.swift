@@ -13,7 +13,7 @@ public final class RegistroDeModulos {
     @ObservationIgnored public var alCambiar: (@MainActor () -> Void)?
     @ObservationIgnored private var registrados: [any ModuloDeIsla] = []
     @ObservationIgnored private var arrancados: Set<String> = []
-    @ObservationIgnored private let ajustes: Ajustes
+    @ObservationIgnored public let ajustes: Ajustes
 
     public init(ajustes: Ajustes) {
         self.ajustes = ajustes

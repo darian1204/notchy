@@ -2,7 +2,7 @@ import NotchyCore
 import NotchyDesign
 import SwiftUI
 
-/// Módulo de Agenda: mini calendario del mes, eventos del día, pendientes con casilla y aviso de llamada (AGD-1 a AGD-4).
+/// Módulo de Agenda: mini calendario del mes, eventos del día, pendientes con casilla y Dynamic Mac Notch Call UI (AGD-1 a AGD-4).
 @MainActor
 public final class ModuloDeAgenda: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
@@ -21,6 +21,34 @@ public final class ModuloDeAgenda: ModuloDeIsla {
 
     public var salud: SaludDeModulo {
         modelo.salud
+    }
+
+    public var orejaIzquierdaCompacta: AnyView? {
+        guard modelo.llamadaActiva != nil else { return nil }
+        return AnyView(
+            HStack(spacing: 5) {
+                Image(systemName: "phone.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0x30D158))
+                Text(modelo.duracionLlamadaFormateada)
+                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .foregroundStyle(Color(hex: 0x30D158))
+            }
+            .accessibilityLabel("Llamada activa \(modelo.duracionLlamadaFormateada)")
+        )
+    }
+
+    public var orejaDerechaCompacta: AnyView? {
+        guard modelo.llamadaActiva != nil else { return nil }
+        return AnyView(
+            EspectroDeAudio(
+                niveles: modelo.nivelesOndaLlamada,
+                alto: 13,
+                reproduciendo: true,
+                color: Color(hex: 0x30D158)
+            )
+            .accessibilityHidden(true)
+        )
     }
 
     public var vistaExpandida: AnyView {
@@ -124,48 +152,107 @@ struct VistaDeAgenda: View {
             } label: {
                 VStack(spacing: 1) {
                     Text("\(dia)")
-                        .font(.system(size: 11, weight: celda.esHoy ? .bold : .regular).monospacedDigit())
-                        .foregroundStyle(celda.esHoy ? Paleta.fondo : Paleta.texto)
+                        .font(.system(size: 10, weight: celda.esHoy ? .bold : .medium).monospacedDigit())
+                        .foregroundStyle(colorDeTexto(celda))
                     HStack(spacing: 2) {
                         if celda.punto.tieneEvento {
                             Circle()
-                                .fill(celda.esHoy ? Paleta.fondo : Paleta.agenda)
-                                .frame(width: 3, height: 3)
+                                .fill(celda.esHoy ? Color.black : Paleta.agenda)
+                                .frame(width: 3.5, height: 3.5)
                         }
                         if celda.punto.tienePendiente {
                             Circle()
-                                .fill(Paleta.portapapeles)
-                                .frame(width: 3, height: 3)
+                                .fill(celda.esHoy ? Color.black : Paleta.portapapeles)
+                                .frame(width: 3.5, height: 3.5)
                         }
                     }
-                    .frame(height: 3)
+                    .frame(height: 4)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 18)
-                .background(
-                    celda.esHoy
-                        ? Paleta.texto
-                        : (celda.esSeleccionado ? Paleta.superficieAlta : Color.clear),
-                    in: Capsule()
-                )
+                .frame(height: 20)
+                .background(fondoDeCelda(celda))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Día \(dia)")
         } else {
-            Color.clear.frame(height: 18)
+            Color.clear.frame(height: 20)
+        }
+    }
+
+    private func colorDeTexto(_ celda: CeldaDeCalendario) -> Color {
+        if celda.esHoy {
+            return .black
+        }
+        if celda.esSeleccionado {
+            return Paleta.texto
+        }
+        return Paleta.texto.opacity(0.85)
+    }
+
+    @ViewBuilder
+    private func fondoDeCelda(_ celda: CeldaDeCalendario) -> some View {
+        if celda.esHoy {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Paleta.agenda)
+        } else if celda.esSeleccionado {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Paleta.agenda.opacity(0.8), lineWidth: 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Paleta.superficieAlta)
+                )
+        } else {
+            Color.clear
         }
     }
 
     private var panelEventos: some View {
         Tarjeta {
             VStack(alignment: .leading, spacing: 4) {
-                Text(modelo.tituloDelDiaSeleccionado.uppercased())
-                    .rotulo(Paleta.agenda)
+                HStack(spacing: 6) {
+                    Text(modelo.tituloDelDiaSeleccionado.uppercased())
+                        .rotulo(Paleta.agenda)
+                    Spacer(minLength: 0)
+                    if modelo.llamadaActiva != nil {
+                        Button {
+                            modelo.colgarLlamadaActiva()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "phone.down.fill")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text(modelo.duracionLlamadaFormateada)
+                                    .font(.system(size: 10, weight: .bold).monospacedDigit())
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color(hex: 0xFF453A), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Colgar llamada activa")
+                    } else {
+                        Button {
+                            Task { await modelo.simularAvisoDeLlamada() }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "phone.fill")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text("Call UI")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .foregroundStyle(Color(hex: 0x30D158))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color(hex: 0x30D158).opacity(0.16), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Mostrar Dynamic Mac Notch Call UI")
+                    }
+                }
                 if modelo.permisoCalendario != .concedido {
                     avisoDePermiso(permiso: .calendario, estado: modelo.permisoCalendario)
                 } else if modelo.eventosDelDiaSeleccionado.isEmpty {
                     Spacer(minLength: 0)
-                    Text("Sin eventos programados").textoDeApoyo()
+                    Text("Sin eventos para este día").textoDeApoyo()
                     Spacer(minLength: 0)
                 } else {
                     ScrollView {
@@ -197,14 +284,14 @@ struct VistaDeAgenda: View {
             }
             if let enlace = evento.enlaceDeLlamada {
                 Button {
-                    modelo.unirseALlamada(enlace)
+                    modelo.aceptarLlamada(evento)
                 } label: {
-                    Image(systemName: "video.fill")
+                    Image(systemName: "phone.fill")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Paleta.agenda)
+                        .foregroundStyle(Color(hex: 0x30D158))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Paleta.superficieAlta, in: Capsule())
+                        .background(Color(hex: 0x30D158).opacity(0.18), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .help("Unirse a \(enlace.plataforma.nombreVisible)")
@@ -307,70 +394,134 @@ struct VistaDeAgenda: View {
     }
 }
 
-/// Vista del aviso automático 5 minutos antes de una reunión con videollamada (`440 × 82 pt`, AGD-4).
+/// Dynamic Mac Notch Call UI (`440 × 94 pt`, inspirado en FaceTime Dynamic Island).
 struct VistaDeAvisoDeReunion: View {
     let modelo: ModeloDeAgenda
 
     var body: some View {
         VStack(spacing: 0) {
+            // Orejas superiores estilo Call Dynamic Island: teléfono + duración a la izquierda, onda verde a la derecha
             HStack(spacing: 0) {
                 HStack(spacing: 6) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Paleta.agenda)
-                    Text(textoDeMinutos)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Paleta.texto)
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0x30D158))
+                    Text(textoDeOrejaIzquierda)
+                        .font(.system(size: 11, weight: .bold).monospacedDigit())
+                        .foregroundStyle(Color(hex: 0x30D158))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Color.clear.frame(width: Medidas.notch.width)
 
-                Color.clear.frame(maxWidth: .infinity)
+                HStack {
+                    Spacer(minLength: 0)
+                    EspectroDeAudio(
+                        niveles: modelo.nivelesOndaLlamada,
+                        alto: 13,
+                        reproduciendo: true,
+                        color: Color(hex: 0x30D158)
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.horizontal, Medidas.margenLateral)
             .frame(height: Medidas.notch.height)
 
             if let evento = modelo.eventoEnAviso {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
+                    // Avatar circular del contacto o reunión
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: 0xFF9F0A), Color(hex: 0xFF375F)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Text(iniciales(de: evento.titulo))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 40, height: 40)
+                    .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
+
                     VStack(alignment: .leading, spacing: 2) {
+                        Text(subtitulo(para: evento))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Paleta.textoDeApoyo)
+                            .lineLimit(1)
                         Text(evento.titulo)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(Paleta.texto)
                             .lineLimit(1)
-                        Text(subtitulo(para: evento))
-                            .textoDeApoyo()
-                            .lineLimit(1)
                     }
+
                     Spacer(minLength: 0)
-                    if let enlace = evento.enlaceDeLlamada {
-                        Button("Unirme") {
-                            modelo.unirseALlamada(enlace)
+
+                    // Botones circulares rojo (rechazar/colgar) y verde (aceptar/unirse)
+                    HStack(spacing: 10) {
+                        Button {
+                            modelo.descartarAvisoDeLlamada()
+                        } label: {
+                            Image(systemName: "phone.down.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Color(hex: 0xFF453A), in: Circle())
                         }
-                        .buttonStyle(EstiloDePildora(destacado: true))
+                        .buttonStyle(.plain)
+                        .help("Rechazar o cerrar llamada")
+                        .accessibilityLabel("Rechazar o cerrar llamada")
+
+                        Button {
+                            modelo.aceptarLlamada(evento)
+                        } label: {
+                            Image(systemName: "phone.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Color(hex: 0x30D158), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Aceptar o unirse a la llamada")
+                        .accessibilityLabel("Aceptar o unirse a la llamada")
                     }
                 }
-                .padding(.horizontal, Medidas.margenLateral + 2)
-                .padding(.top, 4)
-                .padding(.bottom, 10)
+                .padding(.horizontal, Medidas.margenLateral + 4)
+                .padding(.top, 2)
+                .padding(.bottom, 8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
-    private var textoDeMinutos: String {
-        guard let minutos = modelo.minutosParaAviso else { return "Próxima" }
-        return minutos <= 0 ? "Ahora" : "En \(minutos) min"
+    private var textoDeOrejaIzquierda: String {
+        if modelo.llamadaActiva != nil {
+            return modelo.duracionLlamadaFormateada
+        }
+        guard let minutos = modelo.minutosParaAviso else { return "00:01" }
+        return minutos <= 0 ? modelo.duracionLlamadaFormateada : "En \(minutos)m"
     }
 
     private func subtitulo(para evento: EventoDeCalendario) -> String {
-        let formateador = DateFormatter()
-        formateador.locale = Locale(identifier: "es_MX")
-        formateador.dateFormat = "HH:mm"
-        let hora = formateador.string(from: evento.inicio)
         if let plataforma = evento.enlaceDeLlamada?.plataforma.nombreVisible {
-            return "\(hora) · \(plataforma)"
+            return "\(plataforma) · Llamada"
         }
-        return hora
+        return "FaceTime Audio"
+    }
+
+    private func iniciales(de titulo: String) -> String {
+        let palabras =
+            titulo
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        if palabras.count >= 2 {
+            let primera = palabras[0].prefix(1)
+            let segunda = palabras[1].prefix(1)
+            return "\(primera)\(segunda)".uppercased()
+        }
+        return String(titulo.prefix(2)).uppercased()
     }
 }

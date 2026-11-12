@@ -61,6 +61,18 @@ public final class Ajustes {
     public var rutaVaultObsidian: String {
         didSet { alCambiar(rutaVaultObsidian, oldValue, .rutaVaultObsidian) }
     }
+    /// Tema visual del panel de la isla (7 opciones).
+    public var temaPanel: TemaDePanel {
+        didSet { alCambiar(temaPanel, oldValue, .temaPanel) }
+    }
+    /// Tema de acento de la barra superior (9 opciones).
+    public var temaBarra: TemaDeBarra {
+        didSet { alCambiar(temaBarra, oldValue, .temaBarra) }
+    }
+    /// Mostrar el HUD de volumen, brillo y batería en el notch.
+    public var hudSistemaActivo: Bool {
+        didSet { alCambiar(hudSistemaActivo, oldValue, .hudSistemaActivo) }
+    }
 
     @ObservationIgnored private let almacen: any AlmacenDeAjustes
     @ObservationIgnored private var observadores: [@MainActor () -> Void] = []
@@ -78,6 +90,9 @@ public final class Ajustes {
         appsExcluidasPortapapeles = Self.leer(.appsExcluidasPortapapeles, de: almacen) ?? []
         carpetaFotosEspejo = Self.leer(.carpetaFotosEspejo, de: almacen) ?? Self.rutaDescargasPorDefecto
         rutaVaultObsidian = Self.leer(.rutaVaultObsidian, de: almacen) ?? Self.rutaVaultPorDefecto
+        temaPanel = Self.leer(.temaPanel, de: almacen) ?? .obsidiana
+        temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
+        hudSistemaActivo = Self.leer(.hudSistemaActivo, de: almacen) ?? true
     }
 
     public var urlCarpetaInboxObsidian: URL {
@@ -118,7 +133,7 @@ public final class Ajustes {
     enum Clave: String {
         case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus
         case diasRetencionPortapapeles, limiteElementosPortapapeles, appsExcluidasPortapapeles
-        case carpetaFotosEspejo, rutaVaultObsidian
+        case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {

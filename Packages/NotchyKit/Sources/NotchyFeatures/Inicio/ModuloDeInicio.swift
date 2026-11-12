@@ -136,8 +136,8 @@ public final class GestorDeInboxObsidian {
         """
 }
 
-/// El módulo que muestra el hover cuando el usuario no eligió otro, inspirado en el layout de 3 columnas:
-/// Reproductor a la izquierda, Archivos (Bandeja / AirDrop) al centro y Notas (Obsidian Inbox) a la derecha.
+/// El módulo que muestra el hover cuando el usuario no eligió otro, con diseño de 3 columnas:
+/// Reproductor a la izquierda, Files (imágenes/archivos de Bandeja, AirDrop y Portapapeles sin texto) al centro, y Notes (Obsidian Inbox editable en vivo) a la derecha.
 @MainActor
 public final class ModuloDeInicio: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
@@ -173,6 +173,7 @@ public final class ModuloDeInicio: ModuloDeIsla {
         AnyView(
             VistaDeInicio(
                 ahoraSuena: ahoraSuena,
+                portapapeles: portapapeles,
                 bandeja: bandeja,
                 airdrop: airdrop,
                 inbox: inbox,
@@ -183,6 +184,7 @@ public final class ModuloDeInicio: ModuloDeIsla {
 
 struct VistaDeInicio: View {
     let ahoraSuena: ModeloDeAhoraSuena?
+    let portapapeles: ModeloDePortapapeles?
     let bandeja: ModeloDeBandeja?
     let airdrop: ModeloDeAirDrop?
     let inbox: GestorDeInboxObsidian?
@@ -198,10 +200,10 @@ struct VistaDeInicio: View {
             divisorVertical
 
             ColumnaArchivosInicio(
+                portapapeles: portapapeles,
                 bandeja: bandeja,
                 airdrop: airdrop,
-                alAbrirBandeja: { alAbrirModulo?("bandeja") },
-                alAbrirAirDrop: { alAbrirModulo?("airdrop") }
+                alAbrirBandeja: { alAbrirModulo?("bandeja") }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -306,75 +308,84 @@ private struct ColumnaMusicaInicio: View {
     }
 }
 
+/// Columna central "Files": muestra únicamente las imágenes/miniaturas sin descripción, incluyendo
+/// lo que hay en Bandeja, AirDrop y Portapapeles (imágenes y archivos), listo para arrastrar o abrir.
 private struct ColumnaArchivosInicio: View {
+    let portapapeles: ModeloDePortapapeles?
     let bandeja: ModeloDeBandeja?
     let airdrop: ModeloDeAirDrop?
     let alAbrirBandeja: @MainActor () -> Void
-    let alAbrirAirDrop: @MainActor () -> Void
     @State private var arrastrandoSobreArchivos = false
 
+    private var urlsVisuales: [URL] {
+        var lista: [URL] = []
+        var vistas = Set<String>()
+        func agregar(_ url: URL) {
+            let p = url.standardizedFileURL.path
+            guard !vistas.contains(p), FileManager.default.fileExists(atPath: p) else { return }
+            vistas.insert(p)
+            lista.append(url)
+        }
+        for b in bandeja?.elementos ?? [] {
+            agregar(b.urlParaArrastrar)
+        }
+        for c in portapapeles?.elementos ?? [] {
+            if let ruta = c.rutaArchivo {
+                agregar(URL(fileURLWithPath: ruta))
+            }
+        }
+        for a in airdrop?.recibidos ?? [] {
+            agregar(a.url)
+        }
+        return Array(lista.prefix(4))
+    }
+
     var body: some View {
-        let elementosBandeja = bandeja?.elementos ?? []
-        let recibidosAirDrop = airdrop?.recibidos ?? []
-        return VStack(spacing: 8) {
-            if let primeroBandeja = elementosBandeja.first {
-                VStack(spacing: 6) {
-                    MiniaturaDeArchivo(url: primeroBandeja.urlParaArrastrar, tamano: 44)
-                        .onDrag {
-                            NSItemProvider(object: primeroBandeja.urlParaArrastrar as NSURL)
-                        }
-                    Text(primeroBandeja.nombre)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Paleta.texto)
-                        .lineLimit(1)
-                    Text("\(elementosBandeja.count) en Bandeja · arrastra o abre")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Paleta.textoDeApoyo)
-                        .lineLimit(1)
-                }
-            } else if let primeroAirDrop = recibidosAirDrop.first {
-                VStack(spacing: 6) {
-                    MiniaturaDeArchivo(url: primeroAirDrop.url, tamano: 44)
-                        .onDrag {
-                            NSItemProvider(object: primeroAirDrop.url as NSURL)
-                        }
-                    Text(primeroAirDrop.nombre)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Paleta.texto)
-                        .lineLimit(1)
-                    Text("Recibido por AirDrop")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Paleta.textoDeApoyo)
-                        .lineLimit(1)
-                }
-            } else {
+        let urls = urlsVisuales
+        return ZStack {
+            if urls.isEmpty {
                 Button(action: alAbrirBandeja) {
                     VStack(spacing: 8) {
                         Image(systemName: "folder.fill")
-                            .font(.system(size: 38))
+                            .font(.system(size: 40))
                             .foregroundStyle(Paleta.agenda)
                         Text("Files")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Paleta.texto)
-                        Text("Suelta archivos aquí")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Paleta.textoDeApoyo)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-            }
-
-            HStack(spacing: 8) {
-                Button("Bandeja", action: alAbrirBandeja)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Paleta.textoDeApoyo)
-                    .buttonStyle(.plain)
-                Text("·").foregroundStyle(Paleta.textoDeApoyo)
-                Button("AirDrop", action: alAbrirAirDrop)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Paleta.airdrop)
-                    .buttonStyle(.plain)
+            } else if urls.count == 1, let unica = urls.first {
+                // Solo la imagen/miniatura grande sin descripción
+                Button {
+                    NSWorkspace.shared.open(unica)
+                } label: {
+                    MiniaturaDeArchivo(url: unica, tamano: 96)
+                        .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                }
+                .buttonStyle(.plain)
+                .onDrag {
+                    NSItemProvider(object: unica as NSURL)
+                }
+            } else {
+                // Cuadrícula de hasta 4 imágenes/miniaturas sin texto de descripción
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(urls, id: \.path) { url in
+                        Button {
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            MiniaturaDeArchivo(url: url, tamano: 58)
+                                .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .onDrag {
+                            NSItemProvider(object: url as NSURL)
+                        }
+                    }
+                }
+                .padding(6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -401,26 +412,29 @@ private struct ColumnaArchivosInicio: View {
 
 private struct ColumnaNotasInboxInicio: View {
     let inbox: GestorDeInboxObsidian?
+    @FocusState private var campoEnfocado: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
+                Image(systemName: "note.text")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Paleta.portapapeles)
+                Text("Notes")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Paleta.texto)
+
+                Spacer(minLength: 0)
+
                 Button {
                     inbox?.abrirEnObsidian()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "note.text")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Paleta.portapapeles)
-                        Text("Notes · Inbox")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Paleta.texto)
-                    }
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Paleta.portapapeles)
                 }
                 .buttonStyle(.plain)
                 .help("Abrir 00-inbox/inbox.md en Obsidian")
-
-                Spacer(minLength: 0)
 
                 Button {
                     inbox?.abrirCarpetaEnFinder()
@@ -435,14 +449,16 @@ private struct ColumnaNotasInboxInicio: View {
 
             if let inbox {
                 @Bindable var gestor = inbox
-                HStack(spacing: 4) {
-                    TextField("Nota rápida al inbox…", text: $gestor.borrador)
+                HStack(spacing: 5) {
+                    TextField("Escribe y pulsa ↵ para enviar al inbox…", text: $gestor.borrador)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .foregroundStyle(Paleta.texto)
+                        .focused($campoEnfocado)
                         .onSubmit {
                             _ = inbox.guardarBorrador()
                         }
+
                     Button {
                         _ = inbox.guardarBorrador()
                     } label: {
@@ -458,25 +474,28 @@ private struct ColumnaNotasInboxInicio: View {
                     .help("Guardar en 00-inbox/inbox.md")
                 }
                 .padding(.horizontal, 8)
-                .frame(height: 26)
+                .frame(height: 28)
                 .background(Paleta.superficieAlta, in: RoundedRectangle(cornerRadius: 8))
+                .onTapGesture {
+                    campoEnfocado = true
+                }
 
                 if inbox.lineasRecientes.isEmpty {
                     Spacer(minLength: 0)
-                    Button {
-                        inbox.abrirEnObsidian()
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "note.text")
-                                .font(.system(size: 24))
-                                .foregroundStyle(Paleta.portapapeles)
-                            Text("Inbox limpio · escribe arriba")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Paleta.textoDeApoyo)
-                        }
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 4) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 24))
+                            .foregroundStyle(Paleta.portapapeles.opacity(0.85))
+                        Text("Escribe arriba para guardar en 00-inbox")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Paleta.textoDeApoyo)
+                            .multilineTextAlignment(.center)
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        campoEnfocado = true
+                    }
                     Spacer(minLength: 0)
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
@@ -491,6 +510,10 @@ private struct ColumnaNotasInboxInicio: View {
                                     .lineLimit(1)
                             }
                         }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        campoEnfocado = true
                     }
                     Spacer(minLength: 0)
                 }

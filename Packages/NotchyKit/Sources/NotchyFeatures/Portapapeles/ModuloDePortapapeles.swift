@@ -3,8 +3,8 @@ import NotchyCore
 import NotchyDesign
 import SwiftUI
 
-/// Módulo de Portapapeles en la isla (CLP-1 a CLP-7): búsqueda sin acentos, filtros por tipo,
-/// copiar con clic o ↵, abrir archivo/imagen/enlace, arrastrar como en Finder, fijar y borrar.
+/// Módulo de Portapapeles en la isla (CLP-1 a CLP-7): diseño de tarjetas estilo "Clipboard" con "Clear All"
+/// en rojo, imágenes como tarjeta visual pura sin etiqueta y botón circular de cierre.
 @MainActor
 public final class ModuloDePortapapeles: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
@@ -38,21 +38,25 @@ struct VistaDePortapapeles: View {
     @Bindable var modelo: ModeloDePortapapeles
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            barraBusquedaYFiltros
+        VStack(alignment: .leading, spacing: 8) {
+            encabezado
             listaDeElementos
         }
     }
 
-    private var barraBusquedaYFiltros: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 6) {
+    private var encabezado: some View {
+        HStack(spacing: 10) {
+            Text("Clipboard")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Paleta.texto)
+
+            HStack(spacing: 5) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundStyle(Paleta.textoDeApoyo)
-                TextField("Buscar en \(modelo.totalGuardados) elementos", text: $modelo.busqueda)
+                TextField("Buscar…", text: $modelo.busqueda)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundStyle(Paleta.texto)
                     .onSubmit {
                         modelo.copiarSeleccionado()
@@ -62,33 +66,35 @@ struct VistaDePortapapeles: View {
                         modelo.busqueda = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                             .foregroundStyle(Paleta.textoDeApoyo)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Limpiar búsqueda")
                 }
             }
-            .padding(.horizontal, 10)
-            .frame(height: 26)
+            .padding(.horizontal, 8)
+            .frame(width: 150, height: 22)
             .background(Paleta.superficie, in: Capsule())
 
-            chipFiltro(titulo: "Todo", tipo: nil)
-            ForEach(TipoDePortapapeles.allCases, id: \.self) { tipo in
-                chipFiltro(titulo: tipo.etiqueta, tipo: tipo)
+            HStack(spacing: 4) {
+                chipFiltro(titulo: "All", tipo: nil)
+                ForEach(TipoDePortapapeles.allCases, id: \.self) { tipo in
+                    chipFiltro(titulo: tipo.etiqueta, tipo: tipo)
+                }
             }
+
+            Spacer(minLength: 0)
 
             if modelo.totalGuardados > 0 {
                 Button {
                     modelo.borrarTodo()
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Paleta.textoDeApoyo)
-                        .frame(width: 24, height: 24)
+                    Text("Clear All")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0xFF6B6B))
                 }
                 .buttonStyle(.plain)
-                .help("Borrar todo el historial")
+                .help("Borrar todo el portapapeles")
                 .accessibilityLabel("Borrar todo el historial")
             }
         }
@@ -100,14 +106,13 @@ struct VistaDePortapapeles: View {
             modelo.filtroTipo = tipo
         } label: {
             Text(titulo)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(activo ? Paleta.fondo : Paleta.textoDeApoyo)
-                .padding(.horizontal, 8)
-                .frame(height: 22)
+                .padding(.horizontal, 7)
+                .frame(height: 20)
                 .background(activo ? Paleta.texto : Paleta.superficie, in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Filtrar por \(titulo)")
     }
 
     @ViewBuilder
@@ -122,38 +127,103 @@ struct VistaDePortapapeles: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 6) {
                     ForEach(modelo.elementos) { elemento in
-                        fila(elemento)
+                        filaTarjeta(elemento)
                     }
                 }
             }
         }
     }
 
-    private func fila(_ elemento: ElementoDePortapapeles) -> some View {
+    @ViewBuilder
+    private func filaTarjeta(_ elemento: ElementoDePortapapeles) -> some View {
         let seleccionado = modelo.idSeleccionado == elemento.id
-        return HStack(spacing: 8) {
-            Button {
-                modelo.copiarAlSistema(elemento)
-            } label: {
-                HStack(spacing: 8) {
-                    iconoOVistaPrevia(de: elemento)
-                    Text(elemento.texto.replacingOccurrences(of: "\n", with: " "))
-                        .textoDeCuerpo()
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
-                    if let app = elemento.appOrigen {
-                        Text(app).textoDeApoyo().lineLimit(1)
+        if elemento.tipo == .imagen, let ruta = elemento.rutaArchivo,
+            let nsImage = NSImage(contentsOfFile: ruta)
+        {
+            // Tarjeta de imagen pura sin texto de descripción ("Imagen (12 KB)"), igual a la captura de referencia
+            HStack(spacing: 10) {
+                Button {
+                    modelo.copiarAlSistema(elemento)
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                            .background(
+                                Color.black.opacity(0.25),
+                                in: RoundedRectangle(cornerRadius: 8)
+                            )
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 54)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .padding(.vertical, 4)
                     }
-                    if seleccionado {
-                        Text("↵ copiar").textoDeApoyo()
-                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 62)
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
 
+                botonesAccion(para: elemento)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                seleccionado ? Paleta.superficieAlta : Paleta.superficie,
+                in: RoundedRectangle(cornerRadius: 11)
+            )
+            .onDrag {
+                proveedorDeArrastre(para: elemento)
+            }
+        } else {
+            HStack(spacing: 10) {
+                Button {
+                    modelo.copiarAlSistema(elemento)
+                } label: {
+                    HStack(spacing: 8) {
+                        if elemento.tipo == .archivo, let ruta = elemento.rutaArchivo {
+                            MiniaturaDeArchivo(url: URL(fileURLWithPath: ruta), tamano: 20)
+                        } else if let colorMuestra = ColorMuestreado(hex: elemento.texto) {
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color(hex: colorMuestra.hexEntero))
+                                .frame(width: 16, height: 16)
+                        } else {
+                            Image(systemName: elemento.tipo.icono)
+                                .font(.system(size: 12))
+                                .foregroundStyle(color(de: elemento.tipo))
+                                .frame(width: 16)
+                        }
+
+                        Text(elemento.texto.replacingOccurrences(of: "\n", with: " "))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Paleta.texto)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 4)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                botonesAccion(para: elemento)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(
+                seleccionado ? Paleta.superficieAlta : Paleta.superficie,
+                in: RoundedRectangle(cornerRadius: 10)
+            )
+            .onDrag {
+                proveedorDeArrastre(para: elemento)
+            }
+        }
+    }
+
+    private func botonesAccion(para elemento: ElementoDePortapapeles) -> some View {
+        HStack(spacing: 6) {
             if puedeAbrirse(elemento) {
                 Button {
                     modelo.abrir(elemento)
@@ -164,7 +234,7 @@ struct VistaDePortapapeles: View {
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
-                .help("Abrir archivo o enlace")
+                .help("Abrir en su aplicación predeterminada")
                 .accessibilityLabel("Abrir \(elemento.texto)")
             }
 
@@ -172,46 +242,24 @@ struct VistaDePortapapeles: View {
                 modelo.alternarFijado(elemento.id)
             } label: {
                 Image(systemName: elemento.fijado ? "pin.fill" : "pin")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundStyle(elemento.fijado ? Paleta.portapapeles : Paleta.textoDeApoyo)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 18, height: 18)
             }
             .buttonStyle(.plain)
             .help(elemento.fijado ? "Desfijar" : "Fijar")
-            .accessibilityLabel(elemento.fijado ? "Desfijar elemento" : "Fijar elemento")
 
             Button {
                 modelo.borrar(elemento)
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Paleta.textoDeApoyo)
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.white.opacity(0.45))
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
             .help("Borrar elemento")
             .accessibilityLabel("Borrar elemento")
-        }
-        .padding(.horizontal, 8)
-        .frame(height: Medidas.altoDeFila)
-        .background(
-            seleccionado ? Paleta.superficieAlta : Color.clear,
-            in: RoundedRectangle(cornerRadius: 8)
-        )
-        .onDrag {
-            proveedorDeArrastre(para: elemento)
-        }
-    }
-
-    @ViewBuilder
-    private func iconoOVistaPrevia(de elemento: ElementoDePortapapeles) -> some View {
-        if let ruta = elemento.rutaArchivo {
-            MiniaturaDeArchivo(url: URL(fileURLWithPath: ruta), tamano: 18)
-        } else {
-            Image(systemName: elemento.tipo.icono)
-                .font(.system(size: 12))
-                .foregroundStyle(color(de: elemento.tipo))
-                .frame(width: 18)
         }
     }
 

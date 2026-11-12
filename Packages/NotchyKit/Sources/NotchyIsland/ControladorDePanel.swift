@@ -4,13 +4,13 @@ import NotchyDesign
 import OSLog
 import SwiftUI
 
-/// Panel que no se puede volver ventana clave ni principal: la isla nunca roba el foco (ISL-4).
+/// Panel que permite editar campos de texto dentro de la isla sin activar la app ni quitar el foco global (ISL-4).
 final class PanelDeIsla: NSPanel {
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 
-/// Deja que el primer clic llegue a los botones aunque la app no esté activa.
+/// Deja que el primer clic llegue a los botones y campos de texto aunque la app no esté activa.
 final class AnfitrionDeIsla<Contenido: View>: NSHostingView<Contenido> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
@@ -49,6 +49,7 @@ public final class ControladorDePanel {
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
         panel.isMovable = false
+        panel.becomesKeyOnlyIfNeeded = true
         panel.ignoresMouseEvents = true
         panel.setAccessibilityLabel("Notchy")
 
@@ -136,15 +137,12 @@ public final class ControladorDePanel {
     // MARK: Cursor
 
     private func vigilarCursor() {
-        // Los monitores globales ven los eventos que van a otras apps; los locales, los de la nuestra.
-        // Ninguno necesita permiso de Accesibilidad para el ratón.
         let movimiento: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged]
         let clics: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
         let globales = [
             NSEvent.addGlobalMonitorForEvents(matching: movimiento) { [weak self] _ in
                 MainActor.assumeIsolated { self?.revisarCursor() }
             },
-            // Un clic que llega a otra app es, por definición, un clic fuera de la isla.
             NSEvent.addGlobalMonitorForEvents(matching: clics) { [weak self] _ in
                 MainActor.assumeIsolated { self?.clicFuera() }
             },
@@ -163,6 +161,9 @@ public final class ControladorDePanel {
         let dentro = GeometriaDeIsla.contiene(zona, NSEvent.mouseLocation)
         // En reposo no hay nada que pulsar: los clics sobre el notch pasan a la barra de menús.
         panel.ignoresMouseEvents = !(dentro && coordinador.estado != .reposo)
+        if !dentro && panel.isKeyWindow {
+            panel.resignKey()
+        }
         guard dentro != cursorDentro else { return }
         cursorDentro = dentro
         coordinador.recibir(dentro ? .cursorEntro : .cursorSalio)
@@ -170,6 +171,7 @@ public final class ControladorDePanel {
 
     private func clicFuera() {
         guard case .expandido = coordinador.estado, !cursorDentro else { return }
+        panel?.resignKey()
         coordinador.recibir(.clicFuera)
     }
 }

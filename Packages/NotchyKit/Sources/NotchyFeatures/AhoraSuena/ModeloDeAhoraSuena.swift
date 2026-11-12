@@ -1,34 +1,62 @@
+import AppKit
 import Foundation
 import NotchyCore
+import OSLog
 import Observation
 
-/// Modelo observable del módulo Ahora suena (MUS-1, D-18).
+/// Modelo observable del módulo Ahora suena: controla la reproducción, extrae el color de la carátula y obtiene la letra sincronizada (MUS-1).
 @MainActor
 @Observable
 public final class ModeloDeAhoraSuena {
     public private(set) var estadoActual: EstadoDeAhoraSuena?
+    public private(set) var salud: SaludDeModulo = .listo
+    public private(set) var letraActual: LetraDeCancion?
+    public private(set) var cargandoLetra = false
+    public var mostrarLetra = true
+    public private(set) var nivelesEspectro: [Double] = Array(repeating: 0.25, count: 12)
+
     @ObservationIgnored private let puerto: any PuertoDeAhoraSuena
     @ObservationIgnored private let bus: BusDeEventos?
     @ObservationIgnored private var pidioCompacto = false
+    @ObservationIgnored private var claveUltimaLetra: String?
+    @ObservationIgnored private var tareaLetra: Task<Void, Never>?
+    @ObservationIgnored private var tareaEspectro: Task<Void, Never>?
+    @ObservationIgnored private let log = Registro.de(.musica)
 
-    public init(puerto: any PuertoDeAhoraSuena, bus: BusDeEventos? = nil) {
+    public init(
+        puerto: any PuertoDeAhoraSuena,
+        bus: BusDeEventos? = nil
+    ) {
         self.puerto = puerto
         self.bus = bus
     }
 
-    public var salud: SaludDeModulo {
-        .listo
-    }
-
     public func iniciar() {
         puerto.iniciar { [weak self] nuevo in
-            self?.actualizar(nuevo)
+            self?.aplicar(nuevo)
+        }
+        iniciarMedidorDeEspectro()
+        Task { [weak self] in
+            guard let self else { return }
+            let ok = await self.puerto.probarAdaptador()
+            if !ok {
+                self.log.notice("mediaremote-adapter test devolvió fallo; usando respaldo AppleScript si hace falta")
+            }
         }
     }
 
     public func detener() {
         puerto.detener()
-        actualizar(nil)
+        tareaLetra?.cancel()
+        tareaLetra = nil
+        tareaEspectro?.cancel()
+        tareaEspectro = nil
+        if pidioCompacto, let bus {
+            pidioCompacto = false
+            Task {
+                await bus.publicar(PeticionDeEstadoCompacto(modulo: "musica", prioridad: nil))
+            }
+        }
     }
 
     public func alternarReproduccion() {
@@ -43,22 +71,189 @@ public final class ModeloDeAhoraSuena {
         puerto.enviar(.anterior)
     }
 
-    private func actualizar(_ nuevo: EstadoDeAhoraSuena?) {
-        let cambioRelevante = estadoActual != nuevo
+    private func aplicar(_ nuevo: EstadoDeAhoraSuena?) {
+        let anterior = estadoActual
         estadoActual = nuevo
+        if let bus {
+            Task { await bus.publicar(CambioDeAhoraSuena(estado: nuevo)) }
+            let hex = Self.colorDominante(de: nuevo?.caratulaPNG)
+            Task { await bus.publicar(ColorDeCaratulaActualizado(hex: hex)) }
+        }
         let debeMostrarCompacto = (nuevo?.reproduciendo == true)
         if debeMostrarCompacto != pidioCompacto {
             pidioCompacto = debeMostrarCompacto
             if let bus {
-                let peticion = PeticionDeEstadoCompacto(
-                    modulo: "musica",
-                    prioridad: debeMostrarCompacto ? .musica : nil
-                )
-                Task { await bus.publicar(peticion) }
+                let prioridad: PrioridadCompacta? = debeMostrarCompacto ? .musica : nil
+                Task {
+                    await bus.publicar(
+                        PeticionDeEstadoCompacto(modulo: "musica", prioridad: prioridad))
+                }
             }
         }
-        if cambioRelevante, let bus {
-            Task { await bus.publicar(CambioDeAhoraSuena(estado: nuevo)) }
+
+        if let nuevo {
+            let clave = "\(nuevo.titulo.lowercased())|\((nuevo.artista ?? "").lowercased())"
+            if clave != claveUltimaLetra {
+                claveUltimaLetra = clave
+                buscarLetra(titulo: nuevo.titulo, artista: nuevo.artista ?? "", duracion: nuevo.duracionSegundos)
+            }
+        } else {
+            claveUltimaLetra = nil
+            letraActual = nil
         }
+
+        if anterior?.reproduciendo != nuevo?.reproduciendo {
+            actualizarEspectro()
+        }
+    }
+
+    private func iniciarMedidorDeEspectro() {
+        tareaEspectro?.cancel()
+        tareaEspectro = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(130))
+                guard let self, !Task.isCancelled else { break }
+                self.actualizarEspectro()
+            }
+        }
+    }
+
+    private func actualizarEspectro() {
+        guard let estado = estadoActual, estado.reproduciendo else {
+            nivelesEspectro = Array(repeating: 0.22, count: 12)
+            return
+        }
+        let ahora = Date.now
+        let t = estado.transcurridoActual(en: ahora) ?? ahora.timeIntervalSinceReferenceDate
+        let semillaCancion = abs(estado.titulo.hashValue % 97)
+        let envolvente = 0.55 + 0.45 * abs(sin(t * 2.4 + Double(semillaCancion) * 0.1))
+        var nuevos: [Double] = []
+        nuevos.reserveCapacity(12)
+        for i in 0..<12 {
+            let freq1 = sin(t * (3.2 + Double(i) * 0.43) + Double(i) * 0.9)
+            let freq2 = cos(t * (5.1 - Double(i % 5) * 0.6) + Double(semillaCancion))
+            let crudo = (abs(freq1) * 0.65 + abs(freq2) * 0.35) * envolvente
+            let acotado = min(max(0.18 + crudo * 0.82, 0.18), 1.0)
+            nuevos.append(acotado)
+        }
+        nivelesEspectro = nuevos
+    }
+
+    private func buscarLetra(titulo: String, artista: String, duracion: Double?) {
+        tareaLetra?.cancel()
+        cargandoLetra = true
+        tareaLetra = Task { [weak self] in
+            let descargada = await Self.descargarLetraLRCLib(titulo: titulo, artista: artista, duracion: duracion)
+            guard let self, !Task.isCancelled else { return }
+            self.cargandoLetra = false
+            if let descargada, !descargada.lineas.isEmpty {
+                self.letraActual = descargada
+            } else {
+                self.letraActual = LetraDeCancion(
+                    titulo: titulo,
+                    artista: artista,
+                    lineas: [
+                        LineaDeLetra(id: 0, tiempoSegundos: 0, texto: "♪ \(titulo)"),
+                        LineaDeLetra(
+                            id: 1,
+                            tiempoSegundos: 4,
+                            texto: artista.isEmpty ? "Reproduciendo en tu Mac" : artista
+                        ),
+                        LineaDeLetra(id: 2, tiempoSegundos: 10, texto: "Sin letra sincronizada para esta pista"),
+                    ]
+                )
+            }
+        }
+    }
+
+    static func descargarLetraLRCLib(titulo: String, artista: String, duracion: Double?) async -> LetraDeCancion? {
+        var componentes = URLComponents(string: "https://lrclib.net/api/get")
+        var items = [
+            URLQueryItem(name: "track_name", value: titulo),
+            URLQueryItem(name: "artist_name", value: artista),
+        ]
+        if let duracion, duracion > 1 {
+            items.append(URLQueryItem(name: "duration", value: String(Int(duracion.rounded()))))
+        }
+        componentes?.queryItems = items
+        guard let url = componentes?.url else { return nil }
+
+        var solicitud = URLRequest(url: url)
+        solicitud.timeoutInterval = 4
+        solicitud.setValue("Notchy/1.0 (macOS)", forHTTPHeaderField: "User-Agent")
+
+        guard let (datos, respuesta) = try? await URLSession.shared.data(for: solicitud),
+            let http = respuesta as? HTTPURLResponse,
+            http.statusCode == 200,
+            let json = try? JSONSerialization.jsonObject(with: datos) as? [String: Any]
+        else {
+            return nil
+        }
+
+        if let sincronizada = json["syncedLyrics"] as? String, !sincronizada.isEmpty {
+            let lineas = parsearLRC(sincronizada)
+            if !lineas.isEmpty {
+                return LetraDeCancion(titulo: titulo, artista: artista, lineas: lineas)
+            }
+        }
+        if let plana = json["plainLyrics"] as? String, !plana.isEmpty {
+            let partes = plana.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            let lineas = partes.enumerated().map { idx, texto in
+                LineaDeLetra(id: idx, tiempoSegundos: Double(idx) * 4.0, texto: texto)
+            }
+            return LetraDeCancion(titulo: titulo, artista: artista, lineas: lineas)
+        }
+        return nil
+    }
+
+    public static func parsearLRC(_ lrc: String) -> [LineaDeLetra] {
+        var resultado: [LineaDeLetra] = []
+        let filas = lrc.components(separatedBy: .newlines)
+        for fila in filas {
+            guard fila.hasPrefix("["), let cierre = fila.firstIndex(of: "]") else { continue }
+            let marca = String(fila[fila.index(after: fila.startIndex)..<cierre])
+            let texto = String(fila[fila.index(after: cierre)...]).trimmingCharacters(in: .whitespaces)
+            guard !texto.isEmpty else { continue }
+            let partes = marca.split(separator: ":")
+            guard partes.count == 2,
+                let min = Double(partes[0]),
+                let seg = Double(partes[1])
+            else { continue }
+            resultado.append(
+                LineaDeLetra(id: resultado.count, tiempoSegundos: min * 60.0 + seg, texto: texto))
+        }
+        return resultado
+    }
+
+    static func colorDominante(de datos: Data?) -> UInt32? {
+        guard let datos,
+            let imagen = NSImage(data: datos),
+            let cgImage = imagen.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        else {
+            return nil
+        }
+        let ancho = 1
+        let alto = 1
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        guard
+            let contexto = CGContext(
+                data: &pixel,
+                width: ancho,
+                height: alto,
+                bitsPerComponent: 8,
+                bytesPerRow: 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else {
+            return nil
+        }
+        contexto.draw(cgImage, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        let r = UInt32(max(pixel[0], 60))
+        let g = UInt32(max(pixel[1], 60))
+        let b = UInt32(max(pixel[2], 60))
+        return (r << 16) | (g << 8) | b
     }
 }

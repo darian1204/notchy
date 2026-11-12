@@ -11,6 +11,10 @@ public final class CoordinadorDeIsla {
     /// La pone el panel al leer la pantalla.
     public var geometria = GeometriaDeIsla()
     public let registro: RegistroDeModulos
+    /// Color dominante de la carátula en reproducción (para el tema dinámico de panel o barra).
+    public private(set) var hexCaratulaActual: UInt32?
+    /// HUD efímero de volumen, brillo o batería que se muestra en las orejas compactas del notch.
+    public private(set) var hudActual: EstadoDeHUDSistema?
 
     /// Acciones del menú del engrane. Las pone la aplicación.
     @ObservationIgnored public var alAbrirAjustes: (@MainActor () -> Void)?
@@ -19,6 +23,7 @@ public final class CoordinadorDeIsla {
 
     @ObservationIgnored private var maquina = MaquinaDeIsla()
     @ObservationIgnored private var temporizadores: [MaquinaDeIsla.Temporizador: Task<Void, Never>] = [:]
+    @ObservationIgnored private var tareaHUD: Task<Void, Never>?
     @ObservationIgnored private var tareasDeBus: [Task<Void, Never>] = []
     @ObservationIgnored private let bus: BusDeEventos?
     @ObservationIgnored private let dormir: @Sendable (Duration) async throws -> Void
@@ -53,7 +58,13 @@ public final class CoordinadorDeIsla {
 
     /// Tamaño del cuerpo de la isla en el estado actual.
     public var tamano: CGSize {
-        geometria.tamano(de: estado, expandido: moduloAbierto?.tamanoExpandido)
+        if estado == .reposo, hudActual != nil {
+            return geometria.tamano(
+                de: .compacto(PeticionCompacta(modulo: "hud", prioridad: .musica)),
+                expandido: nil
+            )
+        }
+        return geometria.tamano(de: estado, expandido: moduloAbierto?.tamanoExpandido)
     }
 
     /// Abierta sin el cursor encima (atajo o menú): quien registra atajos debe ofrecer Esc para cerrarla.
@@ -62,6 +73,16 @@ public final class CoordinadorDeIsla {
     /// Llama a `accion` después de cada cambio de estado. Para quien no es una vista (panel, atajos).
     public func observar(_ accion: @escaping @MainActor () -> Void) {
         observadores.append(accion)
+    }
+
+    public func mostrarHUD(_ hud: EstadoDeHUDSistema, duracion: Duration = .milliseconds(1600)) {
+        hudActual = hud
+        tareaHUD?.cancel()
+        let dormir = self.dormir
+        tareaHUD = Task { [weak self] in
+            guard (try? await dormir(duracion)) != nil, !Task.isCancelled else { return }
+            self?.hudActual = nil
+        }
     }
 
     public func recibir(_ entrada: MaquinaDeIsla.Entrada) {
@@ -113,6 +134,13 @@ public final class CoordinadorDeIsla {
                 self.recibir(.mostrarAviso(modulo: aviso.modulo))
             }
         }
-        tareasDeBus = [tareaCompacto, tareaAviso]
+        let tareaColorCaratula = Task { [weak self] in
+            let flujo = await bus.suscribir(a: ColorDeCaratulaActualizado.self)
+            for await cambio in flujo {
+                guard let self else { break }
+                self.hexCaratulaActual = cambio.hex
+            }
+        }
+        tareasDeBus = [tareaCompacto, tareaAviso, tareaColorCaratula]
     }
 }

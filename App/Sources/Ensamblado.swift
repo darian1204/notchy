@@ -24,6 +24,9 @@ final class Ensamblado {
     let modeloDePortapapeles: ModeloDePortapapeles
     let modeloDeBandeja: ModeloDeBandeja
     let modeloDeAirDrop: ModeloDeAirDrop
+    let modeloDeColorPicker: ModeloDeColorPicker
+    let modeloDeScreenTime: ModeloDeScreenTime
+    let vigilanteDeHUD: VigilanteDeHUDSistema
     let gestorDeInbox: GestorDeInboxObsidian
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
     private var ventanaDeAjustes: ControladorDeVentanaDeAjustes?
@@ -35,6 +38,7 @@ final class Ensamblado {
     private let adaptadorDeCamara = AdaptadorDeCamara()
     private let adaptadorDePortapapeles = AdaptadorDePortapapeles()
     private let adaptadorDeAirDrop = AdaptadorDeAirDrop()
+    private let adaptadorDeColor = AdaptadorMuestreadorDeColor()
     private let log = Registro.de(.arranque)
 
     init() {
@@ -88,6 +92,11 @@ final class Ensamblado {
                 }
             }
         )
+        modeloDeColorPicker = ModeloDeColorPicker(
+            muestreador: adaptadorDeColor
+        )
+        modeloDeScreenTime = ModeloDeScreenTime()
+
         gestorDeInbox = GestorDeInboxObsidian(
             ajustes: ajustes,
             alAbrirURL: abrirURL
@@ -95,6 +104,12 @@ final class Ensamblado {
 
         registro = RegistroDeModulos(ajustes: ajustes)
         coordinador = CoordinadorDeIsla(registro: registro, bus: bus)
+        let ajustesParaHUD = ajustes
+        let coordinadorParaHUD = coordinador
+        vigilanteDeHUD = VigilanteDeHUDSistema { estado in
+            guard ajustesParaHUD.hudSistemaActivo else { return }
+            coordinadorParaHUD.mostrarHUD(estado)
+        }
 
         let coordinadorCapturado = coordinador
         registro.registrar(
@@ -113,6 +128,8 @@ final class Ensamblado {
         registro.registrar(ModuloDeBandeja(modelo: modeloDeBandeja))
         registro.registrar(ModuloDePortapapeles(modelo: modeloDePortapapeles))
         registro.registrar(ModuloDeAirDrop(modelo: modeloDeAirDrop))
+        registro.registrar(ModuloDeColorPicker(modelo: modeloDeColorPicker))
+        registro.registrar(ModuloDeScreenTime(modelo: modeloDeScreenTime))
 
         panel = ControladorDePanel(coordinador: coordinador, ajustes: ajustes)
         atajo = ControladorDeAtajo(coordinador: coordinador, ajustes: ajustes, registrador: registradorCarbon)
@@ -168,10 +185,12 @@ final class Ensamblado {
     }
 
     func arrancar() {
+        vigilanteDeHUD.iniciar()
         panel.mostrar()
     }
 
     func detener() {
+        vigilanteDeHUD.detener()
         ventanaDeAjustes?.cerrar()
         barraDeMenus?.ocultar()
         atajo.detener()

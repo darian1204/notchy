@@ -2,8 +2,8 @@ import NotchyCore
 import NotchyDesign
 import SwiftUI
 
-/// Lo que se dibuja dentro del panel: la silueta negra que crece desde el notch y, expandida,
-/// la barra de módulos en las orejas y el contenido del módulo debajo.
+/// Lo que se dibuja dentro del panel: la silueta con el tema elegido que crece desde el notch y,
+/// expandida, la barra de módulos en las orejas y el contenido del módulo debajo.
 public struct VistaDeIsla: View {
     private let coordinador: CoordinadorDeIsla
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
@@ -26,6 +26,10 @@ public struct VistaDeIsla: View {
                     vistaAviso
                         .frame(width: tamano.width, height: tamano.height)
                         .transition(entrada)
+                } else if let hud = coordinador.hudActual {
+                    contenidoHUD(hud)
+                        .frame(width: tamano.width, height: tamano.height)
+                        .transition(.opacity)
                 } else if let modulo = coordinador.moduloCompacto {
                     contenidoCompacto(de: modulo)
                         .frame(width: tamano.width, height: tamano.height)
@@ -37,11 +41,13 @@ public struct VistaDeIsla: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.estado)
+        .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.hudActual)
     }
 
     /// En reposo la isla es el notch: sin hombros, para no asomarse sobre la barra de menús.
     private var hombro: CGFloat {
-        coordinador.geometria.tieneNotch && coordinador.estado != .reposo ? Medidas.hombro : 0
+        coordinador.geometria.tieneNotch && (coordinador.estado != .reposo || coordinador.hudActual != nil)
+            ? Medidas.hombro : 0
     }
 
     private var radio: CGFloat {
@@ -51,12 +57,37 @@ public struct VistaDeIsla: View {
         }
     }
 
+    private var colorDePanel: Color {
+        let tema = coordinador.registro.ajustes.temaPanel
+        if coordinador.estado == .reposo && coordinador.hudActual == nil {
+            return Paleta.fondo
+        }
+        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
+            return Color(hex: Self.oscurecerHex(hex, factor: 0.22))
+        }
+        return Color(hex: tema.hexBase)
+    }
+
+    private static func oscurecerHex(_ hex: UInt32, factor: Double) -> UInt32 {
+        let r = UInt32(Double((hex >> 16) & 0xFF) * factor) & 0xFF
+        let g = UInt32(Double((hex >> 8) & 0xFF) * factor) & 0xFF
+        let b = UInt32(Double(hex & 0xFF) * factor) & 0xFF
+        return (r << 16) | (g << 8) | b
+    }
+
     @ViewBuilder private var silueta: some View {
         if coordinador.geometria.tieneNotch {
-            FormaDeIsla(radioInferior: radio, hombro: hombro).fill(Paleta.fondo)
+            FormaDeIsla(radioInferior: radio, hombro: hombro)
+                .fill(
+                    LinearGradient(
+                        colors: [Paleta.fondo, colorDePanel],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         } else {
-            // Sin notch la isla flota bajo la barra de menús: píldora con las cuatro esquinas redondas.
-            RoundedRectangle(cornerRadius: min(radio, coordinador.tamano.height / 2)).fill(Paleta.fondo)
+            RoundedRectangle(cornerRadius: min(radio, coordinador.tamano.height / 2))
+                .fill(colorDePanel)
         }
     }
 
@@ -70,6 +101,48 @@ public struct VistaDeIsla: View {
                 .padding(.bottom, Medidas.margenInferior)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func contenidoHUD(_ hud: EstadoDeHUDSistema) -> some View {
+        let colorBarra = colorAcentoBarra(porDefecto: 0xE09DB4)
+        return HStack(spacing: 0) {
+            HStack(spacing: 5) {
+                Image(systemName: hud.tipo.icono)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Paleta.texto)
+                Text(hud.etiqueta)
+                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .foregroundStyle(Paleta.texto)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+            Color.clear.frame(width: coordinador.geometria.pantalla.notch?.width ?? 0)
+
+            HStack(spacing: 0) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Paleta.superficieAlta)
+                            .frame(height: 5)
+                        Capsule()
+                            .fill(colorBarra)
+                            .frame(width: max(4, geo.size.width * hud.nivel), height: 5)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .center)
+                }
+                .frame(width: 48, height: 12)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 10)
+    }
+
+    private func colorAcentoBarra(porDefecto: UInt32) -> Color {
+        let tema = coordinador.registro.ajustes.temaBarra
+        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
+            return Color(hex: hex)
+        }
+        return Color(hex: tema.hexAcento ?? porDefecto)
     }
 
     private func contenidoCompacto(de modulo: any ModuloDeIsla) -> some View {
@@ -129,8 +202,7 @@ struct BarraDeModulos: View {
     var body: some View {
         let modulos = coordinador.registro.activos.map(\.identidad)
         HStack(spacing: 0) {
-            HStack(spacing: 4) {
-                // Con un solo módulo no hay a dónde cambiar: la barra queda limpia.
+            HStack(spacing: 3) {
                 if modulos.count > 1 {
                     ForEach(modulos.filter { $0.lado == .izquierda }) { boton($0) }
                 }
@@ -139,7 +211,7 @@ struct BarraDeModulos: View {
 
             Color.clear.frame(width: coordinador.geometria.pantalla.notch?.width ?? 0)
 
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 if modulos.count > 1 {
                     ForEach(modulos.filter { $0.lado == .derecha }) { boton($0) }
                 }
@@ -150,15 +222,30 @@ struct BarraDeModulos: View {
         .padding(.horizontal, Medidas.margenLateral)
     }
 
+    private func colorParaIcono(_ modulo: IdentidadDeModulo) -> Color {
+        let tema = coordinador.registro.ajustes.temaBarra
+        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
+            return Color(hex: hex)
+        }
+        if let hexTema = tema.hexAcento {
+            return Color(hex: hexTema)
+        }
+        return Color(hex: modulo.color)
+    }
+
     private func boton(_ modulo: IdentidadDeModulo) -> some View {
         let abierto = coordinador.moduloAbierto?.identidad.id == modulo.id
         return Button {
             coordinador.recibir(.elegirModulo(modulo.id))
         } label: {
             Image(systemName: modulo.icono)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(abierto ? Color(hex: modulo.color) : Paleta.textoDeApoyo)
-                .frame(width: 24, height: 24)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(abierto ? colorParaIcono(modulo) : Paleta.textoDeApoyo)
+                .frame(width: 24, height: 22)
+                .background(
+                    abierto ? Paleta.superficieAlta : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 6)
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -176,9 +263,9 @@ struct BarraDeModulos: View {
             Button("Salir de Notchy") { coordinador.alSalir?() }
         } label: {
             Image(systemName: "gearshape.fill")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Paleta.textoDeApoyo)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
         .menuStyle(.button)

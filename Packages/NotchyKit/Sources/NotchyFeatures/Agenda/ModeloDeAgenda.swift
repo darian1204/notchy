@@ -29,7 +29,7 @@ public struct CeldaDeCalendario: Identifiable, Sendable, Equatable {
     }
 }
 
-/// Modelo observable del módulo de Agenda: mini calendario, eventos, pendientes y aviso 5 min antes (AGD-1 a AGD-4).
+/// Modelo observable del módulo de Agenda: mini calendario, eventos, pendientes y Dynamic Mac Notch Call UI (AGD-1 a AGD-4).
 @MainActor
 @Observable
 public final class ModeloDeAgenda {
@@ -41,6 +41,9 @@ public final class ModeloDeAgenda {
     public private(set) var pendientes: [PendienteDeRecordatorios] = []
     public private(set) var eventoEnAviso: EventoDeCalendario?
     public private(set) var minutosParaAviso: Int?
+    public private(set) var llamadaActiva: EventoDeCalendario?
+    public private(set) var segundosLlamadaActiva: Int = 0
+    public private(set) var nivelesOndaLlamada: [Double] = [0.35, 0.72, 0.48, 0.88, 0.54]
     public private(set) var mensajeDeError: String?
 
     @ObservationIgnored private let puertoCalendario: any PuertoDeCalendario
@@ -50,6 +53,8 @@ public final class ModeloDeAgenda {
     @ObservationIgnored private let alAbrirURL: (@MainActor (URL) -> Void)?
     @ObservationIgnored private var tareaVigilancia: Task<Void, Never>?
     @ObservationIgnored private var tareaEventosIsla: Task<Void, Never>?
+    @ObservationIgnored private var tareaTemporizadorLlamada: Task<Void, Never>?
+    @ObservationIgnored private var inicioLlamadaActiva: Date?
     @ObservationIgnored private var observadorEventKit: NSObjectProtocol?
     @ObservationIgnored private var avisosEmitidos: Set<String> = []
     @ObservationIgnored private var yaPidioPermisosAlAbrir = false
@@ -95,6 +100,12 @@ public final class ModeloDeAgenda {
         return .listo
     }
 
+    public var duracionLlamadaFormateada: String {
+        let minutos = segundosLlamadaActiva / 60
+        let segundos = segundosLlamadaActiva % 60
+        return String(format: "%02d:%02d", minutos, segundos)
+    }
+
     public func iniciar() {
         detener()
         actualizarEstadosDePermiso()
@@ -113,17 +124,17 @@ public final class ModeloDeAgenda {
         tareaVigilancia = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
-                guard !Task.isCancelled, let self else { break }
-                await self.recargar()
+                guard !Task.isCancelled else { break }
+                await self?.recargar()
             }
         }
         if let bus {
             tareaEventosIsla = Task { [weak self] in
                 let flujo = await bus.suscribir(a: IslaCambioDeEstado.self)
                 for await cambio in flujo {
-                    guard let self else { break }
+                    guard !Task.isCancelled else { break }
                     if cambio.moduloAbierto == "agenda" {
-                        await self.alAbrirAgenda()
+                        await self?.alAbrirAgenda()
                     }
                 }
             }
@@ -135,13 +146,14 @@ public final class ModeloDeAgenda {
         tareaVigilancia = nil
         tareaEventosIsla?.cancel()
         tareaEventosIsla = nil
+        tareaTemporizadorLlamada?.cancel()
+        tareaTemporizadorLlamada = nil
         if let observadorEventKit {
             NotificationCenter.default.removeObserver(observadorEventKit)
             self.observadorEventKit = nil
         }
     }
 
-    /// Pide permisos la primera vez que se abre la Agenda (Principio 4: permiso al usar).
     public func alAbrirAgenda() async {
         actualizarEstadosDePermiso()
         if !yaPidioPermisosAlAbrir,
@@ -180,6 +192,84 @@ public final class ModeloDeAgenda {
 
     public func unirseALlamada(_ enlace: EnlaceDeLlamada) {
         alAbrirURL?(enlace.url)
+    }
+
+    public func aceptarLlamada(_ evento: EventoDeCalendario) {
+        if let enlace = evento.enlaceDeLlamada {
+            alAbrirURL?(enlace.url)
+        }
+        llamadaActiva = evento
+        inicioLlamadaActiva = reloj()
+        segundosLlamadaActiva = 3
+        iniciarTemporizadorDeLlamada()
+    }
+
+    public func descartarAvisoDeLlamada() {
+        eventoEnAviso = nil
+        minutosParaAviso = nil
+        if llamadaActiva != nil {
+            colgarLlamadaActiva()
+        }
+    }
+
+    public func colgarLlamadaActiva() {
+        llamadaActiva = nil
+        inicioLlamadaActiva = nil
+        segundosLlamadaActiva = 0
+        tareaTemporizadorLlamada?.cancel()
+        tareaTemporizadorLlamada = nil
+    }
+
+    /// Dispara un aviso de llamada Dynamic Island (con el próximo evento con llamada o una llamada FaceTime de demostración).
+    public func simularAvisoDeLlamada() async {
+        let ahora = reloj()
+        let evento =
+            eventosDeHoy.first(where: { $0.enlaceDeLlamada != nil })
+            ?? eventosDeHoy.first
+            ?? EventoDeCalendario(
+                id: "call-demo-\(Int(ahora.timeIntervalSince1970))",
+                titulo: "FaceTime Audio · Reunión",
+                inicio: ahora,
+                fin: ahora.addingTimeInterval(1800),
+                todoElDia: false,
+                calendario: "Personal",
+                enlaceDeLlamada: EnlaceDeLlamada(
+                    plataforma: .googleMeet,
+                    url: URL(string: "facetime-audio://")!
+                )
+            )
+        eventoEnAviso = evento
+        minutosParaAviso = 0
+        llamadaActiva = evento
+        inicioLlamadaActiva = ahora.addingTimeInterval(-3)
+        segundosLlamadaActiva = 3
+        iniciarTemporizadorDeLlamada()
+        if let bus {
+            await bus.publicar(PeticionDeAvisoDeIsla(modulo: "agenda"))
+        }
+    }
+
+    private func iniciarTemporizadorDeLlamada() {
+        tareaTemporizadorLlamada?.cancel()
+        tareaTemporizadorLlamada = Task { [weak self] in
+            var paso = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(350))
+                guard !Task.isCancelled, let self else { break }
+                paso += 1
+                if let inicio = self.inicioLlamadaActiva {
+                    self.segundosLlamadaActiva = max(
+                        1,
+                        Int(self.reloj().timeIntervalSince(inicio))
+                    )
+                }
+                self.nivelesOndaLlamada = (0..<5).map { indice in
+                    let fase = Double(paso) * 0.65 + Double(indice) * 1.15
+                    let base = 0.28 + abs(sin(fase)) * 0.55 + abs(cos(fase * 0.6)) * 0.15
+                    return min(max(base, 0.2), 0.98)
+                }
+            }
+        }
     }
 
     public func recargar() async {
@@ -260,7 +350,7 @@ public final class ModeloDeAgenda {
         let formateador = DateFormatter()
         formateador.locale = Locale(identifier: "es_MX")
         formateador.dateFormat = "LLLL yyyy"
-        return formateador.string(from: mesVisible).capitalized
+        return formateador.string(from: mesVisible).uppercased()
     }
 
     public var esHoyElDiaSeleccionado: Bool {
@@ -333,8 +423,6 @@ public final class ModeloDeAgenda {
         let inicioMes = Self.inicioDeMes(para: mesVisible, calendario: cal)
         guard let rangoDias = cal.range(of: .day, in: .month, for: inicioMes) else { return [] }
         let diaSemanaPrimero = cal.component(.weekday, from: inicioMes)
-        // En calendario gregoriano: domingo = 1, lunes = 2 ... sábado = 7.
-        // Desplazamiento desde lunes (0 a 6):
         let desplazamiento = (diaSemanaPrimero + 5) % 7
         let puntos = puntosDelMes()
         let hoy = cal.startOfDay(for: reloj())

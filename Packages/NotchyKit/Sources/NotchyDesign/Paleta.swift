@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Colores de la isla. Negro puro para fundirse con el notch; el color solo aparece en íconos y estados vivos.
+/// Colores de la isla. Negro puro por defecto para fundirse con el notch, o el tema elegido.
 public enum Paleta {
     public static let fondo = Color.black
     public static let texto = Color.white
@@ -10,6 +10,7 @@ public enum Paleta {
     public static let decorativo = Color.white.opacity(0.4)
     public static let superficie = Color.white.opacity(0.075)
     public static let superficieAlta = Color.white.opacity(0.14)
+    public static let borde = Color.white.opacity(0.14)
 
     public static let hexAgenda: UInt32 = 0x5AA9FF
     public static let hexGrabadora: UInt32 = 0xFF5D55
@@ -18,6 +19,8 @@ public enum Paleta {
     public static let hexPortapapeles: UInt32 = 0xFFB84D
     public static let hexEspejo: UInt32 = 0xFF8FB8
     public static let hexAirdrop: UInt32 = 0x35C3FF
+    public static let hexColorPicker: UInt32 = 0xD97D98
+    public static let hexScreenTime: UInt32 = 0x5AA9FF
 
     public static let agenda = Color(hex: hexAgenda)
     public static let grabadora = Color(hex: hexGrabadora)
@@ -26,6 +29,8 @@ public enum Paleta {
     public static let portapapeles = Color(hex: hexPortapapeles)
     public static let espejo = Color(hex: hexEspejo)
     public static let airdrop = Color(hex: hexAirdrop)
+    public static let colorPicker = Color(hex: hexColorPicker)
+    public static let screenTime = Color(hex: hexScreenTime)
     public static let agente = Color.white
 }
 

@@ -117,3 +117,90 @@ struct EspejoYAirDropFeaturesTests {
         #expect(urlsAbiertas.first?.scheme == "obsidian")
     }
 }
+
+@MainActor
+private final class MuestreadorDeColorFalso: PuertoMuestreadorDeColor {
+    var colorSimulado: ColorMuestreado? = ColorMuestreado(rojo: 1.0, verde: 1.0, azul: 1.0)
+    var copiados: [String] = []
+
+    func muestrearColorEnPantalla() async -> ColorMuestreado? {
+        colorSimulado
+    }
+
+    func copiarAlPortapapeles(_ texto: String) {
+        copiados.append(texto)
+    }
+}
+
+extension EspejoYAirDropFeaturesTests {
+    @Test func colorPickerCalculaFormatosYContrasteWCAG() async {
+        let blanco = ColorMuestreado(rojo: 1.0, verde: 1.0, azul: 1.0)
+        let negro = ColorMuestreado(rojo: 0.0, verde: 0.0, azul: 0.0)
+        #expect(blanco.hex == "#FFFFFF")
+        #expect(blanco.rgbTexto == "rgb(255, 255, 255)")
+        #expect(blanco.contrasteWCAG(contra: negro) > 20.9)
+
+        let muestreador = MuestreadorDeColorFalso()
+        let suiteName = "notchy.colorpicker.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let modelo = ModeloDeColorPicker(muestreador: muestreador, defaults: defaults)
+        await modelo.muestrearColorPrimario()
+        #expect(modelo.colorPrimario.hex == "#FFFFFF")
+        #expect(modelo.cumpleAA == true)
+        #expect(modelo.cumpleAAA == true)
+        #expect(modelo.cumpleLarge == true)
+
+        modelo.intercambiarColores()
+        #expect(modelo.colorFondo.hex == "#FFFFFF")
+    }
+
+    @Test func ahoraSuenaParseaLetrasSincronizadasLRC() {
+        let lrc = """
+            [00:12.00] Primera línea de la canción
+            [00:18.50] Segunda línea cantando
+            [00:25.00] Tercera línea del coro
+            """
+        let lineas = ModeloDeAhoraSuena.parsearLRC(lrc)
+        #expect(lineas.count == 3)
+        #expect(lineas[0].tiempoSegundos == 12.0)
+        #expect(lineas[1].texto == "Segunda línea cantando")
+
+        let letra = LetraDeCancion(titulo: "Canción", artista: "Artista", lineas: lineas)
+        #expect(letra.indiceActivo(en: 10.0) == 0)
+        #expect(letra.indiceActivo(en: 19.0) == 1)
+        #expect(letra.indiceActivo(en: 30.0) == 2)
+    }
+
+    @Test func screenTimeCategorizaYOrdenaPorTiempo() {
+        let suiteName = "notchy.screentime.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let modelo = ModeloDeScreenTime(defaults: defaults)
+        modelo.registrarTiempoManual(
+            bundleID: "com.apple.dt.Xcode",
+            nombre: "Xcode",
+            segundos: 5400,
+            cambios: 8
+        )
+        #expect(ModeloDeScreenTime.categorizar(bundleID: "com.apple.dt.Xcode", nombre: "Xcode") == .desarrollo)
+        #expect(ModeloDeScreenTime.categorizar(bundleID: "md.obsidian", nombre: "Obsidian") == .productividad)
+        #expect(modelo.appsOrdenadas.first?.bundleId == "com.apple.dt.Xcode")
+    }
+
+    @Test func ajustesGuardaSieteTemasDePanelYNueveDeBarra() {
+        #expect(TemaDePanel.allCases.count == 7)
+        #expect(TemaDeBarra.allCases.count == 9)
+
+        let ajustes = Ajustes(almacen: AlmacenEnMemoria())
+        #expect(ajustes.temaPanel == .obsidiana)
+        #expect(ajustes.temaBarra == .clasico)
+
+        ajustes.temaPanel = .ciruela
+        ajustes.temaBarra = .caratula
+        #expect(ajustes.temaPanel == .ciruela)
+        #expect(ajustes.temaBarra == .caratula)
+    }
+}
