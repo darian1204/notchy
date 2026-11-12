@@ -2,7 +2,7 @@
 RAIZ=${0:A:h:h}
 DERIVADOS=$RAIZ/build/DerivedData
 REGISTROS=$RAIZ/build/logs
-APP=$DERIVADOS/Build/Products/Debug/Isla.app
+APP=$DERIVADOS/Build/Products/Debug/Notchy.app
 mkdir -p $REGISTROS
 
 # Lee un ajuste de Config/Base.xcconfig, que es la única fuente del identificador y del equipo.
@@ -12,6 +12,6 @@ ajuste() {
 
 # compilar_app [ajustes de xcodebuild…]: deja el registro en build/logs/app.log.
 compilar_app() {
-    xcodebuild -project $RAIZ/Isla.xcodeproj -scheme Isla -configuration Debug \
+    xcodebuild -project $RAIZ/Notchy.xcodeproj -scheme Notchy -configuration Debug \
         -derivedDataPath $DERIVADOS -allowProvisioningUpdates build "$@" > $REGISTROS/app.log 2>&1
 }

@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Muestra identidad, equipo y entitlements de la app compilada.
-# Con --estricto compara contra Config/Base.xcconfig y App/Isla.entitlements y sale con 1 si algo no coincide.
+# Con --estricto compara contra Config/Base.xcconfig y App/Notchy.entitlements y sale con 1 si algo no coincide.
 set -u
 source ${0:A:h}/comun.zsh
 
@@ -24,7 +24,7 @@ print -- $permisos | sed 's/^/  /'
 
 fallos=0
 falla() { print -- "   FALLA: $1"; fallos=$((fallos + 1)) }
-esperados=$(plutil -convert json -o - $RAIZ/App/Isla.entitlements | tr ',' '\n' | sed -nE 's/.*"(com\.apple\.[^"]*)".*true.*/\1/p' | sort)
+esperados=$(plutil -convert json -o - $RAIZ/App/Notchy.entitlements | tr ',' '\n' | sed -nE 's/.*"(com\.apple\.[^"]*)".*true.*/\1/p' | sort)
 
 codesign --verify --strict $APP 2> /dev/null || falla "la firma no verifica"
 [[ $identificador == $(ajuste PRODUCT_BUNDLE_IDENTIFIER) ]] || falla "identificador distinto al de Base.xcconfig"
@@ -32,7 +32,7 @@ codesign --verify --strict $APP 2> /dev/null || falla "la firma no verifica"
 [[ $autoridad == "Apple Development:"* ]] || falla "no está firmada con Apple Development"
 [[ $banderas == *runtime* ]] || falla "sin Hardened Runtime"
 # Xcode agrega get-task-allow en Debug para poder depurar; no cuenta como diferencia.
-[[ $(print -- $permisos | /usr/bin/grep -v get-task-allow) == $esperados ]] || falla "los entitlements no coinciden con App/Isla.entitlements"
+[[ $(print -- $permisos | /usr/bin/grep -v get-task-allow) == $esperados ]] || falla "los entitlements no coinciden con App/Notchy.entitlements"
 [[ $(plutil -extract LSUIElement raw $APP/Contents/Info.plist 2> /dev/null) == true ]] || falla "el plist compilado no trae LSUIElement"
 [[ $(plutil -extract CFBundleIdentifier raw $APP/Contents/Info.plist 2> /dev/null) == $identificador ]] || falla "el plist compilado trae otro identificador"
 (( fallos == 0 ))

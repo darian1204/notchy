@@ -1,4 +1,4 @@
-# Isla
+# Notchy
 
 App personal para el notch de mi MacBook Air M4: portapapeles, agenda, bandeja de archivos, música, reuniones transcritas en el propio Mac y un agente de voz. Solo macOS 27, solo arm64, solo para uso mío.
 
@@ -17,14 +17,14 @@ Estado: **M0**, el esqueleto. La app abre sin ventana y sin pedir permisos; las 
 | `scripts/run` | Compila, firma y abre la app de depuración |
 | `scripts/verificar-firma` | Muestra identidad, equipo y entitlements de la app compilada |
 
-Los registros largos quedan en `build/logs`. Para trabajar solo en el paquete: `swift test --package-path Packages/IslaKit`.
+Los registros largos quedan en `build/logs`. Para trabajar solo en el paquete: `swift test --package-path Packages/NotchyKit`.
 
 ## Estructura
 
 ```
 App/                 arranque, Info.plist, entitlements y assets
 Config/              ajustes de compilación (.xcconfig)
-Packages/IslaKit/    todas las capas y sus pruebas
+Packages/NotchyKit/    todas las capas y sus pruebas
 Resources/opencode/  plantilla de config, prompt del agente y versión fijada
 scripts/             check, run, verificar-firma
 docs/                resumen de arquitectura
@@ -34,4 +34,4 @@ La app es delgada: solo ensambla. Las capas y sus reglas están en `docs/arquite
 
 ## No cambiar sin pensarlo
 
-El identificador `dev.darian.isla` y el equipo de firma viven en `Config/Base.xcconfig`. Cambiarlos reinicia todos los permisos del sistema.
+El identificador `dev.darian.notchy` y el equipo de firma viven en `Config/Base.xcconfig`. Cambiarlos reinicia todos los permisos del sistema.

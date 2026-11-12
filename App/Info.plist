@@ -25,20 +25,20 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Isla usa el micrófono para grabar y transcribir reuniones.</string>
+	<string>Notchy usa el micrófono para grabar y transcribir reuniones.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Isla graba el audio del sistema para transcribir reuniones.</string>
+	<string>Notchy graba el audio del sistema para transcribir reuniones.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Isla transcribe en este Mac lo que se dice en tus reuniones y notas de voz.</string>
+	<string>Notchy transcribe en este Mac lo que se dice en tus reuniones y notas de voz.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Isla usa la cámara para el espejo del notch.</string>
+	<string>Notchy usa la cámara para el espejo del notch.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Isla muestra tu agenda del día en el notch.</string>
+	<string>Notchy muestra tu agenda del día en el notch.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Isla muestra y completa tus pendientes de la lista Obsidian.</string>
+	<string>Notchy muestra y completa tus pendientes de la lista Obsidian.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Isla lee qué suena en Música y Spotify cuando falla el método principal.</string>
+	<string>Notchy lee qué suena en Música y Spotify cuando falla el método principal.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
-	<string>Isla vigila Descargas para avisarte de lo que llega por AirDrop.</string>
+	<string>Notchy vigila Descargas para avisarte de lo que llega por AirDrop.</string>
 </dict>
 </plist>

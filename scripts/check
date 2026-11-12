@@ -10,40 +10,40 @@ paso() { print -- "== $1" }
 falla() { print -- "   FALLA: $1"; fallos=$((fallos + 1)) }
 
 paso "Formato"
-fuentes=(App Packages/IslaKit/Sources Packages/IslaKit/Tests Packages/IslaKit/Package.swift)
+fuentes=(App Packages/NotchyKit/Sources Packages/NotchyKit/Tests Packages/NotchyKit/Package.swift)
 xcrun swift-format lint --strict --recursive $fuentes || falla "swift-format (arregla con: xcrun swift-format format -i -r $fuentes)"
 
 paso "Capas"
 typeset -A permitido
 permitido=(
-    IslaCore ""
-    IslaDesign ""
-    IslaStorage "IslaCore GRDB"
-    IslaPlatform "IslaCore"
-    IslaIsland "IslaCore IslaDesign"
-    IslaFeatures "IslaCore IslaStorage IslaDesign"
-    IslaAgent "IslaCore IslaStorage MCP"
-    IslaTestSupport "IslaCore"
+    NotchyCore ""
+    NotchyDesign ""
+    NotchyStorage "NotchyCore GRDB"
+    NotchyPlatform "NotchyCore"
+    NotchyIsland "NotchyCore NotchyDesign"
+    NotchyFeatures "NotchyCore NotchyStorage NotchyDesign"
+    NotchyAgent "NotchyCore NotchyStorage MCP"
+    NotchyTestSupport "NotchyCore"
 )
-for carpeta in Packages/IslaKit/Sources/*(/); do
+for carpeta in Packages/NotchyKit/Sources/*(/); do
     capa=${carpeta:t}
     if (( ! ${+permitido[$capa]} )); then
         falla "la capa $capa no está en la regla de scripts/check"
         continue
     fi
-    /usr/bin/grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(Isla[A-Za-z]*|GRDB|MCP)' $carpeta |
+    /usr/bin/grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(Notchy[A-Za-z]*|GRDB|MCP)' $carpeta |
         while IFS= read -r linea; do
             modulo=$(print -- $linea | sed -E 's/.*import[[:space:]]+([A-Za-z]+).*/\1/')
             [[ " ${permitido[$capa]} " == *" $modulo "* ]] || falla "$capa no puede importar $modulo ($linea)"
         done
 done
 for capa in ${(k)permitido}; do
-    [[ -d Packages/IslaKit/Sources/$capa ]] || falla "falta la capa $capa"
+    [[ -d Packages/NotchyKit/Sources/$capa ]] || falla "falta la capa $capa"
 done
 
 paso "Info.plist y entitlements"
 plutil -lint -s App/Info.plist || falla "App/Info.plist no es un plist válido"
-plutil -lint -s App/Isla.entitlements || falla "App/Isla.entitlements no es un plist válido"
+plutil -lint -s App/Notchy.entitlements || falla "App/Notchy.entitlements no es un plist válido"
 claves=(
     LSUIElement NSMicrophoneUsageDescription NSAudioCaptureUsageDescription NSSpeechRecognitionUsageDescription
     NSCameraUsageDescription NSCalendarsFullAccessUsageDescription NSRemindersFullAccessUsageDescription
@@ -60,8 +60,8 @@ if git ls-files -co --exclude-standard -z | xargs -0 /usr/bin/grep -IEn -- $patr
 fi
 
 paso "Paquete: compilación estricta y pruebas"
-if ISLA_ESTRICTO=1 swift build --package-path Packages/IslaKit --build-tests > $REGISTROS/paquete.log 2>&1; then
-    if ISLA_ESTRICTO=1 swift test --package-path Packages/IslaKit > $REGISTROS/pruebas.log 2>&1; then
+if NOTCHY_ESTRICTO=1 swift build --package-path Packages/NotchyKit --build-tests > $REGISTROS/paquete.log 2>&1; then
+    if NOTCHY_ESTRICTO=1 swift test --package-path Packages/NotchyKit > $REGISTROS/pruebas.log 2>&1; then
         print -- "   $(/usr/bin/grep -cE 'Test .*\(\) passed after' $REGISTROS/pruebas.log) pruebas pasan"
     else
         /usr/bin/grep -E "error|failed|Expectation" $REGISTROS/pruebas.log | head -20
@@ -73,11 +73,11 @@ else
 fi
 
 paso "App: compilación estricta"
-if compilar_app ISLA_ESTRICTO=YES; then
+if compilar_app NOTCHY_ESTRICTO=YES; then
     paso "Firma y plist compilado"
     $RAIZ/scripts/verificar-firma --estricto || falla "firma"
 else
-    /usr/bin/grep -E "error:|warning: .*(App|IslaKit)/" $REGISTROS/app.log | sort -u | head -20
+    /usr/bin/grep -E "error:|warning: .*(App|NotchyKit)/" $REGISTROS/app.log | sort -u | head -20
     falla "compilación de la app (build/logs/app.log)"
 fi
 

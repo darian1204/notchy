@@ -1,0 +1,118 @@
+{
+  "default-configuration": "Release",
+  "configurations": [
+    "Debug",
+    "Release",
+  ],
+  "localizations": {
+    "development": "es",
+    "supported": [
+      "Base",
+      "es",
+    ],
+  },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "Packages/NotchyKit",
+    },
+  ],
+  "files": [
+    { "kind": "folder", "path": "App/Sources", "target-membership": [ "Notchy" ] },
+    { "path": "App/Info.plist" },
+    { "path": "App/Notchy.entitlements" },
+    {
+      "kind": "group",
+      "path": "Config",
+      "children": [
+        { "path": "Base.xcconfig" },
+        { "path": "Debug.xcconfig" },
+        { "path": "Release.xcconfig" },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/Notchy.app", "id": "15A000000000000000000002", "type": "wrapper.application", "index": false },
+      ],
+    },
+  ],
+  "targets": [
+    {
+      "name": "Notchy",
+      "id": "15A000000000000000000001",
+      "product": "Products/Notchy.app",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "id": "15A000000000000000000003", "name": "Debug", "file": "Config/Debug.xcconfig" },
+        { "id": "15A000000000000000000004", "name": "Release", "file": "Config/Release.xcconfig" },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "package-product-members": [
+        {
+          "package": "NotchyKit",
+          "product-name": "NotchyAgent",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "NotchyKit",
+          "product-name": "NotchyCore",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "NotchyKit",
+          "product-name": "NotchyDesign",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "NotchyKit",
+          "product-name": "NotchyFeatures",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "NotchyKit",
+          "product-name": "NotchyIsland",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "NotchyKit",
+          "product-name": "NotchyPlatform",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "NotchyKit",
+          "product-name": "NotchyStorage",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+    },
+  ],
+  "build-settings": {
+    "ALWAYS_SEARCH_USER_PATHS": "NO",
+    "ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS": "YES",
+    "CLANG_ANALYZER_NONNULL": "YES",
+    "CLANG_ENABLE_MODULES": "YES",
+    "CLANG_ENABLE_OBJC_ARC": "YES",
+    "CLANG_ENABLE_OBJC_WEAK": "YES",
+    "CLANG_WARN_UNGUARDED_AVAILABILITY": "YES_AGGRESSIVE",
+    "COPY_PHASE_STRIP": "NO",
+    "DEBUG_INFORMATION_FORMAT[config=Debug]": "dwarf",
+    "DEBUG_INFORMATION_FORMAT[config=Release]": "dwarf-with-dsym",
+    "ENABLE_NS_ASSERTIONS[config=Release]": "NO",
+    "ENABLE_STRICT_OBJC_MSGSEND": "YES",
+    "ENABLE_TESTABILITY[config=Debug]": "YES",
+    "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+    "GCC_NO_COMMON_BLOCKS": "YES",
+    "GCC_OPTIMIZATION_LEVEL[config=Debug]": "0",
+    "GCC_PREPROCESSOR_DEFINITIONS[config=Debug]": [
+      "DEBUG=1",
+      "$(inherited)",
+    ],
+    "LOCALIZATION_PREFERS_STRING_CATALOGS": "YES",
+    "ONLY_ACTIVE_ARCH[config=Debug]": "YES",
+    "SDKROOT": "macosx",
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Debug]": "DEBUG $(inherited)",
+    "SWIFT_COMPILATION_MODE[config=Release]": "wholemodule",
+    "SWIFT_OPTIMIZATION_LEVEL[config=Debug]": "-Onone",
+  },
+  "last-upgrade": "27.2",
+  "last-swift-update": "27.2",
+}

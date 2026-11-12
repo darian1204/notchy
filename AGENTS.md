@@ -1,6 +1,6 @@
 # Reglas para agentes
 
-Aplican a cualquier agente que toque este repo. La fuente de verdad del diseño es el vault de Darian (`03-proyectos/programacion/isla/`); este archivo resume lo que no se negocia.
+Aplican a cualquier agente que toque este repo. La fuente de verdad del diseño es el vault de Darian (`03-proyectos/programacion/notchy/`); este archivo resume lo que no se negocia.
 
 ## Antes de tocar nada
 
@@ -9,34 +9,34 @@ Aplican a cualquier agente que toque este repo. La fuente de verdad del diseño 
 
 ## Capas
 
-Todo el código vive en `Packages/IslaKit`. `App/` solo ensambla.
+Todo el código vive en `Packages/NotchyKit`. `App/` solo ensambla.
 
 | Capa | Puede importar |
 |---|---|
-| IslaCore | nada del proyecto |
-| IslaDesign | nada del proyecto (solo SwiftUI) |
-| IslaStorage | IslaCore, GRDB |
-| IslaPlatform | IslaCore |
-| IslaIsland | IslaCore, IslaDesign |
-| IslaFeatures | IslaCore, IslaStorage, IslaDesign |
-| IslaAgent | IslaCore, IslaStorage, MCP |
-| IslaTestSupport | IslaCore |
+| NotchyCore | nada del proyecto |
+| NotchyDesign | nada del proyecto (solo SwiftUI) |
+| NotchyStorage | NotchyCore, GRDB |
+| NotchyPlatform | NotchyCore |
+| NotchyIsland | NotchyCore, NotchyDesign |
+| NotchyFeatures | NotchyCore, NotchyStorage, NotchyDesign |
+| NotchyAgent | NotchyCore, NotchyStorage, MCP |
+| NotchyTestSupport | NotchyCore |
 
-- IslaFeatures nunca importa IslaPlatform: habla con el sistema por puertos definidos en IslaCore.
-- La regla está en dos lugares que deben coincidir: `Packages/IslaKit/Package.swift` y `scripts/check`.
+- NotchyFeatures nunca importa NotchyPlatform: habla con el sistema por puertos definidos en NotchyCore.
+- La regla está en dos lugares que deben coincidir: `Packages/NotchyKit/Package.swift` y `scripts/check`.
 - Sin dependencias externas nuevas sin permiso de Darian. Hoy son GRDB y el SDK de MCP.
 
 ## Código
 
 - Swift 6 con concurrencia estricta. Las advertencias son errores en `scripts/check`.
-- Formato con `xcrun swift-format format -i -r App Packages/IslaKit`.
+- Formato con `xcrun swift-format format -i -r App Packages/NotchyKit`.
 - Pruebas con Swift Testing, una carpeta por capa. Lo nuevo entra con pruebas.
 - Nombres y comentarios en español; términos técnicos en inglés cuando así se usan.
 
 ## Firma y permisos
 
 - No cambies `PRODUCT_BUNDLE_IDENTIFIER`, `DEVELOPMENT_TEAM` ni el estilo de firma: reinicia los permisos del sistema.
-- `App/Info.plist` y `App/Isla.entitlements` se escriben a mano. Un permiso nuevo necesita su texto de uso y su línea en `scripts/check`.
+- `App/Info.plist` y `App/Notchy.entitlements` se escriben a mano. Un permiso nuevo necesita su texto de uso y su línea en `scripts/check`.
 - Sin App Sandbox y con Hardened Runtime; no lo cambies.
 
 ## Git

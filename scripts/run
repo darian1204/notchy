@@ -8,7 +8,7 @@ if ! compilar_app; then
     print -- "No compiló. Registro: build/logs/app.log"
     exit 1
 fi
-pkill -x Isla 2> /dev/null && sleep 1
+pkill -x Notchy 2> /dev/null && sleep 1
 open -n $APP --args "$@"
 sleep 1
-print -- "Isla abierta (pid $(pgrep -x Isla | head -1)). Para cerrarla: pkill -x Isla"
+print -- "Notchy abierta (pid $(pgrep -x Notchy | head -1)). Para cerrarla: pkill -x Notchy"
