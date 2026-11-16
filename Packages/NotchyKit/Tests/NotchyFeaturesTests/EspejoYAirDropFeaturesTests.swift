@@ -213,7 +213,7 @@ private final class AgenteOpenCodeFalso: PuertoAgenteOpenCode {
     func estaDisponible() -> Bool { disponible }
 
     func modelosDisponibles() async -> [String] {
-        ["openai/gpt-5.4-fast", "opencode/glm-5.3-flash-free"]
+        ["opencode/glm-5.3-flash-free", "opencode/big-pickle"]
     }
 
     func enviarMensaje(

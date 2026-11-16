@@ -15,7 +15,7 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
 
     public func modelosDisponibles() async -> [String] {
         guard case .instalado(let ruta) = DetectorDeOpenCode.detectar() else {
-            return ["openai/gpt-5.4-fast", "opencode/glm-5.3-flash-free"]
+            return ProveedoresDelAgente.modelosDeRespaldo
         }
         return await Task.detached {
             let proceso = Process()
@@ -34,9 +34,10 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
                     .components(separatedBy: .newlines)
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty && $0.contains("/") }
-                return lineas.isEmpty ? ["openai/gpt-5.4-fast", "opencode/glm-5.3-flash-free"] : lineas
+                let permitidos = ProveedoresDelAgente.filtrar(lineas)
+                return permitidos.isEmpty ? ProveedoresDelAgente.modelosDeRespaldo : permitidos
             } catch {
-                return ["openai/gpt-5.4-fast", "opencode/glm-5.3-flash-free"]
+                return ProveedoresDelAgente.modelosDeRespaldo
             }
         }.value
     }

@@ -12,11 +12,7 @@ public final class ModeloDeAgente {
     public private(set) var mensajes: [MensajeDeAgente] = []
     public var entrada = ""
     public private(set) var respondiendo = false
-    public private(set) var modelosDisponibles: [String] = [
-        "openai/gpt-5.4-fast",
-        "openai/gpt-5.6-luna-fast",
-        "opencode/glm-5.3-flash-free",
-    ]
+    public private(set) var modelosDisponibles: [String] = ProveedoresDelAgente.modelosDeRespaldo
     public var modeloSeleccionado: String {
         didSet { defaults.set(modeloSeleccionado, forKey: Self.claveModelo) }
     }
@@ -36,7 +32,10 @@ public final class ModeloDeAgente {
         self.puerto = puerto
         self.ajustes = ajustes
         self.defaults = defaults
-        self.modeloSeleccionado = defaults.string(forKey: Self.claveModelo) ?? "openai/gpt-5.4-fast"
+        self.modeloSeleccionado = ProveedoresDelAgente.resolver(
+            elegido: defaults.string(forKey: Self.claveModelo),
+            disponibles: ProveedoresDelAgente.modelosDeRespaldo
+        )
         self.mensajes = [
             MensajeDeAgente(
                 rol: .asistente,
@@ -50,14 +49,13 @@ public final class ModeloDeAgente {
     }
 
     public func cargarModelos() async {
-        let lista = await puerto.modelosDisponibles()
+        let lista = ProveedoresDelAgente.filtrar(await puerto.modelosDisponibles())
         if !lista.isEmpty {
             modelosDisponibles = lista
-            if !lista.contains(modeloSeleccionado),
-                let preferido = lista.first(where: { $0.contains("gpt-5.4-fast") }) ?? lista.first
-            {
-                modeloSeleccionado = preferido
-            }
+        }
+        let resuelto = ProveedoresDelAgente.resolver(elegido: modeloSeleccionado, disponibles: modelosDisponibles)
+        if resuelto != modeloSeleccionado {
+            modeloSeleccionado = resuelto
         }
     }
 

@@ -43,7 +43,7 @@ public final class ModeloDeTraductor {
                     "Translate the following text from \(origen.nombreCompleto) to \(destino.nombreCompleto). Reply ONLY with the translated text, without quotes or explanations:\n\n\(limpio)"
                 if let res = try? await agente.enviarMensaje(
                     prompt: prompt,
-                    modelo: "openai/gpt-5.4-fast",
+                    modelo: ProveedoresDelAgente.modeloPorDefecto,
                     sesionID: nil,
                     directorio: nil,
                     alRecibirFragmento: { parcial, _ in

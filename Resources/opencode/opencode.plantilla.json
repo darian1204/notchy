@@ -3,8 +3,8 @@
   "autoupdate": false,
   "share": "disabled",
   "default_agent": "notchy",
-  "enabled_providers": ["openai"],
-  "model": "openai/gpt-5.6-luna",
+  "enabled_providers": ["opencode"],
+  "model": "opencode/glm-5.3-flash-free",
   "agent": {
     "notchy": {
       "description": "Agente de voz de Notchy",
