@@ -91,19 +91,52 @@ public final class VigilanteDeHUDSistema {
             }
         case 2, 3:
             // NX_KEYTYPE_BRIGHTNESS_UP (2), BRIGHTNESS_DOWN (3)
+            // Se lee el brillo real después de que macOS aplica el cambio; solo se estima si no hay lectura.
             let delta = keyCode == 2 ? 0.0625 : -0.0625
-            let nivel = Self.estimarBrillo(delta: delta)
-            alDisparar(EstadoDeHUDSistema(tipo: .brillo, nivel: nivel))
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(60))
+                guard let self else { return }
+                let nivel = Self.leerBrilloDePantalla() ?? Self.estimarBrillo(delta: delta)
+                self.alDisparar(EstadoDeHUDSistema(tipo: .brillo, nivel: nivel))
+            }
         default:
             break
         }
     }
 
-    private static var brilloEstimado: Double = 0.75
+    private static var brilloEstimado: Double = 0.5
 
     private static func estimarBrillo(delta: Double) -> Double {
         brilloEstimado = min(max(brilloEstimado + delta, 0.0), 1.0)
         return brilloEstimado
+    }
+
+    private typealias FuncionLeerBrillo = @convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32
+
+    /// `DisplayServicesGetBrightness` (framework privado) devuelve el brillo real de la pantalla integrada (0…1).
+    private static let funcionLeerBrillo: FuncionLeerBrillo? = {
+        let ruta = "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices"
+        guard let handle = dlopen(ruta, RTLD_LAZY),
+            let simbolo = dlsym(handle, "DisplayServicesGetBrightness")
+        else {
+            return nil
+        }
+        return unsafeBitCast(simbolo, to: FuncionLeerBrillo.self)
+    }()
+
+    /// Brillo real de la pantalla integrada (o la principal si no hay integrada).
+    public static func leerBrilloDePantalla() -> Double? {
+        guard let leer = funcionLeerBrillo else { return nil }
+        var pantallas = [CGDirectDisplayID](repeating: 0, count: 8)
+        var cantidad: UInt32 = 0
+        CGGetOnlineDisplayList(UInt32(pantallas.count), &pantallas, &cantidad)
+        let candidatas = pantallas.prefix(Int(cantidad))
+        let pantalla = candidatas.first(where: { CGDisplayIsBuiltin($0) != 0 }) ?? CGMainDisplayID()
+        var brillo: Float = 0
+        guard leer(pantalla, &brillo) == 0 else { return nil }
+        let nivel = Double(min(max(brillo, 0), 1))
+        brilloEstimado = nivel
+        return nivel
     }
 
     public static func leerVolumenDeSalida() -> (volumen: Double, silenciado: Bool) {

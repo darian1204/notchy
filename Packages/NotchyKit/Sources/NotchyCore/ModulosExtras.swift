@@ -420,6 +420,14 @@ public struct NotificacionReciente: Sendable, Equatable, Codable, Identifiable {
     }
 }
 
+/// Lee las notificaciones que macOS entregó a cualquier app (base de Notification Center).
+public protocol PuertoDeNotificacionesDelSistema: Sendable {
+    /// `false` si falta Acceso total al disco o la base no existe.
+    func tieneAcceso() -> Bool
+    /// Notificaciones entregadas, más recientes primero.
+    func recientes(limite: Int) async throws -> [NotificacionReciente]
+}
+
 // MARK: - Minichatbot Agéntico (OpenCode)
 
 public struct MensajeDeAgente: Sendable, Equatable, Codable, Identifiable {

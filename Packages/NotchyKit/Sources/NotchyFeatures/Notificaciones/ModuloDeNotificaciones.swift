@@ -12,21 +12,39 @@ public final class ModeloDeNotificaciones {
     public private(set) var notificaciones: [NotificacionReciente] = []
     public var appFiltro: String?
 
+    /// `false` cuando falta Acceso total al disco para leer las notificaciones de macOS.
+    public private(set) var accesoAlSistema: Bool = true
+
     @ObservationIgnored private let bus: BusDeEventos?
+    @ObservationIgnored private let sistema: (any PuertoDeNotificacionesDelSistema)?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var tareaEventos: Task<Void, Never>?
+    @ObservationIgnored private var tareaSistema: Task<Void, Never>?
+    @ObservationIgnored private var descartadas: Set<String>
+    @ObservationIgnored private var limpiadoHasta: Date
     @ObservationIgnored private static let claveGuardadas = "notchy.notificaciones.recientes"
+    @ObservationIgnored private static let claveDescartadas = "notchy.notificaciones.descartadas"
+    @ObservationIgnored private static let claveLimpiadoHasta = "notchy.notificaciones.limpiadoHasta"
+    @ObservationIgnored private static let limite = 50
 
-    public init(bus: BusDeEventos? = nil, defaults: UserDefaults = .standard) {
+    public init(
+        bus: BusDeEventos? = nil,
+        sistema: (any PuertoDeNotificacionesDelSistema)? = nil,
+        defaults: UserDefaults = .standard
+    ) {
         self.bus = bus
+        self.sistema = sistema
         self.defaults = defaults
+        self.descartadas = Set(defaults.stringArray(forKey: Self.claveDescartadas) ?? [])
+        self.limpiadoHasta = defaults.object(forKey: Self.claveLimpiadoHasta) as? Date ?? .distantPast
         if let datos = defaults.data(forKey: Self.claveGuardadas),
-            let guardadas = try? JSONDecoder().decode([NotificacionReciente].self, from: datos),
-            !guardadas.isEmpty
+            let guardadas = try? JSONDecoder().decode([NotificacionReciente].self, from: datos)
         {
-            self.notificaciones = guardadas
+            // Quita los ejemplos de demostración que guardaban versiones anteriores.
+            let ejemplos = Set(Self.notificacionesIniciales().map(\.titulo))
+            self.notificaciones = guardadas.filter { !ejemplos.contains($0.titulo) }
         } else {
-            self.notificaciones = Self.notificacionesIniciales()
+            self.notificaciones = []
         }
     }
 
@@ -45,6 +63,7 @@ public final class ModeloDeNotificaciones {
 
     public func iniciar() {
         detener()
+        iniciarLecturaDelSistema()
         guard let bus else { return }
         tareaEventos = Task { [weak self] in
             await withTaskGroup(of: Void.self) { grupo in
@@ -89,6 +108,56 @@ public final class ModeloDeNotificaciones {
     public func detener() {
         tareaEventos?.cancel()
         tareaEventos = nil
+        tareaSistema?.cancel()
+        tareaSistema = nil
+    }
+
+    // MARK: Notificaciones de macOS
+
+    private func iniciarLecturaDelSistema() {
+        guard sistema != nil else { return }
+        tareaSistema = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.sincronizarConElSistema()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    /// Mezcla lo que entregó macOS con lo propio de Notchy, conservando leídas y descartadas.
+    public func sincronizarConElSistema() async {
+        guard let sistema else { return }
+        guard sistema.tieneAcceso() else {
+            accesoAlSistema = false
+            return
+        }
+        do {
+            let delSistema = try await sistema.recientes(limite: Self.limite)
+            accesoAlSistema = true
+            let leidas = Set(notificaciones.filter(\.leida).map(\.id))
+            let nuevas =
+                delSistema
+                .filter { !descartadas.contains($0.id) && $0.fecha > limpiadoHasta }
+                .map { item -> NotificacionReciente in
+                    var copia = item
+                    copia.leida = leidas.contains(item.id)
+                    return copia
+                }
+            let propias = notificaciones.filter { !$0.id.hasPrefix("nc-") }
+            let mezcla = Array((nuevas + propias).sorted { $0.fecha > $1.fecha }.prefix(Self.limite))
+            if mezcla != notificaciones {
+                notificaciones = mezcla
+                guardar()
+            }
+        } catch {
+            accesoAlSistema = false
+        }
+    }
+
+    public func abrirAjustesDeAccesoAlDisco() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     public func registrar(_ nueva: NotificacionReciente) {
@@ -102,6 +171,10 @@ public final class ModeloDeNotificaciones {
 
     public func descartar(_ id: String) {
         notificaciones.removeAll { $0.id == id }
+        if id.hasPrefix("nc-") {
+            descartadas.insert(id)
+            defaults.set(Array(descartadas.suffix(500)), forKey: Self.claveDescartadas)
+        }
         guardar()
     }
 
@@ -114,6 +187,10 @@ public final class ModeloDeNotificaciones {
 
     public func limpiarTodas() {
         notificaciones.removeAll()
+        limpiadoHasta = .now
+        defaults.set(limpiadoHasta, forKey: Self.claveLimpiadoHasta)
+        descartadas.removeAll()
+        defaults.removeObject(forKey: Self.claveDescartadas)
         guardar()
     }
 
@@ -188,7 +265,9 @@ public final class ModuloDeNotificaciones: ModuloDeIsla {
         self.modelo = modelo
     }
 
-    public var salud: SaludDeModulo { .listo }
+    public var salud: SaludDeModulo {
+        modelo.accesoAlSistema ? .listo : .faltaPermiso("Acceso total al disco")
+    }
 
     public var vistaExpandida: AnyView {
         AnyView(VistaDeNotificaciones(modelo: modelo))
@@ -209,6 +288,9 @@ struct VistaDeNotificaciones: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             encabezado
+            if !modelo.accesoAlSistema {
+                avisoDeAccesoAlDisco
+            }
             if modelo.notificacionesFiltradas.isEmpty {
                 Spacer(minLength: 0)
                 HStack {
@@ -234,6 +316,28 @@ struct VistaDeNotificaciones: View {
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    private var avisoDeAccesoAlDisco: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Paleta.notificaciones)
+            Text("Para ver todas las notificaciones de la Mac, da Acceso total al disco a Notchy.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(Paleta.textoDeApoyo)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            Button("Abrir Ajustes") { modelo.abrirAjustesDeAccesoAlDisco() }
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Paleta.notificaciones, in: Capsule())
+                .buttonStyle(.plain)
+        }
+        .padding(8)
+        .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var encabezado: some View {

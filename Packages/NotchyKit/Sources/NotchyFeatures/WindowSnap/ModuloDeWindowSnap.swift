@@ -33,8 +33,36 @@ public final class ModeloDeWindowSnap {
         .centrar,
     ]
 
+    public private(set) var tienePermiso: Bool
+
+    @ObservationIgnored private var tareaEsperaPermiso: Task<Void, Never>?
+    @ObservationIgnored private var observadorAccesibilidad: NSObjectProtocol?
+
     public init(puerto: any PuertoWindowSnap) {
         self.puerto = puerto
+        self.tienePermiso = puerto.tienePermisoAccesibilidad
+        // macOS avisa por este canal cuando cambia la lista de apps con Accesibilidad.
+        observadorAccesibilidad = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.accessibility.api"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                self?.refrescarPermiso()
+            }
+        }
+    }
+
+    /// Relee el permiso de Accesibilidad; la vista se actualiza sola al cambiar.
+    public func refrescarPermiso() {
+        let actual = puerto.tienePermisoAccesibilidad
+        if actual != tienePermiso { tienePermiso = actual }
+        if actual {
+            tareaEsperaPermiso?.cancel()
+            tareaEsperaPermiso = nil
+            if estadoMensaje?.hasPrefix("Concede permiso") == true { estadoMensaje = nil }
+        }
     }
 
     public var nombreApp: String {
@@ -45,12 +73,26 @@ public final class ModeloDeWindowSnap {
         puerto.bundleIdObjetivo
     }
 
-    public var tienePermiso: Bool {
-        puerto.tienePermisoAccesibilidad
-    }
-
     public func pedirPermiso() {
         puerto.pedirPermisoAccesibilidad()
+        // El aviso del sistema solo sale una vez; abrir Ajustes directo cubre el resto.
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+        esperarPermiso()
+    }
+
+    /// Revisa cada segundo (hasta 2 min) si ya se concedió, por si no llega la notificación del sistema.
+    private func esperarPermiso() {
+        tareaEsperaPermiso?.cancel()
+        tareaEsperaPermiso = Task { [weak self] in
+            for _ in 0..<120 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let self else { return }
+                self.refrescarPermiso()
+                if self.tienePermiso { return }
+            }
+        }
     }
 
     public func aplicar(_ disposicion: DisposicionDeVentana) {
@@ -59,7 +101,8 @@ public final class ModeloDeWindowSnap {
         if exito {
             estadoMensaje = "\(disposicion.titulo) aplicado a \(nombreApp)"
         } else if !puerto.tienePermisoAccesibilidad {
-            puerto.pedirPermisoAccesibilidad()
+            refrescarPermiso()
+            pedirPermiso()
             estadoMensaje = "Concede permiso de Accesibilidad para redimensionar \(nombreApp)"
         } else {
             estadoMensaje = "No se encontró ventana redimensionable en \(nombreApp)"
@@ -85,7 +128,7 @@ public final class ModuloDeWindowSnap: ModuloDeIsla {
     }
 
     public var salud: SaludDeModulo {
-        modelo.tienePermiso ? .listo : .faltaPermiso("Accesibilidad")
+        modelo.puerto.tienePermisoAccesibilidad ? .listo : .faltaPermiso("Accesibilidad")
     }
 
     public var vistaExpandida: AnyView {
@@ -107,6 +150,7 @@ struct VistaDeWindowSnap: View {
             filaExtraYEstado
         }
         .padding(.horizontal, 4)
+        .onAppear { modelo.refrescarPermiso() }
     }
 
     private var encabezado: some View {
