@@ -250,15 +250,18 @@ struct VistaDeAgenda: View {
                 }
                 if modelo.permisoCalendario != .concedido {
                     avisoDePermiso(permiso: .calendario, estado: modelo.permisoCalendario)
-                } else if modelo.eventosDelDiaSeleccionado.isEmpty {
+                } else if modelo.eventosDelDiaSeleccionado.isEmpty && modelo.pendientesDelDiaSeleccionado.isEmpty {
                     Spacer(minLength: 0)
-                    Text("Sin eventos para este día").textoDeApoyo()
+                    Text("Sin eventos ni pendientes para este día").textoDeApoyo()
                     Spacer(minLength: 0)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(modelo.eventosDelDiaSeleccionado) { evento in
                                 filaDeEvento(evento)
+                            }
+                            ForEach(modelo.pendientesDelDiaSeleccionado) { pendiente in
+                                filaDePendiente(pendiente)
                             }
                         }
                     }

@@ -106,7 +106,8 @@ final class Ensamblado {
         )
         modeloDeScreenTime = ModeloDeScreenTime()
         modeloDeClima = ModeloDeClima()
-        modeloDeNotificaciones = ModeloDeNotificaciones(bus: bus)
+        modeloDeNotificaciones = ModeloDeNotificaciones(
+            bus: bus, sistema: AdaptadorDeNotificacionesDelSistema())
         modeloDeAgente = ModeloDeAgente(
             puerto: adaptadorDeAgente,
             ajustes: ajustes

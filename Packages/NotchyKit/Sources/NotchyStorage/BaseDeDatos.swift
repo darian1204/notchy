@@ -26,23 +26,51 @@ public final class BaseDeDatos: Sendable {
 
     /// Estado de la base para el panel de diagnóstico (SIS-2).
     public func salud() throws -> SaludDeLaBase {
-        try escritor.read { db in
+        var salud = try escritor.read { db in
             let opciones = try String.fetchAll(db, sql: "PRAGMA compile_options")
+            let revision = try String.fetchAll(db, sql: "PRAGMA quick_check")
             return SaludDeLaBase(
                 migraciones: try Migraciones.aplicadas(db),
-                integra: try String.fetchOne(db, sql: "PRAGMA quick_check") == "ok",
+                integra: revision == ["ok"],
                 busquedaDeTexto: opciones.contains("ENABLE_FTS5"),
-                versionDeSQLite: try String.fetchOne(db, sql: "SELECT sqlite_version()") ?? "")
+                versionDeSQLite: try String.fetchOne(db, sql: "SELECT sqlite_version()") ?? "",
+                problemaDeIntegridad: revision.first(where: { $0 != "ok" }))
         }
+        // Una lectura puede chocar con una escritura del portapapeles en curso (falso positivo).
+        // Antes de alarmar se confirma con integrity_check desde el escritor, que ve la base completa.
+        if !salud.integra {
+            let confirmacion = try escritor.writeWithoutTransaction { db in
+                try String.fetchAll(db, sql: "PRAGMA integrity_check")
+            }
+            salud.integra = confirmacion == ["ok"]
+            salud.problemaDeIntegridad = salud.integra ? nil : confirmacion.first(where: { $0 != "ok" })
+        }
+        return salud
     }
 }
 
 public struct SaludDeLaBase: Sendable, Equatable {
     public let migraciones: [String]
-    public let integra: Bool
+    public internal(set) var integra: Bool
     /// La búsqueda del portapapeles y de las reuniones necesita FTS5.
     public let busquedaDeTexto: Bool
     public let versionDeSQLite: String
+    /// Primer mensaje de SQLite cuando la revisión de integridad no da "ok".
+    public internal(set) var problemaDeIntegridad: String?
+
+    public init(
+        migraciones: [String],
+        integra: Bool,
+        busquedaDeTexto: Bool,
+        versionDeSQLite: String,
+        problemaDeIntegridad: String? = nil
+    ) {
+        self.migraciones = migraciones
+        self.integra = integra
+        self.busquedaDeTexto = busquedaDeTexto
+        self.versionDeSQLite = versionDeSQLite
+        self.problemaDeIntegridad = problemaDeIntegridad
+    }
 
     public var estaBien: Bool { integra && busquedaDeTexto && !migraciones.isEmpty }
 }

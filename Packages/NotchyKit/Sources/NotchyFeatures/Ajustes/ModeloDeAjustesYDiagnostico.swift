@@ -127,7 +127,9 @@ public final class ModeloDeAjustesYDiagnostico {
                 )
             }
             var problemas: [String] = []
-            if !salud.integra { problemas.append("falló quick_check") }
+            if !salud.integra {
+                problemas.append("falló la revisión de integridad (\(salud.problemaDeIntegridad ?? "sin detalle"))")
+            }
             if !salud.busquedaDeTexto { problemas.append("sin soporte FTS5") }
             if salud.migraciones.isEmpty { problemas.append("sin migraciones aplicadas") }
             return DiagnosticoDeBase(

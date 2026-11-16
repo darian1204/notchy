@@ -58,6 +58,7 @@ public final class ModeloDeAgenda {
     @ObservationIgnored private var observadorEventKit: NSObjectProtocol?
     @ObservationIgnored private var avisosEmitidos: Set<String> = []
     @ObservationIgnored private var yaPidioPermisosAlAbrir = false
+    @ObservationIgnored private var ultimoHoy: Date
     @ObservationIgnored private let log = Registro.de(.agenda)
 
     public static var calendarioLunes: Calendar {
@@ -84,6 +85,7 @@ public final class ModeloDeAgenda {
         self.permisoCalendario = calendario.estadoDePermiso()
         self.permisoRecordatorios = recordatorios.estadoDePermiso()
         self.diaSeleccionado = cal.startOfDay(for: ahora)
+        self.ultimoHoy = cal.startOfDay(for: ahora)
         self.mesVisible = Self.inicioDeMes(para: ahora, calendario: cal)
     }
 
@@ -275,6 +277,13 @@ public final class ModeloDeAgenda {
     public func recargar() async {
         actualizarEstadosDePermiso()
         let cal = Self.calendarioLunes
+        // Si la app sigue abierta después de medianoche, "Hoy" avanza con el reloj.
+        let hoy = cal.startOfDay(for: reloj())
+        if cal.isDate(diaSeleccionado, inSameDayAs: ultimoHoy), !cal.isDate(hoy, inSameDayAs: ultimoHoy) {
+            diaSeleccionado = hoy
+            mesVisible = Self.inicioDeMes(para: hoy, calendario: cal)
+        }
+        ultimoHoy = hoy
         let inicioMes = Self.inicioDeMes(para: mesVisible, calendario: cal)
         let finMes = cal.date(byAdding: .month, value: 1, to: inicioMes) ?? inicioMes.addingTimeInterval(86_400 * 31)
 
@@ -374,6 +383,21 @@ public final class ModeloDeAgenda {
 
     public var eventosDelDiaSeleccionado: [EventoDeCalendario] {
         eventos(en: diaSeleccionado)
+    }
+
+    /// Pendientes que vencen el día seleccionado; si es hoy, también los atrasados.
+    public var pendientesDelDiaSeleccionado: [PendienteDeRecordatorios] {
+        let cal = Self.calendarioLunes
+        let esHoy = esHoyElDiaSeleccionado
+        let inicioDia = cal.startOfDay(for: diaSeleccionado)
+        return
+            pendientes
+            .filter { pendiente in
+                guard !pendiente.completado, let vencimiento = pendiente.vencimiento else { return false }
+                if cal.isDate(vencimiento, inSameDayAs: inicioDia) { return true }
+                return esHoy && vencimiento < inicioDia
+            }
+            .sorted { ($0.vencimiento ?? .distantFuture) < ($1.vencimiento ?? .distantFuture) }
     }
 
     public func eventos(en fecha: Date) -> [EventoDeCalendario] {
