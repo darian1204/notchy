@@ -6,11 +6,17 @@ import Testing
 @testable import NotchyStorage
 
 @Suite struct MigracionesTests {
+    static let migracionesEsperadas = [
+        "v1-meta",
+        "v2-portapapeles-y-bandeja",
+        "v3-grabadora-y-reuniones",
+    ]
+
     @Test func v1CreaMetaConLaFechaDeCreacion() throws {
         let base = try BaseDeDatos.enMemoria()
         let creada = try #require(try RepositorioDeMeta(base).leer("creada_en"))
         #expect(try Date(creada, strategy: .iso8601) <= Date())
-        #expect(try base.salud().migraciones == ["v1-meta", "v2-portapapeles-y-bandeja"])
+        #expect(try base.salud().migraciones == Self.migracionesEsperadas)
     }
 
     @Test func reabrirNoRepiteMigracionesNiPierdeDatos() throws {
@@ -29,7 +35,13 @@ import Testing
         let base = try BaseDeDatos.abrir(en: ruta)
         #expect(try RepositorioDeMeta(base).leer("creada_en") == creada)
         #expect(try RepositorioDeMeta(base).leer("marca") == "1")
-        #expect(try base.salud().migraciones == ["v1-meta", "v2-portapapeles-y-bandeja"])
+        #expect(try base.salud().migraciones == Self.migracionesEsperadas)
+    }
+
+    @Test func v3SemillaElGlosarioPorDefecto() throws {
+        let repo = RepositorioDeGrabadoraYReuniones(try BaseDeDatos.enMemoria())
+        let glosario = try repo.listarGlosario()
+        #expect(glosario.contains { $0.malReconocido == "supavase" && $0.correcto == "Supabase" })
     }
 
     @Test func noTocaUnaBaseDeUnaVersionMasNueva() throws {

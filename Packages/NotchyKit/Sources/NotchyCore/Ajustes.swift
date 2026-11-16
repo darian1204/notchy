@@ -73,6 +73,28 @@ public final class Ajustes {
     public var hudSistemaActivo: Bool {
         didSet { alCambiar(hudSistemaActivo, oldValue, .hudSistemaActivo) }
     }
+    /// Días que se conserva el audio de reuniones para poder retranscribir (D-25, por defecto 30).
+    public var diasRetencionAudioReuniones: Int {
+        didSet { alCambiar(diasRetencionAudioReuniones, oldValue, .diasRetencionAudioReuniones) }
+    }
+    /// Si se guardan en disco las pistas de audio de las reuniones (D-25).
+    public var guardarAudioReuniones: Bool {
+        didSet { alCambiar(guardarAudioReuniones, oldValue, .guardarAudioReuniones) }
+    }
+    /// Idioma inicial para la transcripción en vivo (GRB-3).
+    public var idiomaTranscripcionPorDefecto: IdiomaDeTranscripcion {
+        didSet { alCambiar(idiomaTranscripcionPorDefecto, oldValue, .idiomaTranscripcionPorDefecto) }
+    }
+    /// Preferir el micrófono interno cuando la salida es Bluetooth para evitar el modo llamada a 16 kHz (S3).
+    public var preferirMicrofonoInternoConBluetooth: Bool {
+        didSet {
+            alCambiar(
+                preferirMicrofonoInternoConBluetooth,
+                oldValue,
+                .preferirMicrofonoInternoConBluetooth
+            )
+        }
+    }
 
     @ObservationIgnored private let almacen: any AlmacenDeAjustes
     @ObservationIgnored private var observadores: [@MainActor () -> Void] = []
@@ -93,6 +115,12 @@ public final class Ajustes {
         temaPanel = Self.leer(.temaPanel, de: almacen) ?? .obsidiana
         temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
         hudSistemaActivo = Self.leer(.hudSistemaActivo, de: almacen) ?? true
+        diasRetencionAudioReuniones = Self.leer(.diasRetencionAudioReuniones, de: almacen) ?? 30
+        guardarAudioReuniones = Self.leer(.guardarAudioReuniones, de: almacen) ?? true
+        idiomaTranscripcionPorDefecto =
+            Self.leer(.idiomaTranscripcionPorDefecto, de: almacen) ?? .espanolMexico
+        preferirMicrofonoInternoConBluetooth =
+            Self.leer(.preferirMicrofonoInternoConBluetooth, de: almacen) ?? true
     }
 
     public var urlCarpetaInboxObsidian: URL {
@@ -134,6 +162,8 @@ public final class Ajustes {
         case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus
         case diasRetencionPortapapeles, limiteElementosPortapapeles, appsExcluidasPortapapeles
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
+        case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
+        case preferirMicrofonoInternoConBluetooth
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {

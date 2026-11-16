@@ -12,6 +12,7 @@ public enum Medidas {
     public static let portapapeles = CGSize(width: 620, height: 240)
     public static let bandeja = CGSize(width: 620, height: 236)
     public static let agenda = CGSize(width: 620, height: 232)
+    public static let grabadora = CGSize(width: 620, height: 238)
     public static let ahoraSuena = CGSize(width: 620, height: 224)
     public static let espejo = CGSize(width: 620, height: 232)
     public static let airdrop = CGSize(width: 620, height: 212)

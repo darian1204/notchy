@@ -47,6 +47,64 @@ enum Migraciones {
                 tabla.column("bytes", .integer).notNull().defaults(to: 0)
             }
         }
+        migrador.registerMigration("v3-grabadora-y-reuniones") { db in
+            try db.create(table: "voice_note") { tabla in
+                tabla.primaryKey("id", .text)
+                tabla.column("creado", .double).notNull().indexed()
+                tabla.column("titulo", .text).notNull()
+                tabla.column("duracion", .double).notNull().defaults(to: 0)
+                tabla.column("ruta", .text).notNull()
+                tabla.column("transcripcion", .text)
+                tabla.column("idioma", .text).notNull().defaults(to: "es-MX")
+            }
+            try db.create(table: "meeting") { tabla in
+                tabla.primaryKey("id", .text)
+                tabla.column("titulo", .text).notNull()
+                tabla.column("inicio", .double).notNull().indexed()
+                tabla.column("fin", .double)
+                tabla.column("estado", .text).notNull().indexed()
+                tabla.column("idioma", .text).notNull().defaults(to: "es-MX")
+                tabla.column("evento_calendario", .text)
+                tabla.column("rutas_audio_mic", .text).notNull().defaults(to: "[]")
+                tabla.column("rutas_audio_sistema", .text).notNull().defaults(to: "[]")
+                tabla.column("desfase_ms", .double)
+            }
+            try db.create(table: "transcript_segment") { tabla in
+                tabla.primaryKey("id", .text)
+                tabla.column("reunion_id", .text).notNull().indexed()
+                    .references("meeting", onDelete: .cascade)
+                tabla.column("fuente", .text).notNull()
+                tabla.column("inicio", .double).notNull()
+                tabla.column("fin", .double).notNull()
+                tabla.column("texto", .text).notNull()
+                tabla.column("confianza", .double)
+                tabla.column("es_final", .boolean).notNull().defaults(to: true)
+            }
+            try db.execute(
+                sql: """
+                    CREATE VIRTUAL TABLE transcript_fts USING fts5(
+                        id UNINDEXED,
+                        reunion_id UNINDEXED,
+                        texto,
+                        tokenize='unicode61 remove_diacritics 2'
+                    )
+                    """)
+            try db.create(table: "glossary") { tabla in
+                tabla.primaryKey("id", .text)
+                tabla.column("mal_reconocido", .text).notNull().unique()
+                tabla.column("correcto", .text).notNull()
+                tabla.column("activo", .boolean).notNull().defaults(to: true)
+            }
+            for entrada in EntradaDeGlosario.porDefecto {
+                try db.execute(
+                    sql: """
+                        INSERT INTO glossary (id, mal_reconocido, correcto, activo)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                    arguments: [entrada.id, entrada.malReconocido, entrada.correcto, entrada.activo]
+                )
+            }
+        }
         return migrador
     }
 

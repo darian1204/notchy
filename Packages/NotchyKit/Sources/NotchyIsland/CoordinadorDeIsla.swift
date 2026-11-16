@@ -15,6 +15,8 @@ public final class CoordinadorDeIsla {
     public private(set) var hexCaratulaActual: UInt32?
     /// HUD efímero de volumen, brillo o batería que se muestra en las orejas compactas del notch.
     public private(set) var hudActual: EstadoDeHUDSistema?
+    /// Estado de grabación activo para garantizar que nunca se oculte el indicador (GRB-6).
+    public private(set) var grabacionActual: GrabacionCambiada?
 
     /// Acciones del menú del engrane. Las pone la aplicación.
     @ObservationIgnored public var alAbrirAjustes: (@MainActor () -> Void)?
@@ -141,6 +143,13 @@ public final class CoordinadorDeIsla {
                 self.hexCaratulaActual = cambio.hex
             }
         }
-        tareasDeBus = [tareaCompacto, tareaAviso, tareaColorCaratula]
+        let tareaGrabacion = Task { [weak self] in
+            let flujo = await bus.suscribir(a: GrabacionCambiada.self)
+            for await estado in flujo {
+                guard let self else { break }
+                self.grabacionActual = estado.activa ? estado : nil
+            }
+        }
+        tareasDeBus = [tareaCompacto, tareaAviso, tareaColorCaratula, tareaGrabacion]
     }
 }
