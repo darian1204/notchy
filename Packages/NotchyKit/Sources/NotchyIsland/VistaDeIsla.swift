@@ -26,7 +26,7 @@ public struct VistaDeIsla: View {
                     vistaAviso
                         .frame(width: tamano.width, height: tamano.height)
                         .transition(entrada)
-                } else if let hud = coordinador.hudActual {
+                } else if let hud = coordinador.hudActual, coordinador.grabacionActual == nil {
                     contenidoHUD(hud)
                         .frame(width: tamano.width, height: tamano.height)
                         .transition(.opacity)
@@ -241,18 +241,32 @@ struct BarraDeModulos: View {
 
     private func boton(_ modulo: IdentidadDeModulo) -> some View {
         let abierto = coordinador.moduloAbierto?.identidad.id == modulo.id
+        let grabandoEnEsteModulo =
+            modulo.id == "grabadora" && (coordinador.grabacionActual?.activa == true)
         return Button {
             coordinador.recibir(.elegirModulo(modulo.id))
         } label: {
-            Image(systemName: modulo.icono)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(abierto ? colorParaIcono(modulo) : Paleta.textoDeApoyo)
-                .frame(width: 21, height: 22)
-                .background(
-                    abierto ? Paleta.superficieAlta : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 6)
-                )
-                .contentShape(Rectangle())
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: modulo.icono)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(
+                        grabandoEnEsteModulo
+                            ? Paleta.grabadora
+                            : (abierto ? colorParaIcono(modulo) : Paleta.textoDeApoyo)
+                    )
+                    .frame(width: 21, height: 22)
+                if grabandoEnEsteModulo {
+                    Circle()
+                        .fill(Paleta.grabadora)
+                        .frame(width: 5, height: 5)
+                        .offset(x: -2, y: 2)
+                }
+            }
+            .background(
+                abierto ? Paleta.superficieAlta : Color.clear,
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(modulo.nombre)

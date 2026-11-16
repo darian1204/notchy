@@ -5,7 +5,7 @@ import OSLog
 public enum Registro {
     public enum Categoria: String, Sendable, CaseIterable {
         case arranque, isla, ajustes, datos, modulos, permisos, agenda, musica, espejo, airdrop, colorpicker,
-            screentime, hud, clima, notificaciones, agente, traductor, windowsnap, monitor
+            screentime, hud, clima, notificaciones, agente, traductor, windowsnap, monitor, grabadora, reuniones
     }
 
     public static func de(_ categoria: Categoria) -> Logger {

@@ -19,6 +19,7 @@ final class Ensamblado {
     let panel: ControladorDePanel
     let atajo: ControladorDeAtajo
     let modeloDeAgenda: ModeloDeAgenda
+    let modeloDeGrabadora: ModeloDeGrabadora
     let modeloDeAhoraSuena: ModeloDeAhoraSuena
     let modeloDeEspejo: ModeloDeEspejo
     let modeloDePortapapeles: ModeloDePortapapeles
@@ -39,6 +40,9 @@ final class Ensamblado {
     private var barraDeMenus: ControladorDeBarraDeMenus?
     private let registradorCarbon = RegistradorDeAtajosCarbon()
     private let adaptadorDeCalendario = AdaptadorDeCalendarioEventKit()
+    private let adaptadorDeCapturaDeAudio = AdaptadorDeCapturaDeAudio()
+    private let adaptadorDeEscritorDeAudio = AdaptadorDeEscritorDeAudio()
+    private let adaptadorDeTranscripcion = AdaptadorDeTranscripcion()
     private let adaptadorDeRecordatorios = AdaptadorDeRecordatoriosEventKit()
     private let adaptadorDeAhoraSuena = AdaptadorDeAhoraSuena()
     private let adaptadorDeCamara = AdaptadorDeCamara()
@@ -61,6 +65,16 @@ final class Ensamblado {
         modeloDeAgenda = ModeloDeAgenda(
             calendario: adaptadorDeCalendario,
             recordatorios: adaptadorDeRecordatorios,
+            bus: bus,
+            alAbrirURL: abrirURL
+        )
+        modeloDeGrabadora = ModeloDeGrabadora(
+            captura: adaptadorDeCapturaDeAudio,
+            escritor: adaptadorDeEscritorDeAudio,
+            transcripcion: adaptadorDeTranscripcion,
+            repositorio: baseAbierta.map(RepositorioDeGrabadoraYReuniones.init),
+            carpetaAudio: rutasAbiertas?.audio,
+            ajustes: ajustes,
             bus: bus,
             alAbrirURL: abrirURL
         )
@@ -141,6 +155,7 @@ final class Ensamblado {
                 alAbrirModulo: { id in coordinadorCapturado.recibir(.elegirModulo(id)) }
             ))
         registro.registrar(ModuloDeAgenda(modelo: modeloDeAgenda))
+        registro.registrar(ModuloDeGrabadora(modelo: modeloDeGrabadora))
         registro.registrar(ModuloDeAhoraSuena(modelo: modeloDeAhoraSuena))
         registro.registrar(ModuloDeClima(modelo: modeloDeClima))
         registro.registrar(ModuloDeNotificaciones(modelo: modeloDeNotificaciones))
