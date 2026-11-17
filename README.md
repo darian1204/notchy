@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/assets/hero.svg" alt="Notchy: el notch de tu Mac convertido en centro de control" width="100%">
-</p>
+<h1 align="center">Notchy</h1>
 
 <p align="center">
   <b>Ese hueco negro arriba de tu pantalla por fin sirve para algo.</b><br>
@@ -11,102 +9,77 @@
   <img alt="macOS 27" src="https://img.shields.io/badge/macOS-27-000000?style=for-the-badge&logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-8b5cf6?style=for-the-badge">
   <img alt="Hecha en Swift" src="https://img.shields.io/badge/hecha%20en-Swift-F05138?style=for-the-badge&logo=swift&logoColor=white">
-  <img alt="Sin anuncios" src="https://img.shields.io/badge/sin-anuncios-22c55e?style=for-the-badge">
+  <img alt="Gratis" src="https://img.shields.io/badge/gratis-para%20amigos-22c55e?style=for-the-badge">
   <img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-3b82f6?style=for-the-badge">
 </p>
+
+<p align="center">
+  <img src="docs/assets/capturas/inicio.png" alt="Inicio de Notchy: música, archivos recientes y notas rápidas" width="100%">
+</p>
+
+<p align="center"><sub>Capturas reales de Notchy en una MacBook Air M4.</sub></p>
 
 ---
 
 ## Todo a un vistazo, sin abrir nada
 
-Notchy vive en el notch de tu MacBook. No ocupa espacio en el Dock ni llena la pantalla de ventanas: se abre al acercar el cursor y se esconde cuando terminas.
+Notchy vive en el notch de tu MacBook. No ocupa espacio en el Dock ni llena la pantalla de ventanas: se abre al acercar el cursor y se esconde cuando terminas. Arriba tienes una fila de íconos; cada uno abre un módulo.
 
-<table>
-  <tr>
-    <td width="33%" valign="top">
-      <h3>🎵 Ahora suena</h3>
-      Carátula, controles y <b>letra sincronizada estilo karaoke</b>. Toca cualquier verso para saltar a esa parte.
-    </td>
-    <td width="33%" valign="top">
-      <h3>📅 Agenda</h3>
-      Tus eventos y pendientes del día, con un aviso elegante justo antes de cada llamada.
-    </td>
-    <td width="33%" valign="top">
-      <h3>🎙️ Reuniones</h3>
-      Graba y <b>transcribe en vivo</b> lo que dices tú y lo que dicen los demás. Cópialo todo con un clic.
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h3>📋 Portapapeles</h3>
-      Todo lo que copiaste, en tarjetas visuales. Busca, recupera y vuelve a pegar en segundos.
-    </td>
-    <td valign="top">
-      <h3>📂 Bandeja de archivos</h3>
-      Arrastra archivos al notch, déjalos ahí y llévatelos a donde quieras después.
-    </td>
-    <td valign="top">
-      <h3>📡 AirDrop</h3>
-      Envía y recibe con vista previa, directo desde el notch.
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h3>🌐 Traductor</h3>
-      Traduce al instante, en tu propia Mac, sin copiar y pegar en otra página.
-    </td>
-    <td valign="top">
-      <h3>✨ Asistente</h3>
-      Un mini chat que te ayuda a resolver cosas sin salir de lo que estás haciendo.
-    </td>
-    <td valign="top">
-      <h3>🪟 Window Snap</h3>
-      Acomoda la ventana activa en mitades, tercios, cuartos o a pantalla completa con un toque.
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h3>🔔 Notificaciones</h3>
-      Las últimas notificaciones de tu Mac juntas, para que no se te pase nada.
-    </td>
-    <td valign="top">
-      <h3>⏱️ Tiempo en pantalla</h3>
-      Descubre en qué se te va el día, con gráficas por categoría y ranking de apps.
-    </td>
-    <td valign="top">
-      <h3>📈 Monitor del sistema</h3>
-      CPU, memoria y almacenamiento en anillos que se leen de un vistazo.
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h3>🎨 Selector de color</h3>
-      Toma cualquier color de la pantalla y cópialo en HEX, RGB o HSL. Incluye revisión de contraste.
-    </td>
-    <td valign="top">
-      <h3>🪞 Espejo</h3>
-      Revisa cómo te ves antes de entrar a una videollamada, y toma una foto si quieres.
-    </td>
-    <td valign="top">
-      <h3>☀️ Clima</h3>
-      El pronóstico de tu ciudad, siempre a la mano.
-    </td>
-  </tr>
-</table>
+### 🏠 Inicio
+Lo que está sonando, tus archivos recientes y una nota rápida que va directo a tu Obsidian. Todo en una sola vista.
 
----
+### 🎙️ Reuniones y clases que se resumen solas
+Graba tu micrófono y el audio de la llamada, **transcribe en vivo** y, al terminar, **Apple Intelligence escribe el resumen** y lo deja en tu inbox de Obsidian. Copia la transcripción completa con un clic. Todo pasa en tu Mac.
 
-<p align="center">
-  <img src="docs/assets/reuniones.svg" alt="Reuniones transcritas en vivo dentro del notch" width="100%">
-</p>
+<p align="center"><img src="docs/assets/capturas/grabadora.png" alt="Módulo de reuniones" width="100%"></p>
 
-### Nunca vuelvas a tomar notas en una llamada
+### 📅 Agenda
+Calendario del mes, eventos del día y pendientes de Recordatorios, con un aviso estilo llamada antes de cada reunión.
 
-- **Tú y los demás, separados.** Notchy distingue lo que dices tú de lo que se oye en la llamada.
-- **Transcripción en vivo**, en español o en inglés, mientras hablas.
-- **Marcas de tiempo** para señalar los momentos importantes con un clic.
-- **Historial con buscador**: encuentra lo que se dijo hace semanas, aunque escribas sin acentos.
-- **Copiar transcripción** al portapapeles para pegarla en tus notas, en un correo o en tu chat.
+<p align="center"><img src="docs/assets/capturas/agenda.png" alt="Módulo de agenda" width="100%"></p>
+
+### ☀️ Clima
+Temperatura, sensación térmica, viento, UV y pronóstico por hora de tu ciudad.
+
+<p align="center"><img src="docs/assets/capturas/clima.png" alt="Módulo de clima" width="100%"></p>
+
+### 🪟 Window Snap
+Acomoda la ventana activa en mitades, tercios, cuartos o a pantalla completa con un toque.
+
+<p align="center"><img src="docs/assets/capturas/snap.png" alt="Módulo Window Snap" width="100%"></p>
+
+### 🌐 Traductor
+Traduce al instante entre idiomas con el traductor de Apple, sin internet y sin abrir otra página.
+
+<p align="center"><img src="docs/assets/capturas/traductor.png" alt="Módulo de traducción" width="100%"></p>
+
+### 📈 Monitor del sistema
+CPU, memoria, almacenamiento, red y batería en anillos que se leen de un vistazo.
+
+<p align="center"><img src="docs/assets/capturas/monitor.png" alt="Monitor del sistema" width="100%"></p>
+
+### ⏱️ Tiempo en pantalla
+Descubre en qué se te va el día: categorías, sesiones y ranking de apps.
+
+<p align="center"><img src="docs/assets/capturas/screentime.png" alt="Tiempo en pantalla" width="100%"></p>
+
+### 🎨 Selector de color
+Toma cualquier color de la pantalla y cópialo en HEX, RGB, HSL o Swift. Incluye revisión de contraste.
+
+<p align="center"><img src="docs/assets/capturas/color.png" alt="Selector de color" width="100%"></p>
+
+### 📂 Bandeja de archivos
+Arrastra archivos al notch para guardarlos, convertirlos, mandarlos por AirDrop o subirlos a iCloud.
+
+<p align="center"><img src="docs/assets/capturas/bandeja.png" alt="Bandeja de archivos" width="100%"></p>
+
+### ✨ Asistente
+Un mini chat para resolver cosas rápidas sin salir de lo que estás haciendo.
+
+<p align="center"><img src="docs/assets/capturas/agente.png" alt="Asistente" width="100%"></p>
+
+### Y además
+🎵 **Ahora suena** con letra sincronizada estilo karaoke · 📋 **Portapapeles** con historial visual · 📡 **AirDrop** con vista previa · 🔔 **Notificaciones** recientes de tu Mac · 🪞 **Espejo** para revisarte antes de una videollamada
 
 ---
 
@@ -116,23 +89,29 @@ Notchy vive en el notch de tu MacBook. No ocupa espacio en el Dock ni llena la p
 |---|---|
 | 🌙 **Discreta** | Se esconde sola. Solo aparece cuando la buscas. |
 | ⚡ **Rápida** | Hecha en Swift nativo para Apple Silicon. Sin Electron y sin pantallas de carga. |
-| 🔒 **Privada** | La transcripción de reuniones y la traducción ocurren en tu Mac. Tus datos se quedan contigo. |
+| 🔒 **Privada** | Las transcripciones, los resúmenes y la traducción se hacen en tu Mac. Tus datos se quedan contigo. |
 | 🎛️ **Tuya** | Activa solo los módulos que usas y ordénalos a tu gusto. |
-| 🔊 **Detalles finos** | Indicadores de volumen y brillo rediseñados, animaciones suaves y modo oscuro de verdad. |
+| 🔊 **Detalles finos** | Indicadores de volumen y brillo rediseñados, animaciones suaves y temas para la isla. |
 
 ---
 
 ## Empieza en un minuto
 
 1. Abre **Notchy**.
-2. Acerca el cursor al notch.
+2. Acerca el cursor al notch (o usa <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>Espacio</kbd>).
 3. Listo. Notchy te pide cada permiso (micrófono, calendario, accesibilidad) solo cuando usas el módulo que lo necesita, nunca antes.
 
-> **Requisitos:** MacBook con notch y chip Apple Silicon, con macOS 27 o posterior.
+> **Requisitos:** MacBook con notch y chip Apple Silicon, con macOS 27 o posterior. Para los resúmenes de reuniones, Apple Intelligence activado.
 
 ---
 
 ## Preguntas frecuentes
+
+<details>
+<summary><b>¿Cuánto cuesta?</b></summary>
+
+Nada. Notchy es un proyecto personal que comparto con amigos. No tiene anuncios ni suscripciones.
+</details>
 
 <details>
 <summary><b>¿Necesito internet?</b></summary>
@@ -143,7 +122,13 @@ La mayoría de los módulos funcionan sin conexión. El clima y el asistente sí
 <details>
 <summary><b>¿Mis reuniones se suben a algún servidor?</b></summary>
 
-No. El audio y la transcripción se guardan y procesan en tu Mac.
+No. El audio, la transcripción y el resumen se guardan y procesan en tu Mac.
+</details>
+
+<details>
+<summary><b>¿Puedo apagar el resumen automático?</b></summary>
+
+Sí: Ajustes → Reuniones → "Resumir cada reunión en el inbox de Obsidian".
 </details>
 
 <details>
