@@ -21,7 +21,7 @@ public final class Ajustes {
 
     public static var rutaVaultPorDefecto: String {
         FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Documents/Personal Darian")
+            .appending(path: "Documents/Obsidian")
             .path
     }
 
