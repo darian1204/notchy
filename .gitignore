@@ -5,3 +5,21 @@ build/
 DerivedData/
 xcuserdata/
 *.xcuserstate
+
+# Secretos y credenciales: nunca al repo
+.env
+.env.*
+*.p12
+*.pem
+*.key
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# Datos del usuario: audio, transcripciones y bases locales
+*.m4a
+*.wav
+*.caf
+*.sqlite
+*.sqlite-*
+*.db
