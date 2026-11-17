@@ -165,8 +165,22 @@ public struct RepositorioDePortapapeles: Sendable {
         elementosMaximos: Int,
         ahora: Date = .now
     ) throws -> [String] {
+        try aplicarRetencion(
+            antiguedadMaxima: Double(max(1, diasMaximos)) * 86_400,
+            elementosMaximos: elementosMaximos,
+            ahora: ahora
+        )
+    }
+
+    /// Igual que la versión por días, con la antigüedad máxima en segundos (mínimo 1 minuto).
+    @discardableResult
+    public func aplicarRetencion(
+        antiguedadMaxima: TimeInterval,
+        elementosMaximos: Int,
+        ahora: Date = .now
+    ) throws -> [String] {
         try base.escritor.write { db in
-            let corte = ahora.addingTimeInterval(-Double(max(1, diasMaximos)) * 86_400).timeIntervalSince1970
+            let corte = ahora.addingTimeInterval(-max(60, antiguedadMaxima)).timeIntervalSince1970
             let vencidos = try FilaIdRuta.fetchAll(
                 db,
                 sql: "SELECT id, ruta_archivo FROM clipboard_item WHERE fijado = 0 AND creado < ?",

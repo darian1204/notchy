@@ -184,10 +184,11 @@ public struct VistaDeAjustesYDiagnostico: View {
             }
 
             Section("Portapapeles") {
-                Picker("Retención por antigüedad", selection: ajustes.diasRetencionPortapapeles) {
-                    Text("7 días").tag(7)
-                    Text("30 días").tag(30)
-                    Text("90 días").tag(90)
+                Picker("Borrar copias después de", selection: ajustes.horasRetencionPortapapeles) {
+                    Text("1 hora").tag(1)
+                    Text("24 horas").tag(24)
+                    Text("7 días").tag(168)
+                    Text("30 días").tag(720)
                 }
                 .accessibilityLabel("Retención por antigüedad del portapapeles")
 

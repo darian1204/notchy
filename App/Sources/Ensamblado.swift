@@ -224,6 +224,7 @@ final class Ensamblado {
         }
         coordinador.alAbrirAjustes = abrirAjustes
         resumidorDeReuniones.arrancar()
+        modeloDeBandeja.iniciarLimpiezaAutomatica()
         coordinador.alSalir = salir
 
         barraDeMenus = ControladorDeBarraDeMenus(

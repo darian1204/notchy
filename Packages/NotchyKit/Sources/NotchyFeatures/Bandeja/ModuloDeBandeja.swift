@@ -53,24 +53,6 @@ struct VistaDeBandeja: View {
             }
             divisorVertical
             casillaDropAction(
-                id: "airdrop",
-                icono: "square.and.arrow.up",
-                titulo: "AirDrop",
-                subtitulo: "Send nearby"
-            ) { urls in
-                modelo.enviarPorAirDrop(urls)
-            }
-            divisorVertical
-            casillaDropAction(
-                id: "open",
-                icono: "app.badge",
-                titulo: "Open with",
-                subtitulo: "Default app"
-            ) { urls in
-                modelo.abrirConAppPredeterminada(urls)
-            }
-            divisorVertical
-            casillaDropAction(
                 id: "convert",
                 icono: "camera.viewfinder",
                 titulo: "Convert",
@@ -90,7 +72,7 @@ struct VistaDeBandeja: View {
                 subtitulo: "Hold files (\(modelo.elementos.count))"
             ) { urls in
                 if !urls.isEmpty {
-                    _ = modelo.agregarArchivos(urls)
+                    modelo.agregarEnSegundoPlano(urls)
                 }
             }
             divisorVertical
@@ -218,11 +200,15 @@ struct VistaDeBandeja: View {
     private var tiraShelfArchivos: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("SHELF · ARCHIVOS RETENIDOS (\(modelo.elementos.count))")
+                Text("SHELF · SE VACÍA A LOS 10 MIN (\(modelo.elementos.count))")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(0.6)
                     .foregroundStyle(Paleta.textoDeApoyo)
                 Spacer(minLength: 0)
+                if modelo.trabajando {
+                    ProgressView()
+                        .controlSize(.mini)
+                }
                 if let aviso = modelo.mensajeEstado, !modelo.mostrarSegundaFila {
                     Text(aviso)
                         .font(.system(size: 9.5, weight: .semibold))
@@ -256,7 +242,7 @@ struct VistaDeBandeja: View {
                 .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .onDrop(of: [.fileURL], isTargeted: nil) { proveedores in
                     recibirProveedores(proveedores) { urls in
-                        _ = modelo.agregarArchivos(urls)
+                        modelo.agregarEnSegundoPlano(urls)
                     }
                 }
             } else {
@@ -274,18 +260,19 @@ struct VistaDeBandeja: View {
     private func fichaCompactaShelf(_ elemento: ElementoDeBandeja) -> some View {
         let url = elemento.urlParaArrastrar
         return HStack(spacing: 7) {
-            if let img = NSImage(contentsOf: url) {
-                Image(nsImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 28, height: 28)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            } else {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
+            Group {
+                if let img = modelo.miniaturas[elemento.id] {
+                    Image(nsImage: img)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "doc")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Paleta.textoDeApoyo)
+                }
             }
+            .frame(width: 28, height: 28)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
             Text(elemento.nombre)
                 .font(.system(size: 10.5, weight: .semibold))
@@ -313,19 +300,31 @@ struct VistaDeBandeja: View {
         }
     }
 
+    /// Junta todas las URLs soltadas y ejecuta la acción una sola vez (no una por archivo).
     private func recibirProveedores(
         _ proveedores: [NSItemProvider],
         accion: @escaping @MainActor ([URL]) -> Void
     ) -> Bool {
         guard !proveedores.isEmpty else { return false }
-        for proveedor in proveedores {
-            _ = proveedor.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                Task { @MainActor in
-                    accion([url])
+        Task { @MainActor in
+            var urls: [URL] = []
+            for proveedor in proveedores {
+                if let url = await Self.cargarURL(de: proveedor) {
+                    urls.append(url)
                 }
+            }
+            if !urls.isEmpty {
+                accion(urls)
             }
         }
         return true
+    }
+
+    private static func cargarURL(de proveedor: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuacion in
+            _ = proveedor.loadObject(ofClass: URL.self) { url, _ in
+                continuacion.resume(returning: url)
+            }
+        }
     }
 }

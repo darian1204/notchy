@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NotchyCore
 import NotchyStorage
@@ -119,5 +120,40 @@ import Testing
         #expect(modelo.elementos.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: item.rutaCopia))
         #expect(FileManager.default.fileExists(atPath: archivoOriginal.path))
+    }
+
+    @Test func shelfSeVaciaALosDiezMinutos() throws {
+        let raiz = FileManager.default.temporaryDirectory.appending(path: "notchy-tray-\(UUID().uuidString)")
+        let origen = raiz.appending(path: "nota.txt")
+        try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: raiz) }
+        try Data("hola".utf8).write(to: origen)
+
+        let modelo = ModeloDeBandeja(
+            repositorio: RepositorioDeBandeja(try BaseDeDatos.enMemoria()),
+            carpetaBandeja: raiz.appending(path: "tray")
+        )
+        #expect(modelo.agregarArchivos([origen]) == 1)
+        let item = try #require(modelo.elementos.first)
+
+        #expect(modelo.limpiarVencidos(ahora: item.creado.addingTimeInterval(9 * 60)) == 0)
+        #expect(modelo.limpiarVencidos(ahora: item.creado.addingTimeInterval(10 * 60)) == 1)
+        #expect(modelo.elementos.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: item.rutaCopia))
+        #expect(FileManager.default.fileExists(atPath: origen.path))
+    }
+
+    @Test func miniaturaNoPasaDeSesentaYCuatroPixeles() throws {
+        let raiz = FileManager.default.temporaryDirectory.appending(path: "notchy-mini-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: raiz) }
+        let rep = try #require(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: 1200, pixelsHigh: 800, bitsPerSample: 8,
+                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                bytesPerRow: 0, bitsPerPixel: 0))
+        try #require(rep.representation(using: .png, properties: [:])).write(to: raiz)
+
+        let mini = try #require(ModeloDeBandeja.miniatura(de: raiz))
+        #expect(max(mini.size.width, mini.size.height) <= 64)
     }
 }

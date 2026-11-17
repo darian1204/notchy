@@ -69,7 +69,7 @@ Toma cualquier color de la pantalla y cópialo en HEX, RGB, HSL o Swift. Incluye
 <p align="center"><img src="docs/assets/capturas/color.png" alt="Selector de color" width="100%"></p>
 
 ### 📂 Bandeja de archivos
-Arrastra archivos al notch para guardarlos, convertirlos, mandarlos por AirDrop o subirlos a iCloud.
+Arrastra archivos al notch para tenerlos a la mano, convertir imágenes, comprimirlos o subirlos a iCloud. El Shelf se vacía solo a los 10 minutos, así nunca se llena.
 
 <p align="center"><img src="docs/assets/capturas/bandeja.png" alt="Bandeja de archivos" width="100%"></p>
 
@@ -79,7 +79,7 @@ Un mini chat para resolver cosas rápidas sin salir de lo que estás haciendo.
 <p align="center"><img src="docs/assets/capturas/agente.png" alt="Asistente" width="100%"></p>
 
 ### Y además
-🎵 **Ahora suena** con letra sincronizada estilo karaoke · 📋 **Portapapeles** con historial visual · 📡 **AirDrop** con vista previa · 🔔 **Notificaciones** recientes de tu Mac · 🪞 **Espejo** para revisarte antes de una videollamada
+🎵 **Ahora suena** con letra sincronizada estilo karaoke · 📋 **Portapapeles** con historial visual que se borra solo después de una hora · 📡 **AirDrop** con vista previa · 🔔 **Notificaciones** recientes de tu Mac · 🪞 **Espejo** para revisarte antes de una videollamada
 
 ---
 

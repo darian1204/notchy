@@ -64,9 +64,15 @@ public final class ModeloDePortapapeles {
         ultimoConteo = puerto.conteoDeCambios
         let dormir = self.dormir
         tareaVigilancia = Task { [weak self] in
+            var vueltas = 0
             while !Task.isCancelled {
                 guard (try? await dormir(.milliseconds(500))) != nil, !Task.isCancelled else { break }
                 self?.revisarSiCambio()
+                // Cada minuto se borra lo que ya cumplió su tiempo, aunque no haya copias nuevas.
+                vueltas += 1
+                if vueltas % 120 == 0 {
+                    self?.aplicarRetencionYRecargar()
+                }
             }
         }
     }
@@ -164,7 +170,7 @@ public final class ModeloDePortapapeles {
         guard let repositorio else { return }
         let rutas =
             (try? repositorio.aplicarRetencion(
-                diasMaximos: ajustes.diasRetencionPortapapeles,
+                antiguedadMaxima: Double(max(1, ajustes.horasRetencionPortapapeles)) * 3600,
                 elementosMaximos: ajustes.limiteElementosPortapapeles,
                 ahora: ahora
             )) ?? []

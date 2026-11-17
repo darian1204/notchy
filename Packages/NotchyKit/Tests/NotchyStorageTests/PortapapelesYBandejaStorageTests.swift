@@ -92,6 +92,25 @@ import Testing
         #expect(try repo.listar().map(\.id) == ["fijo", "r3", "r2"])
     }
 
+    @Test func retencionPorHorasBorraLoCopiadoHaceMasDeUnaHora() throws {
+        let repo = RepositorioDePortapapeles(try BaseDeDatos.enMemoria())
+        let ahora = Date(timeIntervalSince1970: 1_800_000_000)
+        for (id, edad, fijado) in [("vieja", 3700.0, false), ("nueva", 600.0, false), ("fija", 7200.0, true)] {
+            var elemento = ElementoDePortapapeles(
+                id: id,
+                creado: ahora.addingTimeInterval(-edad),
+                tipo: .texto,
+                texto: id,
+                huella: "h-\(id)",
+                bytes: 1
+            )
+            elemento.fijado = fijado
+            _ = try repo.registrar(elemento)
+        }
+        try repo.aplicarRetencion(antiguedadMaxima: 3600, elementosMaximos: 100, ahora: ahora)
+        #expect(Set(try repo.listar().map(\.id)) == ["nueva", "fija"])
+    }
+
     @Test func bandejaGuardaQuitaYVacia() throws {
         let repo = RepositorioDeBandeja(try BaseDeDatos.enMemoria())
         let e1 = ElementoDeBandeja(

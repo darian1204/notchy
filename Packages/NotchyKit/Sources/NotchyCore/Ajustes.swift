@@ -41,9 +41,9 @@ public final class Ajustes {
     public var iconoEnBarraDeMenus: Bool {
         didSet { alCambiar(iconoEnBarraDeMenus, oldValue, .iconoEnBarraDeMenus) }
     }
-    /// Días de retención del portapapeles (CLP-5). Por defecto 30 días.
-    public var diasRetencionPortapapeles: Int {
-        didSet { alCambiar(diasRetencionPortapapeles, oldValue, .diasRetencionPortapapeles) }
+    /// Horas que vive cada copia del portapapeles (por defecto 1). Los fijados no se borran.
+    public var horasRetencionPortapapeles: Int {
+        didSet { alCambiar(horasRetencionPortapapeles, oldValue, .horasRetencionPortapapeles) }
     }
     /// Límite de elementos guardados en el portapapeles (CLP-5). Por defecto 2000 elementos.
     public var limiteElementosPortapapeles: Int {
@@ -111,7 +111,7 @@ public final class Ajustes {
         pantalla = Self.leer(.pantalla, de: almacen) ?? .conNotch
         atajo = Self.leer(.atajo, de: almacen) ?? .controlOpcionEspacio
         iconoEnBarraDeMenus = Self.leer(.iconoEnBarraDeMenus, de: almacen) ?? false
-        diasRetencionPortapapeles = Self.leer(.diasRetencionPortapapeles, de: almacen) ?? 30
+        horasRetencionPortapapeles = Self.leer(.horasRetencionPortapapeles, de: almacen) ?? 1
         limiteElementosPortapapeles = Self.leer(.limiteElementosPortapapeles, de: almacen) ?? 2000
         appsExcluidasPortapapeles = Self.leer(.appsExcluidasPortapapeles, de: almacen) ?? []
         carpetaFotosEspejo = Self.leer(.carpetaFotosEspejo, de: almacen) ?? Self.rutaDescargasPorDefecto
@@ -165,7 +165,8 @@ public final class Ajustes {
 
     enum Clave: String {
         case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus
-        case diasRetencionPortapapeles, limiteElementosPortapapeles, appsExcluidasPortapapeles
+        case diasRetencionPortapapeles, horasRetencionPortapapeles, limiteElementosPortapapeles,
+            appsExcluidasPortapapeles
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox
