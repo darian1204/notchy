@@ -81,6 +81,10 @@ public final class Ajustes {
     public var guardarAudioReuniones: Bool {
         didSet { alCambiar(guardarAudioReuniones, oldValue, .guardarAudioReuniones) }
     }
+    /// Si al terminar una reunión se resume con Apple Intelligence y se deja en el inbox de Obsidian.
+    public var resumirReunionesEnInbox: Bool {
+        didSet { alCambiar(resumirReunionesEnInbox, oldValue, .resumirReunionesEnInbox) }
+    }
     /// Idioma inicial para la transcripción en vivo (GRB-3).
     public var idiomaTranscripcionPorDefecto: IdiomaDeTranscripcion {
         didSet { alCambiar(idiomaTranscripcionPorDefecto, oldValue, .idiomaTranscripcionPorDefecto) }
@@ -117,6 +121,7 @@ public final class Ajustes {
         hudSistemaActivo = Self.leer(.hudSistemaActivo, de: almacen) ?? true
         diasRetencionAudioReuniones = Self.leer(.diasRetencionAudioReuniones, de: almacen) ?? 30
         guardarAudioReuniones = Self.leer(.guardarAudioReuniones, de: almacen) ?? true
+        resumirReunionesEnInbox = Self.leer(.resumirReunionesEnInbox, de: almacen) ?? true
         idiomaTranscripcionPorDefecto =
             Self.leer(.idiomaTranscripcionPorDefecto, de: almacen) ?? .espanolMexico
         preferirMicrofonoInternoConBluetooth =
@@ -163,7 +168,7 @@ public final class Ajustes {
         case diasRetencionPortapapeles, limiteElementosPortapapeles, appsExcluidasPortapapeles
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
-        case preferirMicrofonoInternoConBluetooth
+        case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {

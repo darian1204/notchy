@@ -211,6 +211,16 @@ public struct VistaDeAjustesYDiagnostico: View {
                 }
             }
 
+            Section("Reuniones") {
+                Toggle("Resumir cada reunión en el inbox de Obsidian", isOn: ajustes.resumirReunionesEnInbox)
+                    .accessibilityLabel("Resumir cada reunión en el inbox de Obsidian")
+                Text(
+                    "Al detener una reunión, Apple Intelligence la resume en tu Mac y agrega el resumen a 00-inbox/inbox.md."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Section("Barra de menús") {
                 Toggle("Mostrar ícono en la barra de menús", isOn: ajustes.iconoEnBarraDeMenus)
                     .accessibilityLabel("Mostrar ícono en la barra de menús")

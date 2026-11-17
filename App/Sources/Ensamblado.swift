@@ -35,6 +35,7 @@ final class Ensamblado {
     let modeloDeMonitorSistema: ModeloDeMonitorSistema
     let vigilanteDeHUD: VigilanteDeHUDSistema
     let gestorDeInbox: GestorDeInboxObsidian
+    let resumidorDeReuniones: ResumidorDeReuniones
     let modeloDeAjustes: ModeloDeAjustesYDiagnostico
     private var ventanaDeAjustes: ControladorDeVentanaDeAjustes?
     private var barraDeMenus: ControladorDeBarraDeMenus?
@@ -133,6 +134,15 @@ final class Ensamblado {
             ajustes: ajustes,
             alAbrirURL: abrirURL
         )
+        let repositorioDeResumen = baseAbierta.map(RepositorioDeGrabadoraYReuniones.init)
+        let inboxParaResumen = gestorDeInbox
+        resumidorDeReuniones = ResumidorDeReuniones(
+            bus: bus,
+            modelo: AdaptadorDeResumenLocal(),
+            ajustes: ajustes,
+            segmentosDe: { id in (try? repositorioDeResumen?.listarSegmentos(reunionID: id)) ?? [] },
+            escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) }
+        )
 
         registro = RegistroDeModulos(ajustes: ajustes)
         coordinador = CoordinadorDeIsla(registro: registro, bus: bus)
@@ -213,6 +223,7 @@ final class Ensamblado {
             self?.ventanaDeAjustes?.mostrar()
         }
         coordinador.alAbrirAjustes = abrirAjustes
+        resumidorDeReuniones.arrancar()
         coordinador.alSalir = salir
 
         barraDeMenus = ControladorDeBarraDeMenus(
