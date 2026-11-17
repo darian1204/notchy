@@ -19,6 +19,13 @@ public final class AdaptadorDeCapturaDeAudio: PuertoDeCapturaDeAudio {
     private var preferirInternoActivo = true
     private var callbackBloque: (@Sendable (BloqueDeAudioPCM) -> Void)?
     private var callbackEntorno: (@Sendable (EventoDeEntornoDeAudio) -> Void)?
+    /// Sube en cada arranque o paro; un arranque viejo que despierta de un `sleep` ve que ya no es el actual y se retira.
+    private var generacion = 0
+    /// Un solo reinicio pendiente a la vez: las notificaciones seguidas se agrupan en uno.
+    private var tareaDeReinicio: Task<Void, Never>?
+    private var dispositivoPendiente = "Dispositivo de audio"
+    private var limitador = LimitadorDeReinicios()
+    private var avisoDeLimiteEnviado = false
 
     public init() {}
 
@@ -66,50 +73,66 @@ public final class AdaptadorDeCapturaDeAudio: PuertoDeCapturaDeAudio {
         alCambiarEntorno: @escaping @Sendable (EventoDeEntornoDeAudio) -> Void
     ) async throws {
         await detenerCaptura()
+        generacion &+= 1
+        let mia = generacion
         incluirSistemaActivo = incluirSistema
         preferirInternoActivo = preferirMicrofonoInterno
         callbackBloque = alRecibirBloque
         callbackEntorno = alCambiarEntorno
+        limitador.reiniciar()
+        avisoDeLimiteEnviado = false
 
-        try await arrancarMotores(
-            incluirSistema: incluirSistema,
-            preferirMicrofonoInterno: preferirMicrofonoInterno,
-            alRecibirBloque: alRecibirBloque,
-            alCambiarEntorno: alCambiarEntorno
-        )
+        try await arrancarMotores(generacion: mia)
+        guard mia == generacion else { return }
         instalarObservadoresDeEntorno()
         capturando = true
     }
 
     public func detenerCaptura() async {
+        generacion &+= 1
+        tareaDeReinicio?.cancel()
+        tareaDeReinicio = nil
         quitarObservadoresDeEntorno()
+        apagarMotores()
+        capturando = false
+    }
+
+    /// Libera micrófono, tap y dispositivo agregado. Seguro de llamar varias veces.
+    private func apagarMotores() {
         capturadorMic?.detener()
         capturadorSistema?.detener()
         capturadorMic = nil
         capturadorSistema = nil
-        capturando = false
     }
 
-    private func arrancarMotores(
-        incluirSistema: Bool,
-        preferirMicrofonoInterno: Bool,
-        alRecibirBloque: @escaping @Sendable (BloqueDeAudioPCM) -> Void,
-        alCambiarEntorno: @escaping @Sendable (EventoDeEntornoDeAudio) -> Void
-    ) async throws {
+    /// Arranca micrófono y (si aplica) tap del sistema. Siempre apaga lo anterior primero, así nunca
+    /// quedan dos taps vivos en `coreaudiod`.
+    private func arrancarMotores(generacion mia: Int) async throws {
+        apagarMotores()
+        guard let alRecibirBloque = callbackBloque, let alCambiarEntorno = callbackEntorno else { return }
+
         let mic = CapturadorMicrofonoInterno(
             alRecibir: alRecibirBloque,
             alFallar: { detalle in
                 alCambiarEntorno(.falloDeFuente(fuente: .microfono, detalle: detalle))
             }
         )
-        try mic.iniciar(preferirInterno: preferirMicrofonoInterno)
+        do {
+            try mic.iniciar(preferirInterno: preferirInternoActivo)
+        } catch {
+            mic.detener()
+            throw error
+        }
         capturadorMic = mic
 
-        guard incluirSistema else { return }
+        guard incluirSistemaActivo else { return }
         if !mic.usaInterno {
             // S3: si se abrió un micrófono Bluetooth, los audífonos tardan en cambiar a modo llamada (16 kHz).
             try? await Task.sleep(for: .milliseconds(1500))
         }
+        // Mientras dormía pudo llegar un paro u otro arranque; ese ya se encargó de apagar este micrófono.
+        guard mia == generacion else { return }
+
         let sis = CapturadorSistemaInterno(
             alRecibir: alRecibirBloque,
             alFallar: { detalle in
@@ -135,10 +158,7 @@ public final class AdaptadorDeCapturaDeAudio: PuertoDeCapturaDeAudio {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, self.capturando else { return }
-                self.capturadorMic?.detener()
-                self.capturadorSistema?.detener()
-                self.callbackEntorno?(.reposoDelMacIniciado)
+                self?.alDormir()
             }
         }
         let obsDespertar = ws.addObserver(
@@ -147,60 +167,108 @@ public final class AdaptadorDeCapturaDeAudio: PuertoDeCapturaDeAudio {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, self.capturando,
-                    let cbBloque = self.callbackBloque,
-                    let cbEntorno = self.callbackEntorno
-                else { return }
-                try? await Task.sleep(for: .milliseconds(800))
-                try? await self.arrancarMotores(
-                    incluirSistema: self.incluirSistemaActivo,
-                    preferirMicrofonoInterno: self.preferirInternoActivo,
-                    alRecibirBloque: cbBloque,
-                    alCambiarEntorno: cbEntorno
-                )
-                cbEntorno(.despertarDelMac)
+                self?.alDespertar()
             }
         }
 
         let nc = NotificationCenter.default
+        let alCambiar: @Sendable (Notification) -> Void = { [weak self] notif in
+            let dispositivo = notif.object as? AVCaptureDevice
+            let nombre = dispositivo?.localizedName ?? ""
+            let uid = dispositivo?.uniqueID ?? ""
+            let tieneAudio = dispositivo?.hasMediaType(.audio) ?? false
+            Task { @MainActor [weak self] in
+                self?.alCambiarDispositivo(nombre: nombre, uid: uid, tieneAudio: tieneAudio)
+            }
+        }
         let obsConectado = nc.addObserver(
             forName: AVCaptureDevice.wasConnectedNotification,
             object: nil,
-            queue: .main
-        ) { [weak self] notif in
-            let nombre = (notif.object as? AVCaptureDevice)?.localizedName ?? "Dispositivo de audio"
-            Task { @MainActor [weak self] in
-                await self?.manejarCambioDeDispositivo(nombre: nombre)
-            }
-        }
+            queue: .main,
+            using: alCambiar
+        )
         let obsDesconectado = nc.addObserver(
             forName: AVCaptureDevice.wasDisconnectedNotification,
             object: nil,
-            queue: .main
-        ) { [weak self] notif in
-            let nombre = (notif.object as? AVCaptureDevice)?.localizedName ?? "Dispositivo de audio"
-            Task { @MainActor [weak self] in
-                await self?.manejarCambioDeDispositivo(nombre: nombre)
-            }
-        }
+            queue: .main,
+            using: alCambiar
+        )
         observadoresEntorno = [obsDormir, obsDespertar, obsConectado, obsDesconectado]
     }
 
-    private func manejarCambioDeDispositivo(nombre: String) async {
+    private func alDormir() {
+        guard capturando else { return }
+        generacion &+= 1
+        tareaDeReinicio?.cancel()
+        tareaDeReinicio = nil
+        apagarMotores()
+        callbackEntorno?(.reposoDelMacIniciado)
+    }
+
+    private func alDespertar() {
+        guard capturando else { return }
+        programarReinicio(retraso: .milliseconds(800)) { adaptador in
+            await adaptador.reiniciarMotores(evento: .despertarDelMac, limitar: false)
+        }
+    }
+
+    private func alCambiarDispositivo(nombre: String, uid: String, tieneAudio: Bool) {
         guard capturando,
-            let cbBloque = callbackBloque,
-            let cbEntorno = callbackEntorno
+            FiltroDeDispositivosDeAudio.ameritaReinicio(nombre: nombre, uid: uid, tieneAudio: tieneAudio)
         else { return }
-        capturadorMic?.detener()
-        capturadorSistema?.detener()
-        cbEntorno(.cambioDeDispositivo(nombre: nombre))
-        try? await Task.sleep(for: .milliseconds(400))
-        try? await arrancarMotores(
-            incluirSistema: incluirSistemaActivo,
-            preferirMicrofonoInterno: preferirInternoActivo,
-            alRecibirBloque: cbBloque,
-            alCambiarEntorno: cbEntorno
-        )
+        dispositivoPendiente = nombre.isEmpty ? "Dispositivo de audio" : nombre
+        programarReinicio(retraso: .milliseconds(600)) { adaptador in
+            await adaptador.reiniciarMotores(
+                evento: .cambioDeDispositivo(nombre: adaptador.dispositivoPendiente),
+                limitar: true
+            )
+        }
+    }
+
+    /// Cancela el reinicio pendiente y agenda uno nuevo: 10 notificaciones seguidas = 1 reinicio.
+    private func programarReinicio(
+        retraso: Duration,
+        _ accion: @escaping @MainActor (AdaptadorDeCapturaDeAudio) async -> Void
+    ) {
+        tareaDeReinicio?.cancel()
+        tareaDeReinicio = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: retraso)
+            guard !Task.isCancelled, let self else { return }
+            await accion(self)
+        }
+    }
+
+    private func reiniciarMotores(evento: EventoDeEntornoDeAudio, limitar: Bool) async {
+        guard capturando, let alCambiarEntorno = callbackEntorno else { return }
+        if limitar {
+            guard limitador.permitir(en: ProcessInfo.processInfo.systemUptime) else {
+                // Freno de mano: no seguimos creando taps; la grabación sigue con lo que ya está abierto.
+                if !avisoDeLimiteEnviado {
+                    avisoDeLimiteEnviado = true
+                    log.error("Demasiados cambios de dispositivo seguidos; se ignoran por ahora.")
+                    alCambiarEntorno(
+                        .falloDeFuente(
+                            fuente: .sistema,
+                            detalle: "Demasiados cambios de dispositivo seguidos; se sigue con el actual."
+                        )
+                    )
+                }
+                return
+            }
+            avisoDeLimiteEnviado = false
+        }
+        generacion &+= 1
+        let mia = generacion
+        apagarMotores()
+        do {
+            try await arrancarMotores(generacion: mia)
+        } catch {
+            guard mia == generacion else { return }
+            log.error("No se pudo reanudar la captura: \(error.localizedDescription, privacy: .public)")
+            alCambiarEntorno(.falloDeFuente(fuente: .microfono, detalle: error.localizedDescription))
+        }
+        guard mia == generacion else { return }
+        alCambiarEntorno(evento)
     }
 
     private func quitarObservadoresDeEntorno() {
@@ -211,6 +279,43 @@ public final class AdaptadorDeCapturaDeAudio: PuertoDeCapturaDeAudio {
             nc.removeObserver(obs)
         }
         observadoresEntorno.removeAll()
+    }
+}
+
+/// Cuenta reinicios en una ventana de tiempo para no entrar en bucle con `coreaudiod`.
+struct LimitadorDeReinicios: Sendable {
+    let maximo: Int
+    let ventana: TimeInterval
+    private var marcas: [TimeInterval] = []
+
+    init(maximo: Int = 3, ventana: TimeInterval = 20) {
+        self.maximo = maximo
+        self.ventana = ventana
+    }
+
+    /// Registra un intento en `ahora`; `false` si ya hubo `maximo` dentro de la ventana.
+    mutating func permitir(en ahora: TimeInterval) -> Bool {
+        marcas.removeAll { ahora - $0 >= ventana }
+        guard marcas.count < maximo else { return false }
+        marcas.append(ahora)
+        return true
+    }
+
+    mutating func reiniciar() {
+        marcas.removeAll()
+    }
+}
+
+/// Decide qué cambios de dispositivo ameritan reiniciar la captura.
+enum FiltroDeDispositivosDeAudio {
+    /// Prefijo del UID y nombre del dispositivo agregado que crea Notchy.
+    static let prefijoPropio = "NotchySystemTap"
+
+    static func ameritaReinicio(nombre: String, uid: String, tieneAudio: Bool) -> Bool {
+        guard tieneAudio else { return false }
+        // El dispositivo agregado del tap lo crea Notchy; si lo contamos, cada arranque provoca otro (bucle).
+        if uid.hasPrefix(prefijoPropio) || nombre.hasPrefix(prefijoPropio) { return false }
+        return true
     }
 }
 
@@ -242,11 +347,16 @@ nonisolated final class ContadorDeFuenteAudio: @unchecked Sendable {
         return (_bloques, _cortes, _primerHostMs)
     }
 
-    static func hostTimeAMilisegundos(_ host: UInt64) -> Double {
+    /// Factor de host time a milisegundos; `mach_timebase_info` no cambia, se calcula una vez.
+    private static let factorHostAMs: Double = {
         var tb = mach_timebase_info_data_t()
         mach_timebase_info(&tb)
         guard tb.denom > 0 else { return 0 }
-        return Double(host) * Double(tb.numer) / Double(tb.denom) / 1_000_000
+        return Double(tb.numer) / Double(tb.denom) / 1_000_000
+    }()
+
+    static func hostTimeAMilisegundos(_ host: UInt64) -> Double {
+        Double(host) * factorHostAMs
     }
 }
 
@@ -262,6 +372,8 @@ nonisolated final class CapturadorMicrofonoInterno: NSObject, AVCaptureAudioData
     private var _formatoTexto = ""
     private var _usaInterno = false
     private var _nombreDispositivo = "Micrófono"
+    /// Solo se toca desde `cola`: evita crear un `AVAudioFormat` en cada bloque.
+    private var formatoEnCache: (descripcion: CMFormatDescription, formato: AVAudioFormat)?
 
     init(
         alRecibir: @escaping @Sendable (BloqueDeAudioPCM) -> Void,
@@ -337,10 +449,17 @@ nonisolated final class CapturadorMicrofonoInterno: NSObject, AVCaptureAudioData
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        guard let desc = sampleBuffer.formatDescription,
-            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc),
-            let formato = AVAudioFormat(streamDescription: asbd)
-        else { return }
+        guard let desc = sampleBuffer.formatDescription else { return }
+        let formato: AVAudioFormat
+        if let cache = formatoEnCache, CMFormatDescriptionEqual(cache.descripcion, otherFormatDescription: desc) {
+            formato = cache.formato
+        } else {
+            guard let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc),
+                let nuevo = AVAudioFormat(streamDescription: asbd)
+            else { return }
+            formatoEnCache = (desc, nuevo)
+            formato = nuevo
+        }
         let n = AVAudioFrameCount(sampleBuffer.numSamples)
         guard n > 0, let buffer = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: n) else { return }
         buffer.frameLength = n
@@ -383,6 +502,15 @@ nonisolated final class CapturadorMicrofonoInterno: NSObject, AVCaptureAudioData
 
     func detener() {
         sesion.stopRunning()
+        sesion.beginConfiguration()
+        for salida in sesion.outputs {
+            (salida as? AVCaptureAudioDataOutput)?.setSampleBufferDelegate(nil, queue: nil)
+            sesion.removeOutput(salida)
+        }
+        for entrada in sesion.inputs {
+            sesion.removeInput(entrada)
+        }
+        sesion.commitConfiguration()
     }
 }
 
@@ -411,7 +539,21 @@ nonisolated final class CapturadorSistemaInterno: @unchecked Sendable {
         return _formatoTexto
     }
 
+    deinit {
+        detener()
+    }
+
+    /// Si algo falla a la mitad, se destruye lo que ya se creó (tap o agregado) para no dejarlo vivo en `coreaudiod`.
     func iniciar() throws {
+        do {
+            try crearYArrancar()
+        } catch {
+            detener()
+            throw error
+        }
+    }
+
+    private func crearYArrancar() throws {
         let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
         desc.uuid = UUID()
         desc.muteBehavior = .unmuted
@@ -432,8 +574,8 @@ nonisolated final class CapturadorSistemaInterno: @unchecked Sendable {
 
         let salida = try uidSalidaPorDefecto()
         let config: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "NotchySystemTap",
-            kAudioAggregateDeviceUIDKey: UUID().uuidString,
+            kAudioAggregateDeviceNameKey: FiltroDeDispositivosDeAudio.prefijoPropio,
+            kAudioAggregateDeviceUIDKey: "\(FiltroDeDispositivosDeAudio.prefijoPropio)-\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: salida,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,
