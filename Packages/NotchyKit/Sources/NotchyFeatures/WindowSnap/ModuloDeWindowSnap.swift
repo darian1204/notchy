@@ -110,13 +110,13 @@ public final class ModeloDeWindowSnap {
     }
 }
 
-/// Módulo Window Snap en el notch (`macwindow.split.2x1`).
+/// Módulo Window Snap en el notch (`rectangle.split.2x1.fill`).
 @MainActor
 public final class ModuloDeWindowSnap: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
         id: "windowsnap",
         nombre: "Snap",
-        icono: "macwindow.split.2x1",
+        icono: "rectangle.split.2x1.fill",
         color: Paleta.hexWindowSnap,
         lado: .derecha
     )
@@ -155,7 +155,7 @@ struct VistaDeWindowSnap: View {
 
     private var encabezado: some View {
         HStack(spacing: 8) {
-            Image(systemName: "macwindow.split.2x1")
+            Image(systemName: "rectangle.split.2x1.fill")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Paleta.windowSnap)
 
