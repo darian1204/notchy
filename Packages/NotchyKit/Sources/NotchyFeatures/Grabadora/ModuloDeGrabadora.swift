@@ -222,6 +222,11 @@ struct VistaDeGrabadora: View {
                     }
                     Spacer(minLength: 0)
 
+                    botonCopiarTranscripcion(
+                        modelo.segmentosEnVivo,
+                        titulo: modelo.reunionActual?.titulo
+                    )
+
                     Button {
                         _ = modelo.agregarMarcaEnReunion()
                     } label: {
@@ -338,6 +343,22 @@ struct VistaDeGrabadora: View {
                 .frame(width: 220)
             }
         }
+    }
+
+    private func botonCopiarTranscripcion(_ segmentos: [SegmentoDeTranscripcion], titulo: String?) -> some View {
+        Button {
+            modelo.copiarTranscripcion(segmentos, titulo: titulo)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: modelo.transcripcionCopiada ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 10))
+                Text(modelo.transcripcionCopiada ? "Copiada" : "Copiar")
+            }
+        }
+        .buttonStyle(EstiloDePildora())
+        .disabled(segmentos.isEmpty)
+        .help("Copiar la transcripción completa")
+        .accessibilityLabel("Copiar transcripción de la reunión")
     }
 
     private func filaSegmento(_ seg: SegmentoDeTranscripcion) -> some View {
@@ -575,6 +596,24 @@ struct VistaDeGrabadora: View {
                         )
                         .rotulo(Paleta.agenda)
                         Spacer(minLength: 0)
+                        if !mostrandoBusqueda, !lista.isEmpty {
+                            let titulo = modelo.reunionesGuardadas.first(where: {
+                                $0.id == modelo.reunionSeleccionadaID
+                            })?.titulo
+                            Button {
+                                modelo.copiarTranscripcion(lista, titulo: titulo)
+                            } label: {
+                                Label(
+                                    modelo.transcripcionCopiada ? "Copiada" : "Copiar",
+                                    systemImage: modelo.transcripcionCopiada ? "checkmark" : "doc.on.doc"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Paleta.agenda)
+                            .help("Copiar la transcripción completa")
+                            .accessibilityLabel("Copiar transcripción de la reunión")
+                        }
                         if let id = modelo.reunionSeleccionadaID,
                             let reunion = modelo.reunionesGuardadas.first(where: { $0.id == id }),
                             !reunion.rutasAudioMicrofono.isEmpty || !reunion.rutasAudioSistema.isEmpty

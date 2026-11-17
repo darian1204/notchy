@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NotchyCore
 import NotchyStorage
@@ -37,6 +38,9 @@ public final class ModeloDeGrabadora {
     public private(set) var estadisticasCaptura = EstadisticasDeCapturaDeAudio()
     public private(set) var avisoDeFuente: String?
     public private(set) var mensajeDeError: String?
+    /// `true` unos segundos después de copiar una transcripción, para confirmar en el botón.
+    public private(set) var transcripcionCopiada = false
+    private var tareaAvisoCopiado: Task<Void, Never>?
 
     public private(set) var reunionActual: ReunionGrabada?
     public private(set) var ensamblador: EnsambladorDeSegmentos?
@@ -337,6 +341,39 @@ public final class ModeloDeGrabadora {
             }
         }
         Task { await publicarEstadoDeGrabacion() }
+    }
+
+    /// Texto plano de una transcripción: `[mm:ss] Tú: …`, una línea por segmento, con título opcional.
+    public nonisolated static func textoDeTranscripcion(_ segmentos: [SegmentoDeTranscripcion], titulo: String? = nil)
+        -> String
+    {
+        var lineas: [String] = []
+        if let titulo = titulo?.trimmingCharacters(in: .whitespacesAndNewlines), !titulo.isEmpty {
+            lineas.append(titulo)
+            lineas.append("")
+        }
+        for seg in segmentos {
+            let texto = seg.texto.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !texto.isEmpty else { continue }
+            lineas.append("[\(seg.marcaDeTiempoFormateada)] \(seg.fuente.etiqueta): \(texto)")
+        }
+        return lineas.joined(separator: "\n")
+    }
+
+    /// Copia la transcripción al portapapeles del sistema y marca `transcripcionCopiada` por 1.5 s.
+    public func copiarTranscripcion(_ segmentos: [SegmentoDeTranscripcion], titulo: String? = nil) {
+        let texto = Self.textoDeTranscripcion(segmentos, titulo: titulo)
+        guard !texto.isEmpty else { return }
+        let pasta = NSPasteboard.general
+        pasta.clearContents()
+        pasta.setString(texto, forType: .string)
+        transcripcionCopiada = true
+        tareaAvisoCopiado?.cancel()
+        tareaAvisoCopiado = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard !Task.isCancelled else { return }
+            self?.transcripcionCopiada = false
+        }
     }
 
     /// Inserta una marca de tiempo en la transcripción de la reunión activa (GRB-8).
