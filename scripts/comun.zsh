@@ -3,6 +3,7 @@ RAIZ=${0:A:h:h}
 DERIVADOS=$RAIZ/build/DerivedData
 REGISTROS=$RAIZ/build/logs
 APP=$DERIVADOS/Build/Products/Debug/Notchy.app
+APP_INSTALADA=/Applications/Notchy.app
 mkdir -p $REGISTROS
 
 # Lee un ajuste de Config/Base.xcconfig, que es la única fuente del identificador y del equipo.

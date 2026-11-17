@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Compila, firma y abre la app de depuración. Cierra antes la que esté abierta.
+# Compila, firma, instala en /Applications/Notchy.app y abre la app de depuración. Cierra antes la que esté abierta.
 set -u
 source ${0:A:h}/comun.zsh
 
@@ -9,6 +9,8 @@ if ! compilar_app; then
     exit 1
 fi
 pkill -x Notchy 2> /dev/null && sleep 1
-open -n $APP --args "$@"
+rm -rf $APP_INSTALADA
+ditto $APP $APP_INSTALADA
+open -n $APP_INSTALADA --args "$@"
 sleep 1
-print -- "Notchy abierta (pid $(pgrep -x Notchy | head -1)). Para cerrarla: pkill -x Notchy"
+print -- "Notchy instalada en $APP_INSTALADA y abierta (pid $(pgrep -x Notchy | head -1)). Para cerrarla: pkill -x Notchy"

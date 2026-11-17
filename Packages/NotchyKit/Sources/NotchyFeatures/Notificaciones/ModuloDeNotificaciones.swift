@@ -155,6 +155,14 @@ public final class ModeloDeNotificaciones {
     }
 
     public func abrirAjustesDeAccesoAlDisco() {
+        let appInstalada = URL(fileURLWithPath: "/Applications/Notchy.app")
+        let rutaApp =
+            FileManager.default.fileExists(atPath: appInstalada.path)
+            ? appInstalada
+            : Bundle.main.bundleURL
+        if rutaApp.pathExtension == "app" {
+            NSWorkspace.shared.activateFileViewerSelecting([rutaApp])
+        }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
             NSWorkspace.shared.open(url)
         }

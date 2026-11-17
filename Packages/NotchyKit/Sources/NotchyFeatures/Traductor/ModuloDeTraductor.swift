@@ -4,11 +4,14 @@ import NotchyCore
 import NotchyDesign
 import Observation
 import SwiftUI
+import Translation
 
-/// Modelo observable del módulo de Traducción (Translate) con soporte instantáneo y LLM vía OpenCode.
+/// Modelo observable del módulo de Traducción (Translate) con motor local en el dispositivo (`Translation`) y modo opcional LLM vía OpenCode.
 @MainActor
 @Observable
 public final class ModeloDeTraductor {
+    public typealias TraductorLocal = @Sendable (String, String, String) async -> String?
+
     public var idiomaOrigen: IdiomaDeTraduccion = .ingles
     public var idiomaDestino: IdiomaDeTraduccion = .espanol
     public var textoOrigen: String = "I find it quite useful!"
@@ -18,16 +21,26 @@ public final class ModeloDeTraductor {
     public private(set) var copiadoReciente = false
 
     @ObservationIgnored private let agente: (any PuertoAgenteOpenCode)?
+    @ObservationIgnored private let traductorLocal: TraductorLocal
     @ObservationIgnored private var tareaTraduccion: Task<Void, Never>?
 
-    public init(agente: (any PuertoAgenteOpenCode)? = nil) {
+    public init(
+        agente: (any PuertoAgenteOpenCode)? = nil,
+        traductorLocal: TraductorLocal? = nil
+    ) {
         self.agente = agente
+        self.traductorLocal =
+            traductorLocal
+            ?? { texto, origen, destino in
+                await Self.traducirInstantaneo(texto: texto, origen: origen, destino: destino)
+            }
     }
 
     public func traducir() {
         let limpio = textoOrigen.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !limpio.isEmpty else {
             textoTraducido = ""
+            traduciendo = false
             return
         }
         tareaTraduccion?.cancel()
@@ -35,6 +48,7 @@ public final class ModeloDeTraductor {
         let origen = idiomaOrigen
         let destino = idiomaDestino
         let usarLLM = usarOpenCodeLLM
+        let traductor = traductorLocal
 
         tareaTraduccion = Task { [weak self] in
             guard let self else { return }
@@ -56,13 +70,11 @@ public final class ModeloDeTraductor {
                 }
             }
 
-            if let instantanea = await Self.traducirInstantaneo(
-                texto: limpio,
-                origen: origen.rawValue,
-                destino: destino.rawValue
-            ) {
-                self.textoTraducido = instantanea
+            if let local = await traductor(limpio, origen.rawValue, destino.rawValue) {
+                guard !Task.isCancelled else { return }
+                self.textoTraducido = local
             }
+            guard !Task.isCancelled else { return }
             self.traduciendo = false
         }
     }
@@ -104,25 +116,25 @@ public final class ModeloDeTraductor {
         }
     }
 
-    public static func traducirInstantaneo(
+    /// Traduce 100 % en local usando `TranslationSession` de Apple cuando el par de idiomas está instalado en el Mac.
+    nonisolated public static func traducirInstantaneo(
         texto: String,
         origen: String,
         destino: String
     ) async -> String? {
-        guard let q = texto.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-            let url = URL(
-                string:
-                    "https://translate.googleapis.com/translate_a/single?client=gtx&sl=\(origen)&tl=\(destino)&dt=t&q=\(q)"
-            )
-        else { return nil }
+        let limpio = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !limpio.isEmpty else { return nil }
+        if origen == destino { return limpio }
+        let idiomaOrigen = Locale.Language(identifier: origen)
+        let idiomaDestino = Locale.Language(identifier: destino)
+        let disponibilidad = LanguageAvailability()
+        let estado = await disponibilidad.status(from: idiomaOrigen, to: idiomaDestino)
+        guard estado == .installed else { return nil }
         do {
-            let (datos, _) = try await URLSession.shared.data(from: url)
-            guard let json = try JSONSerialization.jsonObject(with: datos) as? [Any],
-                let bloques = json.first as? [[Any]]
-            else { return nil }
-            let partes = bloques.compactMap { $0.first as? String }
-            let unido = partes.joined()
-            return unido.isEmpty ? nil : unido
+            let sesion = TranslationSession(installedSource: idiomaOrigen, target: idiomaDestino)
+            let respuesta = try await sesion.translate(limpio)
+            let traducido = respuesta.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return traducido.isEmpty ? nil : traducido
         } catch {
             return nil
         }
@@ -219,7 +231,7 @@ struct VistaDeTraductor: View {
                 HStack(spacing: 3) {
                     Image(systemName: modelo.usarOpenCodeLLM ? "sparkles" : "bolt.fill")
                         .font(.system(size: 8.5, weight: .bold))
-                    Text(modelo.usarOpenCodeLLM ? "LLM" : "Fast")
+                    Text(modelo.usarOpenCodeLLM ? "LLM" : "Local")
                         .font(.system(size: 9, weight: .bold))
                 }
                 .foregroundStyle(modelo.usarOpenCodeLLM ? Paleta.agente : Paleta.traductor)
@@ -228,7 +240,7 @@ struct VistaDeTraductor: View {
                 .background(Paleta.superficie, in: Capsule())
             }
             .buttonStyle(.plain)
-            .help("Alternar entre traducción instantánea y LLM con OpenCode")
+            .help("Alternar entre traducción local en el dispositivo y LLM con OpenCode")
         }
     }
 

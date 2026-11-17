@@ -62,17 +62,41 @@ struct HoyYNotificacionesTests {
         await modelo.sincronizarConElSistema()
         #expect(!modelo.accesoAlSistema)
     }
-}
 
-final class NotificacionesDelSistemaFalso: PuertoDeNotificacionesDelSistema {
-    let items: [NotificacionReciente]
-    let acceso: Bool
+    final class NotificacionesDelSistemaFalso: PuertoDeNotificacionesDelSistema {
+        let items: [NotificacionReciente]
+        let acceso: Bool
 
-    init(items: [NotificacionReciente], acceso: Bool = true) {
-        self.items = items
-        self.acceso = acceso
+        init(items: [NotificacionReciente], acceso: Bool = true) {
+            self.items = items
+            self.acceso = acceso
+        }
+
+        func tieneAcceso() -> Bool { acceso }
+        func recientes(limite: Int) async throws -> [NotificacionReciente] { Array(items.prefix(limite)) }
     }
 
-    func tieneAcceso() -> Bool { acceso }
-    func recientes(limite: Int) async throws -> [NotificacionReciente] { Array(items.prefix(limite)) }
+    @Test func elTraductorFuncionaEnLocalSinRed() async {
+        let modelo = ModeloDeTraductor(
+            traductorLocal: { texto, origen, destino in
+                "[\(origen)->\(destino)] \(texto)"
+            }
+        )
+        modelo.textoOrigen = "Hola mundo"
+        modelo.idiomaOrigen = .espanol
+        modelo.idiomaDestino = .ingles
+        modelo.traducir()
+        for _ in 0..<20 where modelo.traduciendo {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(modelo.textoTraducido == "[es->en] Hola mundo")
+        #expect(!modelo.traduciendo)
+
+        let mismoIdioma = await ModeloDeTraductor.traducirInstantaneo(
+            texto: "Texto igual",
+            origen: "es",
+            destino: "es"
+        )
+        #expect(mismoIdioma == "Texto igual")
+    }
 }
