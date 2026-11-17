@@ -12,6 +12,7 @@
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-8b5cf6?style=for-the-badge">
   <img alt="Hecha en Swift" src="https://img.shields.io/badge/hecha%20en-Swift-F05138?style=for-the-badge&logo=swift&logoColor=white">
   <img alt="Sin anuncios" src="https://img.shields.io/badge/sin-anuncios-22c55e?style=for-the-badge">
+  <img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-3b82f6?style=for-the-badge">
 </p>
 
 ---
@@ -185,4 +186,4 @@ docs/                arquitectura e imágenes del README
 Las capas y sus reglas están en `docs/arquitectura.md` y `AGENTS.md`. El identificador `dev.darian.notchy` y el equipo de firma viven en `Config/Base.xcconfig`; cambiarlos reinicia todos los permisos del sistema.
 </details>
 
-<p align="center"><sub>Hecha con cariño en Chihuahua, México, por <a href="https://github.com/darian1204">Darian Maynez</a>.</sub></p>
+<p align="center"><sub>Código abierto bajo licencia <a href="LICENSE">MIT</a>. Hecha con cariño en Chihuahua, México, por <a href="https://github.com/darian1204">Darian Maynez</a>.</sub></p>
