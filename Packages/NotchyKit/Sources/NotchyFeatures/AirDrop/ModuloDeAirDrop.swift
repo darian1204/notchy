@@ -196,6 +196,27 @@ struct VistaDeAirDrop: View {
 }
 
 /// Miniatura QuickLook o ícono del archivo en el sistema.
+/// Miniaturas ya generadas, compartidas por Inicio, AirDrop y la Bandeja. Vive en el hilo principal.
+@MainActor
+enum CacheDeMiniaturas {
+    private static var guardadas: [String: NSImage] = [:]
+    private static var orden: [String] = []
+    private static let maximo = 120
+
+    static func clave(_ url: URL, _ tamano: CGFloat) -> String { "\(Int(tamano))|\(url.path)" }
+
+    static func buscar(_ url: URL, _ tamano: CGFloat) -> NSImage? { guardadas[clave(url, tamano)] }
+
+    static func guardar(_ imagen: NSImage, _ url: URL, _ tamano: CGFloat) {
+        let k = clave(url, tamano)
+        if guardadas[k] == nil { orden.append(k) }
+        guardadas[k] = imagen
+        while orden.count > maximo {
+            guardadas[orden.removeFirst()] = nil
+        }
+    }
+}
+
 struct MiniaturaDeArchivo: View {
     let url: URL
     let tamano: CGFloat
@@ -203,30 +224,32 @@ struct MiniaturaDeArchivo: View {
 
     var body: some View {
         Group {
-            if let miniatura {
-                Image(nsImage: miniatura)
+            if let imagen = miniatura ?? CacheDeMiniaturas.buscar(url, tamano) {
+                Image(nsImage: imagen)
                     .resizable()
                     .scaledToFill()
             } else {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                    .resizable()
-                    .scaledToFit()
+                Image(systemName: "doc")
+                    .font(.system(size: tamano * 0.35))
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(width: tamano, height: tamano)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .task(id: url) {
+            // Solo se genera una vez por archivo; al reabrir la isla sale de la caché al instante.
+            guard CacheDeMiniaturas.buscar(url, tamano) == nil else { return }
             let solicitud = QLThumbnailGenerator.Request(
                 fileAt: url,
                 size: CGSize(width: tamano * 2, height: tamano * 2),
                 scale: 2.0,
-                representationTypes: .thumbnail
+                representationTypes: .all
             )
-            if let representacion = try? await QLThumbnailGenerator.shared.generateBestRepresentation(
-                for: solicitud)
-            {
-                miniatura = representacion.nsImage
-            }
+            let imagen =
+                (try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: solicitud))?.nsImage
+                ?? NSWorkspace.shared.icon(forFile: url.path)
+            CacheDeMiniaturas.guardar(imagen, url, tamano)
+            miniatura = imagen
         }
     }
 }

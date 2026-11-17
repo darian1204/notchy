@@ -317,27 +317,30 @@ private struct ColumnaArchivosInicio: View {
     let alAbrirBandeja: @MainActor () -> Void
     @State private var arrastrandoSobreArchivos = false
 
+    /// Hasta 4 archivos visibles. Se detiene en cuanto junta 4 para no revisar en disco
+    /// todo el historial del portapapeles en cada redibujo.
     private var urlsVisuales: [URL] {
         var lista: [URL] = []
         var vistas = Set<String>()
         func agregar(_ url: URL) {
+            guard lista.count < 4 else { return }
             let p = url.standardizedFileURL.path
             guard !vistas.contains(p), FileManager.default.fileExists(atPath: p) else { return }
             vistas.insert(p)
             lista.append(url)
         }
-        for b in bandeja?.elementos ?? [] {
+        for b in bandeja?.elementos ?? [] where lista.count < 4 {
             agregar(b.urlParaArrastrar)
         }
-        for c in portapapeles?.elementos ?? [] {
+        for c in portapapeles?.elementos ?? [] where lista.count < 4 {
             if let ruta = c.rutaArchivo {
                 agregar(URL(fileURLWithPath: ruta))
             }
         }
-        for a in airdrop?.recibidos ?? [] {
+        for a in airdrop?.recibidos ?? [] where lista.count < 4 {
             agregar(a.url)
         }
-        return Array(lista.prefix(4))
+        return lista
     }
 
     var body: some View {
@@ -397,13 +400,17 @@ private struct ColumnaArchivosInicio: View {
                 )
         )
         .onDrop(of: [.fileURL], isTargeted: $arrastrandoSobreArchivos) { proveedores in
-            for proveedor in proveedores {
-                _ = proveedor.loadObject(ofClass: URL.self) { url, _ in
-                    guard let url else { return }
-                    Task { @MainActor in
-                        _ = bandeja?.agregarArchivos([url])
+            Task { @MainActor in
+                var urls: [URL] = []
+                for proveedor in proveedores {
+                    let url: URL? = await withCheckedContinuation { continuacion in
+                        _ = proveedor.loadObject(ofClass: URL.self) { url, _ in
+                            continuacion.resume(returning: url)
+                        }
                     }
+                    if let url { urls.append(url) }
                 }
+                bandeja?.agregarEnSegundoPlano(urls)
             }
             return true
         }
