@@ -39,7 +39,7 @@ public final class ModeloDeAgente {
         self.mensajes = [
             MensajeDeAgente(
                 rol: .asistente,
-                texto: "Hola Darian. Estoy conectado a OpenCode y a tu vault. ¿En qué te ayudo?"
+                texto: "Hola. Estoy conectado a OpenCode y a tu vault. ¿En qué te ayudo?"
             )
         ]
     }
