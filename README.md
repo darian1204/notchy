@@ -2,14 +2,15 @@
 
 <p align="center">
   <b>Ese hueco negro arriba de tu pantalla por fin sirve para algo.</b><br>
-  Pasa el cursor por el notch y tu Mac te muestra justo lo que necesitas, en el momento en que lo necesitas.
+  Una isla nativa en el notch de tu MacBook: reuniones que se resumen solas, agenda, portapapeles, archivos y más, a un cursor de distancia.
 </p>
 
 <p align="center">
   <img alt="macOS 27" src="https://img.shields.io/badge/macOS-27-000000?style=for-the-badge&logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-8b5cf6?style=for-the-badge">
-  <img alt="Hecha en Swift" src="https://img.shields.io/badge/hecha%20en-Swift-F05138?style=for-the-badge&logo=swift&logoColor=white">
-  <img alt="Gratis" src="https://img.shields.io/badge/gratis-para%20amigos-22c55e?style=for-the-badge">
+  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?style=for-the-badge&logo=swift&logoColor=white">
+  <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-0A84FF?style=for-the-badge&logo=swift&logoColor=white">
+  <img alt="SQLite + GRDB" src="https://img.shields.io/badge/SQLite-GRDB-003B57?style=for-the-badge&logo=sqlite&logoColor=white">
   <img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-3b82f6?style=for-the-badge">
 </p>
 
@@ -21,7 +22,19 @@
 
 ---
 
-## Todo a un vistazo, sin abrir nada
+## 🧭 Qué es
+
+Notchy es una app de barra de menús (sin ícono en el Dock) que dibuja un panel sobre el notch. Acercas el cursor y se abre; sacas el cursor y se esconde. Cada función es un **módulo** que se registra en la isla.
+
+- 🎙️ Graba micrófono y audio del sistema, transcribe en vivo y resume con Apple Intelligence.
+- 📅 Agenda con Calendario y Recordatorios, y aviso antes de cada reunión.
+- 📋 Portapapeles con historial, bandeja de archivos y AirDrop.
+- 🪟 Window Snap, monitor del sistema, tiempo en pantalla y selector de color.
+- 🔒 Nativa y local: sin Electron, y el audio y las transcripciones no salen de tu Mac.
+
+---
+
+## ✨ Qué incluye
 
 Notchy vive en el notch de tu MacBook. No ocupa espacio en el Dock ni llena la pantalla de ventanas: se abre al acercar el cursor y se esconde cuando terminas. Arriba tienes una fila de íconos; cada uno abre un módulo.
 
@@ -139,36 +152,116 @@ Está diseñada para el notch. En pantallas sin notch, la isla aparece en el bor
 
 ---
 
-<details>
-<summary><b>Para desarrolladores</b></summary>
+## 🏗️ Arquitectura
 
-### Requisitos
+Notchy es un paquete de Swift (`NotchyKit`) dividido en capas con dependencias en una sola dirección, más una app delgada que las ensambla. Los módulos nunca tocan el sistema: piden lo que necesitan por **puertos** (protocolos) definidos en `NotchyCore`, y `NotchyPlatform` trae los adaptadores reales. Por eso cada módulo se prueba con falsos.
 
-- Xcode 27.2 (Swift 6.4) con un certificado Apple Development del equipo `3GB89AS998`.
-- OpenCode en la versión de `Resources/opencode/VERSION` (para el asistente).
+```mermaid
+flowchart TD
+    App["App/ (arranque y ensamblado)"]
+    Island["NotchyIsland<br/>panel, máquina de estados, registro"]
+    Features["NotchyFeatures<br/>módulos de función"]
+    Agent["NotchyAgent<br/>asistente (en construcción)"]
+    Platform["NotchyPlatform<br/>adaptadores reales de macOS"]
+    Storage["NotchyStorage<br/>SQLite + migraciones"]
+    Design["NotchyDesign<br/>colores, medidas, componentes"]
+    Core["NotchyCore<br/>puertos, bus de eventos, ajustes"]
+    Tests["NotchyTestSupport<br/>falsos para pruebas"]
 
-### Comandos
+    App --> Island & Features & Platform & Storage
+    Island --> Core & Design
+    Features --> Core & Storage & Design
+    Agent --> Core & Storage
+    Platform --> Core
+    Storage --> Core
+    Tests --> Core
+```
 
-| Comando | Qué hace |
+| Capa | Rol | Depende de |
+|---|---|---|
+| `NotchyCore` | Puertos, contrato `ModuloDeIsla`, bus de eventos, ajustes, permisos, errores y logs | nada |
+| `NotchyDesign` | Paleta, medidas, forma de la isla y componentes de SwiftUI | nada |
+| `NotchyStorage` | SQLite con GRDB, migraciones que solo avanzan y repositorios | Core |
+| `NotchyPlatform` | Adaptadores reales: audio, transcripción, EventKit, cámara, portapapeles, AirDrop, atajos globales, OpenCode | Core |
+| `NotchyIsland` | Ventana del panel, geometría, máquina de estados y registro de módulos | Core, Design |
+| `NotchyFeatures` | Un módulo por función (agenda, grabadora, bandeja, clima, etc.) | Core, Storage, Design |
+| `NotchyAgent` | Capa reservada para el asistente (supervisor de OpenCode y servidor MCP) | Core, Storage |
+| `NotchyTestSupport` | Falsos y datos de prueba | Core |
+
+La regla de capas no es solo una convención: `Package.swift` la declara y `scripts/check` la verifica contra los `import` de cada archivo.
+
+### Piezas clave
+
+- **`ModuloDeIsla`**: contrato que cumple cada módulo (identidad, tamaño, vista expandida, vistas compactas opcionales, aviso temporal, `arrancar()` y `detener()`).
+- **`MaquinaDeIsla`**: reglas puras de la isla. Recibe entradas y devuelve el estado nuevo (`reposo`, `compacto`, `aviso`, `expandido`) y los temporizadores a programar. No usa ventanas ni relojes, así que se prueba completa.
+- **`BusDeEventos`**: los módulos se comunican con eventos tipados, sin conocerse entre sí.
+- **`Ensamblado`**: único lugar que crea adaptadores reales y los inyecta en los módulos.
+
+### Flujo principal
+
+1. El cursor llega al notch y `NotchyIsland` pasa la máquina de `reposo` a `expandido`.
+2. El registro activa el módulo de Inicio; el resto se abre desde la fila de íconos.
+3. El módulo llama a un puerto de `NotchyCore` (por ejemplo, el calendario o el portapapeles).
+4. `NotchyPlatform` resuelve la llamada con la API de macOS y pide el permiso solo en ese momento.
+5. Lo que debe persistir (portapapeles, bandeja, reuniones) pasa por un repositorio de `NotchyStorage`.
+6. Si algo requiere atención, el módulo emite un evento y la isla muestra un aviso o un estado compacto.
+
+---
+
+## 🛠️ Para desarrolladores
+
+### Stack y requisitos
+
+| Área | Tecnología |
 |---|---|
-| `scripts/check` | Formato, regla de capas, plist, secretos, paquete en modo estricto con pruebas, app y firma. Tiene que pasar antes de unir a `main`. |
+| Lenguaje | Swift 6 (modo estricto en `scripts/check`) |
+| UI | SwiftUI + AppKit para el panel |
+| Persistencia | SQLite con [GRDB.swift](https://github.com/groue/GRDB.swift) 7 |
+| Agente | [MCP Swift SDK](https://github.com/modelcontextprotocol/swift-sdk) y OpenCode (versión fijada en `Resources/opencode/VERSION`) |
+| Sistema | EventKit, Speech, FoundationModels (Apple Intelligence), AVFoundation, Carbon (atajos globales) |
+| Música | [mediaremote-adapter](Resources/mediaremote-adapter/LICENSE) (BSD-3) |
+| Herramientas | Xcode 27.2 (Swift 6.4) y un certificado Apple Development propio |
+
+### Compilar y correr
+
+```bash
+swift test --package-path Packages/NotchyKit   # pruebas del paquete
+scripts/check                                  # verificación completa
+scripts/run                                    # compila, firma, instala y abre la app
+```
+
+| Script | Qué hace |
+|---|---|
+| `scripts/check` | Formato, regla de capas, plist, secretos, paquete estricto con pruebas, app y firma. Debe pasar antes de unir a `main`. |
 | `scripts/run` | Compila, firma, instala en `/Applications/Notchy.app` y la abre. |
 | `scripts/verificar-firma` | Muestra identidad, equipo y entitlements de la app compilada. |
 
-Los registros largos quedan en `build/logs`. Para trabajar solo en el paquete: `swift test --package-path Packages/NotchyKit`.
+El identificador de la app y el equipo de firma viven en `Config/Base.xcconfig`; si compilas con tu propio certificado, cámbialos ahí. Cambiarlos reinicia los permisos del sistema. Los registros largos quedan en `build/logs`.
 
 ### Estructura
 
 ```
-App/                 arranque, Info.plist, entitlements y assets
+App/                 arranque, ensamblado, Info.plist, entitlements y assets
 Config/              ajustes de compilación (.xcconfig)
-Packages/NotchyKit/  todas las capas y sus pruebas
-Resources/           OpenCode y MediaRemote
+Packages/NotchyKit/  capas del paquete y sus pruebas
+Resources/           plantilla de OpenCode y MediaRemote
 scripts/             check, run, verificar-firma
 docs/                arquitectura e imágenes del README
 ```
 
-Las capas y sus reglas están en `docs/arquitectura.md` y `AGENTS.md`. El identificador `dev.darian.notchy` y el equipo de firma viven en `Config/Base.xcconfig`; cambiarlos reinicia todos los permisos del sistema.
-</details>
+Más detalle en `docs/arquitectura.md` y `AGENTS.md`.
+
+---
+
+## 🗺️ Estado y roadmap
+
+Proyecto personal en desarrollo activo; los 15 módulos de arriba ya funcionan en `main`.
+
+- [x] Isla base, grabadora con resumen, portapapeles, bandeja, agenda, extras y pulido de rendimiento.
+- [ ] Rediseño de la isla con estilo de tarjetas (en una rama de trabajo).
+- [ ] Capa `NotchyAgent` completa (supervisor de OpenCode y servidor MCP).
+- [ ] Pruebas manuales largas de la grabadora (60 minutos y medición de energía).
+
+---
 
 <p align="center"><sub>Código abierto bajo licencia <a href="LICENSE">MIT</a>. Hecha con cariño en Chihuahua, México, por <a href="https://github.com/darian1204">Darian Maynez</a>.</sub></p>
