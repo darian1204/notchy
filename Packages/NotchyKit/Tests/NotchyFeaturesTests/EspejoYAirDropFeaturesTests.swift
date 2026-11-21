@@ -1,6 +1,7 @@
 import Foundation
 import NotchyCore
 import NotchyFeatures
+import NotchyStorage
 import NotchyTestSupport
 import Testing
 
@@ -208,9 +209,15 @@ extension EspejoYAirDropFeaturesTests {
 @MainActor
 private final class AgenteOpenCodeFalso: PuertoAgenteOpenCode {
     var disponible = true
+    var redDisponible = true
     var respuestaSimulada = "Respuesta desde OpenCode"
+    var sesionesEliminadas: [String] = []
+    var ultimoPromptEnviado: String?
+    var ultimaSesionEnviada: String?
 
     func estaDisponible() -> Bool { disponible }
+
+    func hayRedDisponible() -> Bool { redDisponible }
 
     func modelosDisponibles() async -> [String] {
         ["opencode/glm-5.3-flash-free", "opencode/big-pickle"]
@@ -223,8 +230,30 @@ private final class AgenteOpenCodeFalso: PuertoAgenteOpenCode {
         directorio: String?,
         alRecibirFragmento: @escaping @MainActor (String, String?) -> Void
     ) async throws -> (textoFinal: String, sesionID: String?) {
-        alRecibirFragmento(respuestaSimulada, "ses_prueba_123")
-        return (respuestaSimulada, "ses_prueba_123")
+        ultimoPromptEnviado = prompt
+        ultimaSesionEnviada = sesionID
+        alRecibirFragmento(respuestaSimulada, sesionID ?? "ses_prueba_123")
+        return (respuestaSimulada, sesionID ?? "ses_prueba_123")
+    }
+
+    func eliminarSesion(id: String) async -> Bool {
+        sesionesEliminadas.append(id)
+        return true
+    }
+}
+
+private final class ChatLocalFalso: PuertoDeChatLocal, @unchecked Sendable {
+    var estaDisponible = true
+    var respuestaSimulada = "Respuesta local de Apple"
+    var ultimasInstrucciones: String?
+    var ultimosMensajes: [MensajeDeAgente] = []
+
+    func disponible() async -> Bool { estaDisponible }
+
+    func responder(mensajes: [MensajeDeAgente], instrucciones: String) async throws -> String {
+        ultimosMensajes = mensajes
+        ultimasInstrucciones = instrucciones
+        return respuestaSimulada
     }
 }
 
@@ -301,6 +330,50 @@ extension EspejoYAirDropFeaturesTests {
         try await Task.sleep(for: .milliseconds(80))
         #expect(modelo.mensajes.last?.texto == "Respuesta desde OpenCode")
         #expect(modelo.sesionID == "ses_prueba_123")
+    }
+
+    @Test func agenteRespaldoAppleSinRedYPersistenciaDeHistorial() async throws {
+        let suite = "notchy.agente.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let puerto = AgenteOpenCodeFalso()
+        let chatLocal = ChatLocalFalso()
+        let repo = RepositorioDeAgente(try BaseDeDatos.enMemoria())
+        let modelo = ModeloDeAgente(
+            puerto: puerto,
+            chatLocal: chatLocal,
+            repositorio: repo,
+            contextoLocal: { "- [evento] 10:00: Revisión de Sprint" },
+            defaults: defaults
+        )
+
+        await modelo.cargarModelos()
+        #expect(modelo.modelosDisponibles.contains(ProveedoresDelAgente.modeloAppleLocal))
+
+        // 1) Sin red usa respaldo Apple y muestra el aviso
+        puerto.redDisponible = false
+        modelo.enviarPrompt("¿Qué tengo hoy?")
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(modelo.avisoDeRespaldoLocal == "Sin red: respondo con el modelo de Apple")
+        #expect(modelo.mensajes.contains { $0.texto == "Sin red: respondo con el modelo de Apple" })
+        #expect(modelo.mensajes.last?.texto == "Respuesta local de Apple")
+        #expect(chatLocal.ultimasInstrucciones?.contains("Revisión de Sprint") == true)
+        #expect(modelo.conversacionesGuardadas.count == 1)
+
+        // 2) Al volver la red y cambiar a modelo OpenCode, conserva mensajes y pasa historial reciente
+        puerto.redDisponible = true
+        modelo.modeloSeleccionado = "opencode/big-pickle"
+        modelo.enviarPrompt("Continúa")
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(puerto.ultimoPromptEnviado?.contains("Contexto reciente de la conversación") == true)
+        #expect(modelo.sesionID == "ses_prueba_123")
+
+        // 3) Borrar conversación borra de SQLite y llama a eliminarSesion en OpenCode
+        let idConv = try #require(modelo.conversacionActualID)
+        await modelo.borrarConversacion(idConv)
+        #expect(puerto.sesionesEliminadas == ["ses_prueba_123"])
+        #expect(modelo.conversacionesGuardadas.isEmpty)
     }
 
     @Test func windowSnapYMonitorSistemaAplicanDisposicionYLeenMetricas() {

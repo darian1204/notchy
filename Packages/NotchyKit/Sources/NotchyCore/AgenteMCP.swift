@@ -52,14 +52,43 @@ public enum ErrorDePermisoAgente: LocalizedError, Sendable, Equatable {
     }
 }
 
-/// Coordina las solicitudes de permiso para herramientas de escritura del agente (AGT-4).
+/// Estado compartido del modelo activo del agente para coordinar permisos de lecturas sensibles (AGT-9).
+@MainActor
+@Observable
+public final class EstadoDelAgente {
+    public var modeloActivo: String {
+        didSet {
+            modeloEsNube = ProveedoresDelAgente.clasificar(modeloActivo) == .nube
+        }
+    }
+    public var modeloEsNube: Bool
+
+    public init(modeloActivo: String = ProveedoresDelAgente.modeloPorDefecto) {
+        self.modeloActivo = modeloActivo
+        self.modeloEsNube = ProveedoresDelAgente.clasificar(modeloActivo) == .nube
+    }
+
+    public func actualizarModelo(_ modelo: String) {
+        self.modeloActivo = modelo
+        self.modeloEsNube = ProveedoresDelAgente.clasificar(modelo) == .nube
+    }
+}
+
+/// Coordina las solicitudes de permiso para herramientas de escritura y lecturas sensibles del agente (AGT-4, AGT-9).
 ///
 /// Soporta tres opciones: Negar, Permitir (una vez) y Siempre (persistido en `Ajustes`).
 /// Si no hay respuesta antes de `tiempoLimite` (60 s por defecto), se niega automáticamente.
 @MainActor
 @Observable
 public final class CorredorDePermisos {
+    /// Herramientas de lectura que contienen datos sensibles y piden permiso si el modelo activo es de Nube (AGT-9).
+    public static let herramientasDeLecturaSensibles: Set<String> = [
+        "portapapeles_recientes",
+        "reuniones_recientes",
+    ]
+
     public private(set) var solicitudActual: SolicitudDePermisoAgente?
+    public let estadoDelAgente: EstadoDelAgente
 
     @ObservationIgnored public var alDenegar: (@MainActor (SolicitudDePermisoAgente) -> Void)?
     @ObservationIgnored private let ajustes: Ajustes?
@@ -71,12 +100,43 @@ public final class CorredorDePermisos {
 
     public init(
         ajustes: Ajustes? = nil,
+        estadoDelAgente: EstadoDelAgente? = nil,
         tiempoLimite: Duration = .seconds(60),
         dormir: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.ajustes = ajustes
+        self.estadoDelAgente = estadoDelAgente ?? EstadoDelAgente()
         self.tiempoLimite = tiempoLimite
         self.dormir = dormir
+    }
+
+    public static func esLecturaSensible(_ herramienta: String) -> Bool {
+        let base =
+            herramienta.hasPrefix("notchy_")
+            ? String(herramienta.dropFirst("notchy_".count))
+            : herramienta
+        return herramientasDeLecturaSensibles.contains(base)
+    }
+
+    /// Indica si una herramienta de lectura debe pasar por la tarjeta de permiso según el modelo activo (AGT-9).
+    public func requierePermisoDeLectura(_ herramienta: String) -> Bool {
+        Self.esLecturaSensible(herramienta) && estadoDelAgente.modeloEsNube
+    }
+
+    /// Ejecuta una lectura pidiendo permiso únicamente cuando la herramienta es sensible y el modelo activo es de Nube (AGT-9).
+    public func ejecutarLectura<T: Sendable>(
+        herramienta: String,
+        argumentos: [String: String],
+        accion: @MainActor () async throws -> T
+    ) async throws -> T {
+        if requierePermisoDeLectura(herramienta) {
+            return try await ejecutarConPermiso(
+                herramienta: herramienta,
+                argumentos: argumentos,
+                accion: accion
+            )
+        }
+        return try await accion()
     }
 
     public func estaSiemprePermitida(_ herramienta: String) -> Bool {
@@ -228,6 +288,13 @@ public protocol PuertoDeHerramientasDelAgente: AnyObject, Sendable {
     func ahoraSuena() -> AhoraSuenaAgente?
     func inboxAgregar(texto: String) throws -> String
     func portapapelesCopiar(texto: String) throws -> String
+    func recordatorioCrear(titulo: String, fechaISO8601: String?) async throws -> String
+}
+
+extension PuertoDeHerramientasDelAgente {
+    public func recordatorioCrear(titulo: String, fechaISO8601: String?) async throws -> String {
+        "Recordatorio creado: \(titulo)"
+    }
 }
 
 /// Puerto de ciclo de vida del servidor MCP local del agente.

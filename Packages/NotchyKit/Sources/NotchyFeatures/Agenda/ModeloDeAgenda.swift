@@ -324,6 +324,16 @@ public final class ModeloDeAgenda {
         }
     }
 
+    @discardableResult
+    public func crearRecordatorio(titulo: String, fecha: Date? = nil) async throws -> PendienteDeRecordatorios {
+        if permisoRecordatorios == .sinPedir {
+            permisoRecordatorios = await puertoRecordatorios.pedirPermiso()
+        }
+        let nuevo = try await puertoRecordatorios.crear(titulo: titulo, fecha: fecha)
+        await recargar()
+        return nuevo
+    }
+
     // MARK: Navegación del mini calendario
 
     public func seleccionarDia(_ fecha: Date) {

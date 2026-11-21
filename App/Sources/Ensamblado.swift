@@ -157,8 +157,22 @@ final class Ensamblado {
                 adaptadorAgenteCapturado.rutaConfigOpenCode = urlConfig.path
             }
         )
+        let herramientasParaContextoLocal = herramientasDelAgente
         modeloDeAgente = ModeloDeAgente(
             puerto: adaptadorDeAgente,
+            chatLocal: AdaptadorDeChatLocal(),
+            repositorio: baseAbierta.map(RepositorioDeAgente.init),
+            contextoLocal: {
+                let items = await herramientasParaContextoLocal.agendaHoy()
+                guard !items.isEmpty else { return "Sin eventos ni recordatorios para hoy." }
+                return
+                    items
+                    .map { item in
+                        let ubicacion = item.ubicacion.map { " (\($0))" } ?? ""
+                        return "- [\(item.tipo)] \(item.hora): \(item.titulo)\(ubicacion)"
+                    }
+                    .joined(separator: "\n")
+            },
             ajustes: ajustes,
             corredorDePermisos: corredorPermisosAgente,
             servidorMCP: coordinadorMCP
@@ -460,5 +474,19 @@ final class AdaptadorHerramientasDelAgente: PuertoDeHerramientasDelAgente {
         puertoPortapapeles.escribir(elemento)
         portapapeles.revisarSiCambio()
         return "Copiado al portapapeles"
+    }
+
+    func recordatorioCrear(titulo: String, fechaISO8601: String?) async throws -> String {
+        var fechaVencimiento: Date?
+        if let fechaISO8601, !fechaISO8601.isEmpty {
+            if let f = try? Date(fechaISO8601, strategy: .iso8601) {
+                fechaVencimiento = f
+            } else {
+                let iso = ISO8601DateFormatter()
+                fechaVencimiento = iso.date(from: fechaISO8601)
+            }
+        }
+        let creado = try await agenda.crearRecordatorio(titulo: titulo, fecha: fechaVencimiento)
+        return "Recordatorio creado en \(creado.lista): \(creado.titulo)"
     }
 }

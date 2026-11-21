@@ -114,6 +114,24 @@ enum Migraciones {
                 tabla.column("editada_en", .double)
             }
         }
+        migrador.registerMigration("v5-agente-historial") { db in
+            try db.create(table: "agent_conversation") { tabla in
+                tabla.primaryKey("id", .text)
+                tabla.column("sesion_opencode", .text).indexed()
+                tabla.column("titulo", .text).notNull()
+                tabla.column("modelo", .text).notNull()
+                tabla.column("creado", .double).notNull().indexed()
+                tabla.column("actualizado", .double).notNull().indexed()
+            }
+            try db.create(table: "agent_message") { tabla in
+                tabla.primaryKey("id", .text)
+                tabla.column("conversacion_id", .text).notNull().indexed()
+                    .references("agent_conversation", onDelete: .cascade)
+                tabla.column("rol", .text).notNull()
+                tabla.column("texto", .text).notNull()
+                tabla.column("fecha", .double).notNull().indexed()
+            }
+        }
         return migrador
     }
 

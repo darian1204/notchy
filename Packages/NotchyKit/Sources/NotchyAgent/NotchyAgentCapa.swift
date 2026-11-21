@@ -289,6 +289,26 @@ public actor ServidorMCPDeNotchy {
             ]),
             annotations: .init(readOnlyHint: false, destructiveHint: false, openWorldHint: false)
         ),
+        Tool(
+            name: "recordatorio_crear",
+            description:
+                "Crea un recordatorio en la lista por defecto de Recordatorios del Mac (requiere permiso del usuario).",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "titulo": .object([
+                        "type": .string("string"),
+                        "description": .string("Título del recordatorio a crear."),
+                    ]),
+                    "fecha": .object([
+                        "type": .string("string"),
+                        "description": .string("Fecha opcional de vencimiento en formato ISO 8601."),
+                    ]),
+                ]),
+                "required": .array([.string("titulo")]),
+            ]),
+            annotations: .init(readOnlyHint: false, destructiveHint: false, openWorldHint: false)
+        ),
     ]
 
     private func ejecutarHerramienta(
@@ -311,8 +331,25 @@ public actor ServidorMCPDeNotchy {
         case "portapapeles_recientes":
             let pedido = argumentos["limite"]?.intValue ?? 10
             let limite = min(max(pedido, 1), 20)
-            let textos = await MainActor.run { herramientas.portapapelesRecientes(limite: limite) }
-            return resultadoJSON(textos)
+            do {
+                let textos = try await corredor.ejecutarLectura(
+                    herramienta: "portapapeles_recientes",
+                    argumentos: ["limite": String(limite)]
+                ) {
+                    herramientas.portapapelesRecientes(limite: limite)
+                }
+                return resultadoJSON(textos)
+            } catch let error as ErrorDePermisoAgente {
+                return CallTool.Result(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            } catch {
+                return CallTool.Result(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
 
         case "bandeja_archivos":
             let nombres = await MainActor.run { herramientas.bandejaArchivos() }
@@ -321,8 +358,25 @@ public actor ServidorMCPDeNotchy {
         case "reuniones_recientes":
             let pedido = argumentos["limite"]?.intValue ?? 5
             let limite = min(max(pedido, 1), 20)
-            let reuniones = await MainActor.run { herramientas.reunionesRecientes(limite: limite) }
-            return resultadoJSON(reuniones)
+            do {
+                let reuniones = try await corredor.ejecutarLectura(
+                    herramienta: "reuniones_recientes",
+                    argumentos: ["limite": String(limite)]
+                ) {
+                    herramientas.reunionesRecientes(limite: limite)
+                }
+                return resultadoJSON(reuniones)
+            } catch let error as ErrorDePermisoAgente {
+                return CallTool.Result(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            } catch {
+                return CallTool.Result(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
 
         case "ahora_suena":
             let estado = await MainActor.run { herramientas.ahoraSuena() }
@@ -379,6 +433,44 @@ public actor ServidorMCPDeNotchy {
                     argumentos: ["texto": texto]
                 ) {
                     try herramientas.portapapelesCopiar(texto: texto)
+                }
+                return CallTool.Result(
+                    content: [.text(text: mensaje, annotations: nil, _meta: nil)],
+                    isError: false
+                )
+            } catch let error as ErrorDePermisoAgente {
+                return CallTool.Result(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            } catch {
+                return CallTool.Result(
+                    content: [.text(text: error.localizedDescription, annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
+
+        case "recordatorio_crear":
+            guard let titulo = argumentos["titulo"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !titulo.isEmpty
+            else {
+                return CallTool.Result(
+                    content: [.text(text: "Falta el argumento 'titulo'", annotations: nil, _meta: nil)],
+                    isError: true
+                )
+            }
+            let fechaBruta = argumentos["fecha"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fechaISO = (fechaBruta?.isEmpty == false) ? fechaBruta : nil
+            var resumenArgs: [String: String] = ["titulo": titulo]
+            if let fechaISO {
+                resumenArgs["fecha"] = fechaISO
+            }
+            do {
+                let mensaje = try await corredor.ejecutarConPermiso(
+                    herramienta: "recordatorio_crear",
+                    argumentos: resumenArgs
+                ) {
+                    try await herramientas.recordatorioCrear(titulo: titulo, fechaISO8601: fechaISO)
                 }
                 return CallTool.Result(
                     content: [.text(text: mensaje, annotations: nil, _meta: nil)],

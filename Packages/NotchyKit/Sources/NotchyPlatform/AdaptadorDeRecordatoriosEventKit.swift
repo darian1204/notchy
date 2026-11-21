@@ -77,4 +77,39 @@ public final class AdaptadorDeRecordatoriosEventKit: PuertoDeRecordatorios {
         item.completionDate = .now
         try almacen.save(item, commit: true)
     }
+
+    @discardableResult
+    public func crear(titulo: String, fecha: Date?) async throws -> PendienteDeRecordatorios {
+        let limpio = titulo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !limpio.isEmpty else {
+            throw NotchyError.datos("El título del recordatorio no puede estar vacío")
+        }
+        guard estadoDePermiso() == .concedido else {
+            throw NotchyError.datos("Sin permiso para acceder a Recordatorios")
+        }
+        guard
+            let calendarioDestino = almacen.defaultCalendarForNewReminders()
+                ?? almacen.calendars(for: .reminder).first
+        else {
+            throw NotchyError.datos("No hay una lista de Recordatorios disponible")
+        }
+
+        let recordatorio = EKReminder(eventStore: almacen)
+        recordatorio.title = limpio
+        recordatorio.calendar = calendarioDestino
+        if let fecha {
+            recordatorio.dueDateComponents = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute],
+                from: fecha
+            )
+        }
+        try almacen.save(recordatorio, commit: true)
+        return PendienteDeRecordatorios(
+            id: recordatorio.calendarItemIdentifier,
+            titulo: limpio,
+            lista: calendarioDestino.title,
+            vencimiento: fecha,
+            completado: false
+        )
+    }
 }

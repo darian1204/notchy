@@ -458,6 +458,7 @@ public struct MensajeDeAgente: Sendable, Equatable, Codable, Identifiable {
 @MainActor
 public protocol PuertoAgenteOpenCode: AnyObject {
     func estaDisponible() -> Bool
+    func hayRedDisponible() -> Bool
     func modelosDisponibles() async -> [String]
     func enviarMensaje(
         prompt: String,
@@ -466,6 +467,59 @@ public protocol PuertoAgenteOpenCode: AnyObject {
         directorio: String?,
         alRecibirFragmento: @escaping @MainActor (String, String?) -> Void
     ) async throws -> (textoFinal: String, sesionID: String?)
+    @discardableResult
+    func eliminarSesion(id: String) async -> Bool
+}
+
+extension PuertoAgenteOpenCode {
+    public func hayRedDisponible() -> Bool { true }
+    @discardableResult
+    public func eliminarSesion(id: String) async -> Bool { false }
+}
+
+/// Conversación previa del agente persistida en SQLite (AGT-8).
+public struct ConversacionDeAgente: Sendable, Equatable, Codable, Identifiable {
+    public let id: String
+    public var sesionOpenCodeID: String?
+    public var titulo: String
+    public var modelo: String
+    public let creado: Date
+    public var actualizado: Date
+
+    public init(
+        id: String = UUID().uuidString,
+        sesionOpenCodeID: String? = nil,
+        titulo: String,
+        modelo: String = ProveedoresDelAgente.modeloPorDefecto,
+        creado: Date = .now,
+        actualizado: Date = .now
+    ) {
+        self.id = id
+        self.sesionOpenCodeID = sesionOpenCodeID
+        self.titulo = titulo
+        self.modelo = modelo
+        self.creado = creado
+        self.actualizado = actualizado
+    }
+
+    /// Recorta el primer mensaje del usuario para usarlo como título de la conversación.
+    public static func recortarTitulo(_ texto: String, maximo: Int = 48) -> String {
+        let primeraLinea =
+            texto
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? "Conversación"
+        if primeraLinea.count <= maximo {
+            return primeraLinea
+        }
+        return String(primeraLinea.prefix(maximo)).trimmingCharacters(in: .whitespaces) + "…"
+    }
+}
+
+/// Puerto de chat local con el modelo de Apple Intelligence en la Mac (AGT-6).
+public protocol PuertoDeChatLocal: Sendable {
+    func disponible() async -> Bool
+    func responder(mensajes: [MensajeDeAgente], instrucciones: String) async throws -> String
 }
 
 // MARK: - Traductor (Translate)

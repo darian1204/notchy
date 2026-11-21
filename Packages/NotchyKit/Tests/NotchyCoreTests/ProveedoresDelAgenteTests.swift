@@ -41,6 +41,19 @@ struct ProveedoresDelAgenteTests {
         #expect(ProveedoresDelAgente.modelosDeRespaldo.allSatisfy(ProveedoresDelAgente.estaPermitido))
         #expect(ProveedoresDelAgente.estaPermitido(ProveedoresDelAgente.modeloPorDefecto))
     }
+
+    @Test
+    func clasificaModelosLocalesYNube() {
+        #expect(ProveedoresDelAgente.clasificar("apple/local") == .local)
+        #expect(ProveedoresDelAgente.clasificar("apple/foundation-model") == .local)
+        #expect(ProveedoresDelAgente.clasificar("local") == .local)
+        #expect(ProveedoresDelAgente.clasificar("ollama/llama3.3") == .local)
+        #expect(ProveedoresDelAgente.clasificar("lmstudio/qwen2.5") == .local)
+        #expect(ProveedoresDelAgente.clasificar("opencode/glm-5.3-flash-free") == .nube)
+        #expect(ProveedoresDelAgente.clasificar("opencode/big-pickle") == .nube)
+        #expect(ProveedoresDelAgente.esModeloDeApple("apple/local"))
+        #expect(ProveedoresDelAgente.nombreParaMostrar("apple/local") == "Apple (en la Mac)")
+    }
 }
 
 private final class AlmacenMemoriaAgente: AlmacenDeAjustes, @unchecked Sendable {
@@ -180,5 +193,43 @@ struct AgenteMCPCoreTests {
         let permisos = try #require(objeto["permission"] as? [String: Any])
         #expect(permisos["*"] as? String == "deny")
         #expect(permisos["notchy_*"] as? String == "allow")
+    }
+
+    @Test @MainActor
+    func lecturasSensiblesPidenPermisoSoloCuandoElModeloEsNube() async throws {
+        let estado = EstadoDelAgente(modeloActivo: "apple/local")
+        let corredor = CorredorDePermisos(estadoDelAgente: estado)
+        #expect(!estado.modeloEsNube)
+        #expect(!corredor.requierePermisoDeLectura("portapapeles_recientes"))
+        #expect(!corredor.requierePermisoDeLectura("reuniones_recientes"))
+
+        let resultadoLocal = try await corredor.ejecutarLectura(
+            herramienta: "portapapeles_recientes",
+            argumentos: ["limite": "5"]
+        ) {
+            ["clip-local"]
+        }
+        #expect(resultadoLocal == ["clip-local"])
+        #expect(corredor.solicitudActual == nil)
+
+        estado.actualizarModelo("opencode/glm-5.3-flash-free")
+        #expect(estado.modeloEsNube)
+        #expect(corredor.requierePermisoDeLectura("portapapeles_recientes"))
+        #expect(corredor.requierePermisoDeLectura("reuniones_recientes"))
+        #expect(!corredor.requierePermisoDeLectura("agenda_hoy"))
+
+        let tareaNube = Task { @MainActor in
+            try await corredor.ejecutarLectura(
+                herramienta: "reuniones_recientes",
+                argumentos: ["limite": "3"]
+            ) {
+                ["reunion-nube"]
+            }
+        }
+        await Task.yield()
+        #expect(corredor.solicitudActual?.herramienta == "reuniones_recientes")
+        corredor.responder(.permitirUnaVez)
+        let resultadoNube = try await tareaNube.value
+        #expect(resultadoNube == ["reunion-nube"])
     }
 }

@@ -119,13 +119,28 @@ public protocol PuertoDeCalendario: AnyObject {
     func eventos(desde: Date, hasta: Date) async throws -> [EventoDeCalendario]
 }
 
-/// Puerto para leer y completar pendientes de Recordatorios del Mac (AGD-3).
+/// Puerto para leer, crear y completar pendientes de Recordatorios del Mac (AGD-3, AGT-4).
 @MainActor
 public protocol PuertoDeRecordatorios: AnyObject {
     func estadoDePermiso() -> EstadoDePermiso
     func pedirPermiso() async -> EstadoDePermiso
     func pendientesIncompletos() async throws -> [PendienteDeRecordatorios]
     func completar(id: String) async throws
+    @discardableResult
+    func crear(titulo: String, fecha: Date?) async throws -> PendienteDeRecordatorios
+}
+
+extension PuertoDeRecordatorios {
+    @discardableResult
+    public func crear(titulo: String, fecha: Date?) async throws -> PendienteDeRecordatorios {
+        PendienteDeRecordatorios(
+            id: UUID().uuidString,
+            titulo: titulo,
+            lista: "Recordatorios",
+            vencimiento: fecha,
+            completado: false
+        )
+    }
 }
 
 /// Se publicó un aviso de reunión próxima con enlace de videollamada (AGD-4).

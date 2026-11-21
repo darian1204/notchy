@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import NotchyCore
 import OSLog
 
@@ -6,6 +7,9 @@ import OSLog
 @MainActor
 public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
     private let log = Registro.de(.agente)
+    private let monitorRed = NWPathMonitor()
+    private let colaMonitorRed = DispatchQueue(label: "com.darian.notchy.agente.red")
+    private var redSatisfecha = true
     /// Ruta al archivo `opencode.json` generado en Application Support con permisos 0600 (AGT-7).
     public var rutaConfigOpenCode: String?
     /// Nombre del agente definido en `opencode.json`.
@@ -14,10 +18,32 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
     public init(rutaConfigOpenCode: String? = nil, nombreAgente: String? = "notchy") {
         self.rutaConfigOpenCode = rutaConfigOpenCode
         self.nombreAgente = nombreAgente
+        iniciarMonitorDeRed()
+    }
+
+    deinit {
+        monitorRed.cancel()
+    }
+
+    private func iniciarMonitorDeRed() {
+        monitorRed.pathUpdateHandler = { [weak self] ruta in
+            let disponible = (ruta.status == .satisfied)
+            Task { @MainActor [weak self] in
+                self?.redSatisfecha = disponible
+            }
+        }
+        monitorRed.start(queue: colaMonitorRed)
     }
 
     public func estaDisponible() -> Bool {
         DetectorDeOpenCode.detectar().estaListo
+    }
+
+    public func hayRedDisponible() -> Bool {
+        if monitorRed.currentPath.status == .unsatisfied {
+            return false
+        }
+        return redSatisfecha
     }
 
     public func modelosDisponibles() async -> [String] {
@@ -146,11 +172,70 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
                     let errTexto =
                         String(data: datosError, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if proceso.terminationStatus != 0 || Self.pareceErrorDeRed(errTexto) {
+                        throw NSError(
+                            domain: "NotchyOpenCode",
+                            code: Int(proceso.terminationStatus == 0 ? -1009 : proceso.terminationStatus),
+                            userInfo: [
+                                NSLocalizedDescriptionKey: errTexto.isEmpty
+                                    ? "OpenCode terminó con código \(proceso.terminationStatus)"
+                                    : errTexto
+                            ]
+                        )
+                    }
                     acumulado = errTexto.isEmpty ? "Listo." : errTexto
                 }
             }
+            if Self.pareceErrorDeRed(acumulado) && proceso.terminationStatus != 0 {
+                throw NSError(
+                    domain: "NotchyOpenCode",
+                    code: -1009,
+                    userInfo: [NSLocalizedDescriptionKey: acumulado]
+                )
+            }
             return (acumulado, sesionDetectada)
         }.value
+    }
+
+    @discardableResult
+    public func eliminarSesion(id: String) async -> Bool {
+        let limpio = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !limpio.isEmpty, case .instalado(let ruta) = DetectorDeOpenCode.detectar() else {
+            return false
+        }
+        let rutaConfig = rutaConfigOpenCode
+        return await Task.detached {
+            let proceso = Process()
+            proceso.executableURL = URL(fileURLWithPath: ruta)
+            proceso.arguments = ["session", "delete", limpio]
+            var entorno = ProcessInfo.processInfo.environment
+            let pathActual = entorno["PATH"] ?? "/usr/bin:/bin"
+            entorno["PATH"] = "/opt/homebrew/bin:/usr/local/bin:\(pathActual)"
+            if let rutaConfig, !rutaConfig.isEmpty {
+                entorno["OPENCODE_CONFIG"] = rutaConfig
+            }
+            proceso.environment = entorno
+            proceso.standardOutput = FileHandle.nullDevice
+            proceso.standardError = FileHandle.nullDevice
+            do {
+                try proceso.run()
+                proceso.waitUntilExit()
+                return proceso.terminationStatus == 0
+            } catch {
+                return false
+            }
+        }.value
+    }
+
+    public nonisolated static func pareceErrorDeRed(_ texto: String) -> Bool {
+        let minusculas = texto.lowercased()
+        let pistas = [
+            "network", "offline", "sin red", "connection", "connect",
+            "timed out", "timeout", "enotfound", "econnrefused",
+            "econnreset", "ehostunreach", "enetunreach", "fetch failed",
+            "dns", "socket", "unreachable",
+        ]
+        return pistas.contains { minusculas.contains($0) }
     }
 
     private nonisolated static func limpiarSalidaPlana(_ texto: String) -> String {

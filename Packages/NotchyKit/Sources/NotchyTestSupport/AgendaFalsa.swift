@@ -77,4 +77,20 @@ public final class RecordatoriosFalso: PuertoDeRecordatorios {
             )
         }
     }
+
+    @discardableResult
+    public func crear(titulo: String, fecha: Date?) async throws -> PendienteDeRecordatorios {
+        guard permiso == .concedido else {
+            throw NotchyError.datos("Sin permiso para acceder a Recordatorios")
+        }
+        let nuevo = PendienteDeRecordatorios(
+            id: "rec-\(pendientes.count + 1)",
+            titulo: titulo,
+            lista: "Obsidian",
+            vencimiento: fecha,
+            completado: false
+        )
+        pendientes.append(nuevo)
+        return nuevo
+    }
 }
