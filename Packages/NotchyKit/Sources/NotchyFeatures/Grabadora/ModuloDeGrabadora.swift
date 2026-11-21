@@ -502,6 +502,7 @@ struct VistaDeGrabadora: View {
                                         }
                                         .buttonStyle(.plain)
                                         .help("Reproducir nota de voz")
+                                        .accessibilityLabel("Reproducir nota de voz")
 
                                         Button {
                                             modelo.borrarNotaDeVoz(nota)
@@ -512,6 +513,7 @@ struct VistaDeGrabadora: View {
                                         }
                                         .buttonStyle(.plain)
                                         .help("Borrar nota de voz")
+                                        .accessibilityLabel("Borrar nota de voz")
                                     }
                                     .onDrag {
                                         NSItemProvider(object: nota.urlArchivo as NSURL)
@@ -567,6 +569,8 @@ struct VistaDeGrabadora: View {
                                         .foregroundStyle(Paleta.textoDeApoyo)
                                 }
                                 .buttonStyle(.plain)
+                                .help("Borrar reunión \(reunion.titulo)")
+                                .accessibilityLabel("Borrar reunión \(reunion.titulo)")
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)
@@ -700,6 +704,8 @@ struct VistaDeGrabadora: View {
                                     .foregroundStyle(Paleta.textoDeApoyo)
                             }
                             .buttonStyle(.plain)
+                            .help("Borrar corrección \(entrada.malReconocido)")
+                            .accessibilityLabel("Borrar corrección \(entrada.malReconocido)")
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)

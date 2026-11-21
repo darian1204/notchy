@@ -10,6 +10,9 @@ public enum Paleta {
     public static let decorativo = Color.white.opacity(0.4)
     public static let superficie = Color.white.opacity(0.075)
     public static let superficieAlta = Color.white.opacity(0.14)
+    /// Superficies opacas cuando el usuario activa "Reducir transparencia" en Accesibilidad (ISL-7).
+    public static let superficieSolida = Color(hex: 0x1A1A1E)
+    public static let superficieAltaSolida = Color(hex: 0x26262C)
     public static let borde = Color.white.opacity(0.14)
     /// Borde de las tarjetas del estilo tarjetas: apenas se nota sobre la superficie.
     public static let bordeSuave = Color.white.opacity(0.10)

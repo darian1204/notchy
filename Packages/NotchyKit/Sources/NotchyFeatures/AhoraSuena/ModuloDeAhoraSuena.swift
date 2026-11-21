@@ -189,6 +189,8 @@ struct PanelDeLetraMusical: View {
     let letra: LetraDeCancion?
     let cargando: Bool
     var alSaltarASegundo: ((Double) -> Void)?
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: estado.reproduciendo ? 0.25 : 60.0)) { contexto in
@@ -246,7 +248,10 @@ struct PanelDeLetraMusical: View {
                                         .lineLimit(esActiva ? 2 : 1)
                                         .fixedSize(horizontal: false, vertical: true)
                                         .scaleEffect(esActiva ? 1.02 : 0.96, anchor: .leading)
-                                        .blur(radius: esActiva ? 0 : (abs(distancia) >= 2 ? 0.6 : 0.2))
+                                        .blur(
+                                            radius: (esActiva || reducirTransparencia)
+                                                ? 0 : (abs(distancia) >= 2 ? 0.6 : 0.2)
+                                        )
 
                                     if esActiva, linea.tiempoSegundos != nil {
                                         GeometryReader { geo in
@@ -280,7 +285,7 @@ struct PanelDeLetraMusical: View {
                             )
                         }
                     }
-                    .animation(.spring(response: 0.42, dampingFraction: 0.78), value: idx)
+                    .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: idx)
                     Spacer(minLength: 0)
                 } else {
                     Spacer(minLength: 0)
@@ -338,6 +343,7 @@ struct BarraDeProgresoMusical: View {
 
     @State private var fraccionArrastre: Double?
     @State private var cursorEncima = false
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: estado.reproduciendo ? 0.5 : 60.0)) { contexto in
@@ -380,7 +386,7 @@ struct BarraDeProgresoMusical: View {
                     .frame(maxHeight: .infinity, alignment: .center)
                     .contentShape(Rectangle())
                     .onHover { encima in
-                        withAnimation(.easeOut(duration: 0.14)) {
+                        withAnimation(Movimiento.cambioDeEstado(reducir: reducirMovimiento)) {
                             cursorEncima = encima
                         }
                     }

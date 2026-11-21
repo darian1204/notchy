@@ -201,10 +201,18 @@ final class Ensamblado {
         let baseCapturada = base
         let registroCapturado = registro
         let ajustesCapturados = ajustes
+        let portapapelesCapturado = modeloDePortapapeles
+        let bandejaCapturada = modeloDeBandeja
+        let grabadoraCapturada = modeloDeGrabadora
+        let agenteCapturado = modeloDeAgente
+        let colorPickerCapturado = modeloDeColorPicker
+        let notificacionesCapturadas = modeloDeNotificaciones
+        let traductorCapturado = modeloDeTraductor
         modeloDeAjustes = ModeloDeAjustesYDiagnostico(
             ajustes: ajustes,
             modulosDisponibles: registro.todos.map(\.identidad),
             proveedorDePermisos: ProveedorDePermisosReal(),
+            servicioDeInicio: AdaptadorDeInicioAlAbrirSesion(),
             consultarBase: { ModeloDeAjustesYDiagnostico.diagnosticarBase(baseCapturada) },
             consultarOpenCode: { DetectorDeOpenCode.detectar() },
             consultarModulos: {
@@ -217,17 +225,39 @@ final class Ensamblado {
                     )
                 }
             },
+            consultarConteos: {
+                ConteosDeDiagnostico(
+                    portapapeles: portapapelesCapturado.totalGuardados,
+                    bandeja: bandejaCapturada.elementos.count,
+                    reuniones: grabadoraCapturada.reunionesGuardadas.count,
+                    notasDeVoz: grabadoraCapturada.notasDeVoz.count
+                )
+            },
             bus: bus
         )
 
         let modeloCapturado = modeloDeAjustes
-        let portapapelesCapturado = modeloDePortapapeles
         let salir: @MainActor () -> Void = { NSApp.terminate(nil) }
         let ventana = ControladorDeVentanaDeAjustes {
             VistaDeAjustesYDiagnostico(
                 modelo: modeloCapturado,
                 alAbrirEnlace: abrirURL,
                 alBorrarHistorialPortapapeles: { portapapelesCapturado.borrarTodo() },
+                alBorrarTodosLosDatos: {
+                    Task { @MainActor in
+                        // Una grabación en curso escribe en la carpeta de audio: se cierra antes de vaciarla.
+                        if grabadoraCapturada.grabando { await grabadoraCapturada.detenerGrabacion() }
+                        portapapelesCapturado.borrarTodo()
+                        bandejaCapturada.vaciar()
+                        grabadoraCapturada.borrarTodo()
+                        agenteCapturado.borrarHistorial()
+                        colorPickerCapturado.limpiarHistorial()
+                        notificacionesCapturadas.limpiarTodas()
+                        traductorCapturado.limpiar()
+                        ajustesCapturados.restablecerValoresPorDefecto()
+                        modeloCapturado.refrescar()
+                    }
+                },
                 alSalir: salir
             )
         }

@@ -122,6 +122,24 @@ public final class ModeloDeAgente {
         ]
     }
 
+    /// Borra el historial de conversación del agente y restablece el modelo seleccionado.
+    public func borrarHistorial() {
+        cancelar()
+        sesionID = nil
+        entrada = ""
+        defaults.removeObject(forKey: Self.claveModelo)
+        modeloSeleccionado = ProveedoresDelAgente.resolver(
+            elegido: nil,
+            disponibles: modelosDisponibles
+        )
+        mensajes = [
+            MensajeDeAgente(
+                rol: .asistente,
+                texto: "Hola. Estoy conectado a OpenCode y a tu vault. ¿En qué te ayudo?"
+            )
+        ]
+    }
+
     public func copiar(_ texto: String) {
         let pasta = NSPasteboard.general
         pasta.clearContents()
@@ -171,6 +189,8 @@ public final class ModuloDeAgente: ModuloDeIsla {
 struct VistaDeAgente: View {
     @Bindable var modelo: ModeloDeAgente
     @FocusState private var campoEnfocado: Bool
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -245,6 +265,7 @@ struct VistaDeAgente: View {
             }
             .buttonStyle(.plain)
             .help("Nueva sesión de OpenCode")
+            .accessibilityLabel("Nueva sesión de OpenCode")
         }
     }
 
@@ -273,7 +294,7 @@ struct VistaDeAgente: View {
             }
             .onChange(of: modelo.mensajes.count) { _, _ in
                 if let ultimo = modelo.mensajes.last?.id {
-                    withAnimation(.easeOut(duration: 0.18)) {
+                    withAnimation(Movimiento.cambioDeEstado(reducir: reducirMovimiento)) {
                         proxy.scrollTo(ultimo, anchor: .bottom)
                     }
                 }
@@ -304,12 +325,15 @@ struct VistaDeAgente: View {
                     }
                     .buttonStyle(.plain)
                     .help("Copiar respuesta")
+                    .accessibilityLabel("Copiar respuesta")
                 }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                esUsuario ? Paleta.agente.opacity(0.28) : Paleta.superficie,
+                esUsuario
+                    ? Paleta.agente.opacity(0.28)
+                    : (reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie),
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
             .overlay(
@@ -347,6 +371,7 @@ struct VistaDeAgente: View {
                 }
                 .buttonStyle(.plain)
                 .help("Detener ejecución")
+                .accessibilityLabel("Detener ejecución")
             } else {
                 Button {
                     modelo.enviar()
@@ -360,6 +385,7 @@ struct VistaDeAgente: View {
                 .buttonStyle(.plain)
                 .disabled(modelo.entrada.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .help("Enviar a OpenCode")
+                .accessibilityLabel("Enviar a OpenCode")
             }
         }
         .padding(.horizontal, 10)

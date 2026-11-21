@@ -172,6 +172,7 @@ struct VistaDeMonitorSistema: View {
             }
             .buttonStyle(.plain)
             .help("Actualizar métricas ahora")
+            .accessibilityLabel("Actualizar métricas ahora")
         }
     }
 

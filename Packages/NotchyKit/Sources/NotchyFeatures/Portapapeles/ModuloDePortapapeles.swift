@@ -70,6 +70,8 @@ struct VistaDePortapapeles: View {
                             .foregroundStyle(Paleta.textoDeApoyo)
                     }
                     .buttonStyle(.plain)
+                    .help("Limpiar búsqueda")
+                    .accessibilityLabel("Limpiar búsqueda")
                 }
             }
             .padding(.horizontal, 8)
@@ -248,6 +250,7 @@ struct VistaDePortapapeles: View {
             }
             .buttonStyle(.plain)
             .help(elemento.fijado ? "Desfijar" : "Fijar")
+            .accessibilityLabel(elemento.fijado ? "Desfijar elemento" : "Fijar elemento")
 
             Button {
                 modelo.borrar(elemento)

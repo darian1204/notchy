@@ -42,6 +42,7 @@ struct BarraDeTarjetas: View {
     let coordinador: CoordinadorDeIsla
     let paletaAbierta: Bool
     let alBuscar: @MainActor () -> Void
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         HStack(spacing: 0) {
@@ -73,7 +74,10 @@ struct BarraDeTarjetas: View {
         HStack(spacing: 2) { contenido() }
             .padding(2)
             .frame(width: Medidas.anchoDePestanas)
-            .background(Paleta.superficie, in: Capsule())
+            .background(
+                reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
+                in: Capsule()
+            )
             .overlay(Capsule().strokeBorder(Paleta.bordeSuave))
     }
 
@@ -102,7 +106,10 @@ struct BarraDeTarjetas: View {
             .foregroundStyle(activa ? Paleta.texto : Paleta.textoDeApoyo)
             .frame(maxWidth: .infinity)
             .frame(height: 22)
-            .background(activa ? Paleta.superficieAlta : Color.clear, in: Capsule())
+            .background(
+                activa ? (reducirTransparencia ? Paleta.superficieAltaSolida : Paleta.superficieAlta) : Color.clear,
+                in: Capsule()
+            )
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

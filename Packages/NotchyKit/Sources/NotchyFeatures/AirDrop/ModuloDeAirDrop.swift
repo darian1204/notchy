@@ -66,6 +66,7 @@ struct VistaDeAirDrop: View {
                     }
                     .buttonStyle(.plain)
                     .help("Abrir carpeta Descargas")
+                    .accessibilityLabel("Abrir carpeta Descargas")
                 }
 
                 if modelo.recibidos.isEmpty {

@@ -141,4 +141,44 @@ import Testing
         #expect(borrada?.rutaArchivo == "/tmp/nota1.m4a")
         #expect(try repo.listarNotasDeVoz().isEmpty)
     }
+
+    @Test func borrarTodoVaciaReunionesSegmentosYNotasDeVozYDevuelveRutasDeAudio() throws {
+        let repo = RepositorioDeGrabadoraYReuniones(try BaseDeDatos.enMemoria())
+        try repo.guardarNotaDeVoz(
+            NotaDeVoz(
+                id: "nota-1",
+                creado: .now,
+                titulo: "Nota 1",
+                duracionSegundos: 10,
+                rutaArchivo: "/tmp/nota-1.m4a"
+            )
+        )
+        try repo.guardarReunion(
+            ReunionGrabada(
+                id: "reu-1",
+                titulo: "Reunión 1",
+                inicio: .now,
+                estado: .finalizada,
+                rutasAudioMicrofono: ["/tmp/reu-1-mic.m4a"],
+                rutasAudioSistema: ["/tmp/reu-1-sis.m4a"]
+            )
+        )
+        try repo.guardarSegmento(
+            SegmentoDeTranscripcion(
+                id: "seg-1",
+                reunionID: "reu-1",
+                fuente: .microfono,
+                inicioSegundos: 0,
+                finSegundos: 3,
+                texto: "Hola mundo"
+            )
+        )
+
+        let rutas = try repo.borrarTodo()
+        #expect(Set(rutas) == Set(["/tmp/nota-1.m4a", "/tmp/reu-1-mic.m4a", "/tmp/reu-1-sis.m4a"]))
+        #expect(try repo.listarNotasDeVoz().isEmpty)
+        #expect(try repo.listarReuniones().isEmpty)
+        #expect(try repo.listarSegmentos(reunionID: "reu-1").isEmpty)
+        #expect(try repo.buscarSegmentos(consulta: "Hola").isEmpty)
+    }
 }

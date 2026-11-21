@@ -566,6 +566,28 @@ public final class ModeloDeGrabadora {
         }
     }
 
+    /// Borra todas las reuniones, transcripciones y notas de voz de la base y limpia los archivos de audio en disco.
+    public func borrarTodo() {
+        let rutas = (try? repositorio?.borrarTodo()) ?? []
+        for ruta in rutas {
+            try? FileManager.default.removeItem(atPath: ruta)
+        }
+        if let archivos = try? FileManager.default.contentsOfDirectory(
+            at: carpetaAudio,
+            includingPropertiesForKeys: nil
+        ) {
+            for url in archivos {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        notasDeVoz.removeAll()
+        reunionesGuardadas.removeAll()
+        segmentosDeReunionSeleccionada.removeAll()
+        resultadosBusqueda.removeAll()
+        reunionSeleccionadaID = nil
+        consultaBusqueda = ""
+    }
+
     public func abrirArchivo(_ ruta: String) {
         alAbrirURL?(URL(fileURLWithPath: ruta))
     }

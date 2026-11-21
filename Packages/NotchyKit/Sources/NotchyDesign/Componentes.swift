@@ -3,6 +3,7 @@ import SwiftUI
 /// Tarjeta del inicio y de los módulos: superficie tenue sobre el negro de la isla.
 public struct Tarjeta<Contenido: View>: View {
     private let contenido: Contenido
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     public init(@ViewBuilder _ contenido: () -> Contenido) {
         self.contenido = contenido()
@@ -13,7 +14,10 @@ public struct Tarjeta<Contenido: View>: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 11)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjeta))
+            .background(
+                reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
+                in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjeta)
+            )
     }
 }
 
@@ -21,6 +25,7 @@ public struct Tarjeta<Contenido: View>: View {
 public struct TarjetaConBorde<Contenido: View>: View {
     private let relleno: CGFloat
     private let contenido: Contenido
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     public init(relleno: CGFloat = 10, @ViewBuilder _ contenido: () -> Contenido) {
         self.relleno = relleno
@@ -31,7 +36,10 @@ public struct TarjetaConBorde<Contenido: View>: View {
         contenido
             .padding(relleno)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna))
+            .background(
+                reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
+                in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
                     .strokeBorder(Paleta.bordeSuave, lineWidth: 1)

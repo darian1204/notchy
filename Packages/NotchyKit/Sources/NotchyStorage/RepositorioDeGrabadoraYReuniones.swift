@@ -262,6 +262,25 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
         }
     }
 
+    /// Vacía todas las reuniones, transcripciones y notas de voz, y devuelve las rutas de audio para limpiar el disco.
+    @discardableResult
+    public func borrarTodo() throws -> [String] {
+        try base.escritor.write { db in
+            let notas = try FilaNotaDeVoz.fetchAll(db, sql: "SELECT * FROM voice_note").map { $0.aDominio() }
+            let reuniones = try FilaReunion.fetchAll(db, sql: "SELECT * FROM meeting").map { $0.aDominio() }
+            var rutas: [String] = notas.map(\.rutaArchivo)
+            for reunion in reuniones {
+                rutas.append(contentsOf: reunion.rutasAudioMicrofono)
+                rutas.append(contentsOf: reunion.rutasAudioSistema)
+            }
+            try db.execute(sql: "DELETE FROM transcript_fts")
+            try db.execute(sql: "DELETE FROM transcript_segment")
+            try db.execute(sql: "DELETE FROM meeting")
+            try db.execute(sql: "DELETE FROM voice_note")
+            return rutas
+        }
+    }
+
     // MARK: - Glosario de correcciones (GRB-5, D-09)
 
     public func listarGlosario() throws -> [EntradaDeGlosario] {

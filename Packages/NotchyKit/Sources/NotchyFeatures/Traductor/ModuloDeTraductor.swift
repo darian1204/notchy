@@ -204,6 +204,7 @@ struct VistaDeTraductor: View {
             }
             .buttonStyle(.plain)
             .help("Limpiar texto")
+            .accessibilityLabel("Limpiar texto")
 
             Spacer(minLength: 0)
 
@@ -218,6 +219,7 @@ struct VistaDeTraductor: View {
             }
             .buttonStyle(.plain)
             .help("Copiar traducción")
+            .accessibilityLabel("Copiar traducción")
 
             selectorIdioma(seleccion: $modelo.idiomaDestino)
                 .onChange(of: modelo.idiomaDestino) { _, _ in
@@ -321,6 +323,7 @@ struct VistaDeTraductor: View {
             }
             .buttonStyle(.plain)
             .help("Traducir ahora")
+            .accessibilityLabel("Traducir ahora")
 
             Button {
                 modelo.intercambiarIdiomas()
@@ -333,6 +336,7 @@ struct VistaDeTraductor: View {
             }
             .buttonStyle(.plain)
             .help("Intercambiar idiomas")
+            .accessibilityLabel("Intercambiar idiomas")
             Spacer(minLength: 0)
         }
     }

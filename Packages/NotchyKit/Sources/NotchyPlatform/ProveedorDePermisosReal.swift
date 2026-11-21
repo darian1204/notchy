@@ -1,6 +1,7 @@
 import AVFoundation
 import EventKit
 import NotchyCore
+import ServiceManagement
 
 /// Consulta y solicita permisos reales de macOS (AVFoundation y EventKit).
 public struct ProveedorDePermisosReal: ProveedorDePermisos {
@@ -50,6 +51,47 @@ public struct ProveedorDePermisosReal: ProveedorDePermisos {
         case .writeOnly, .denied: .denegado
         case .restricted: .restringido
         @unknown default: .denegado
+        }
+    }
+}
+
+/// Registra o desregistra Notchy como ítem de inicio de sesión usando `SMAppService.mainApp` (SIS-3).
+public struct AdaptadorDeInicioAlAbrirSesion: ServicioDeInicioAlAbrirSesion {
+    public init() {}
+
+    public func estado() -> EstadoDeInicioAlAbrirSesion {
+        traducir(SMAppService.mainApp.status)
+    }
+
+    @discardableResult
+    public func aplicar(activo: Bool) -> EstadoDeInicioAlAbrirSesion {
+        do {
+            if activo {
+                if SMAppService.mainApp.status != .enabled {
+                    try SMAppService.mainApp.register()
+                }
+            } else {
+                if SMAppService.mainApp.status == .enabled || SMAppService.mainApp.status == .requiresApproval {
+                    try SMAppService.mainApp.unregister()
+                }
+            }
+        } catch {
+            // Si falla (ej. requiere aprobación o sin firmar fuera de bundle), devolvemos el estado real actual.
+        }
+        return estado()
+    }
+
+    public func abrirAjustesDeItemsDeInicio() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
+    private func traducir(_ status: SMAppService.Status) -> EstadoDeInicioAlAbrirSesion {
+        switch status {
+        case .enabled: .activo
+        case .notRegistered: .inactivo
+        case .requiresApproval: .requiereAprobacion
+        case .notFound: .noDisponible
+        @unknown default: .noDisponible
         }
     }
 }

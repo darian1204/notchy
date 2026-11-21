@@ -7,6 +7,7 @@ import SwiftUI
 public struct VistaDeIsla: View {
     private let coordinador: CoordinadorDeIsla
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
     /// Paleta ⌘K del estilo tarjetas. Se cierra sola al cerrar la isla o cambiar de módulo.
     @State private var paletaAbierta = false
 
@@ -219,12 +220,12 @@ public struct VistaDeIsla: View {
     /// Primero crece la forma; el contenido entra después con fundido y desenfoque.
     private var entrada: AnyTransition {
         let aparicion: AnyTransition =
-            reducirMovimiento
+            (reducirMovimiento || reducirTransparencia)
             ? .opacity
             : .modifier(active: Desenfoque(radio: 6, opacidad: 0), identity: Desenfoque(radio: 0, opacidad: 1))
         return .asymmetric(
             insertion: aparicion.animation(Movimiento.entradaDeContenido(reducir: reducirMovimiento)),
-            removal: .opacity.animation(.easeOut(duration: 0.1)))
+            removal: .opacity.animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento)))
     }
 }
 

@@ -29,6 +29,8 @@ public final class ModuloDeBandeja: ModuloDeIsla {
 struct VistaDeBandeja: View {
     @Bindable var modelo: ModeloDeBandeja
     @State private var accionConHover: String?
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -86,14 +88,17 @@ struct VistaDeBandeja: View {
                 if !urls.isEmpty {
                     modelo.comprimirEnZip(urls)
                 } else {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                    withAnimation(Movimiento.cambioDeEstado(reducir: reducirMovimiento)) {
                         modelo.mostrarSegundaFila.toggle()
                     }
                 }
             }
         }
         .padding(.vertical, 6)
-        .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Paleta.borde.opacity(0.75), lineWidth: 1)
@@ -288,10 +293,15 @@ struct VistaDeBandeja: View {
                     .foregroundStyle(Paleta.textoDeApoyo)
             }
             .buttonStyle(.plain)
+            .help("Quitar \(elemento.nombre) de la bandeja")
+            .accessibilityLabel("Quitar \(elemento.nombre) de la bandeja")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(
+            reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
         .onTapGesture {
             NSWorkspace.shared.open(url)
         }

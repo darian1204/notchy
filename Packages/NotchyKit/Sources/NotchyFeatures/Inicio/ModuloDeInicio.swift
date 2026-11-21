@@ -487,6 +487,7 @@ private struct ColumnaNotasInboxInicio: View {
                 }
                 .buttonStyle(.plain)
                 .help("Abrir 00-inbox/inbox.md en Obsidian")
+                .accessibilityLabel("Abrir inbox en Obsidian")
 
                 Button {
                     inbox?.abrirCarpetaEnFinder()
@@ -497,6 +498,7 @@ private struct ColumnaNotasInboxInicio: View {
                 }
                 .buttonStyle(.plain)
                 .help("Abrir carpeta 00-inbox en Finder")
+                .accessibilityLabel("Abrir carpeta inbox en Finder")
             }
 
             if let inbox {
@@ -524,6 +526,7 @@ private struct ColumnaNotasInboxInicio: View {
                     .buttonStyle(.plain)
                     .disabled(gestor.borrador.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .help("Guardar en 00-inbox/inbox.md")
+                    .accessibilityLabel("Guardar en el inbox")
                 }
                 .padding(.horizontal, 8)
                 .frame(height: 28)

@@ -41,6 +41,10 @@ public final class Ajustes {
     public var iconoEnBarraDeMenus: Bool {
         didSet { alCambiar(iconoEnBarraDeMenus, oldValue, .iconoEnBarraDeMenus) }
     }
+    /// Registrar Notchy para iniciar al abrir sesión en macOS (SIS-3).
+    public var iniciarAlAbrirSesion: Bool {
+        didSet { alCambiar(iniciarAlAbrirSesion, oldValue, .iniciarAlAbrirSesion) }
+    }
     /// Horas que vive cada copia del portapapeles (por defecto 1). Los fijados no se borran.
     public var horasRetencionPortapapeles: Int {
         didSet { alCambiar(horasRetencionPortapapeles, oldValue, .horasRetencionPortapapeles) }
@@ -124,6 +128,7 @@ public final class Ajustes {
         pantalla = Self.leer(.pantalla, de: almacen) ?? .conNotch
         atajo = Self.leer(.atajo, de: almacen) ?? .controlOpcionEspacio
         iconoEnBarraDeMenus = Self.leer(.iconoEnBarraDeMenus, de: almacen) ?? false
+        iniciarAlAbrirSesion = Self.leer(.iniciarAlAbrirSesion, de: almacen) ?? true
         horasRetencionPortapapeles = Self.leer(.horasRetencionPortapapeles, de: almacen) ?? 1
         limiteElementosPortapapeles = Self.leer(.limiteElementosPortapapeles, de: almacen) ?? 2000
         appsExcluidasPortapapeles = Self.leer(.appsExcluidasPortapapeles, de: almacen) ?? []
@@ -178,14 +183,42 @@ public final class Ajustes {
 
     // MARK: Guardado
 
-    enum Clave: String {
-        case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus
+    enum Clave: String, CaseIterable {
+        case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus, iniciarAlAbrirSesion
         case diasRetencionPortapapeles, horasRetencionPortapapeles, limiteElementosPortapapeles,
             appsExcluidasPortapapeles
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox
         case estiloDeIsla, accesosRapidos
+    }
+
+    /// Restaura todas las preferencias a sus valores por defecto y limpia el almacén.
+    public func restablecerValoresPorDefecto() {
+        for clave in Clave.allCases where clave != .esquema {
+            almacen.guardar(nil, en: clave.rawValue)
+        }
+        ordenDeModulos = []
+        modulosApagados = []
+        pantalla = .conNotch
+        atajo = .controlOpcionEspacio
+        iconoEnBarraDeMenus = false
+        iniciarAlAbrirSesion = true
+        horasRetencionPortapapeles = 1
+        limiteElementosPortapapeles = 2000
+        appsExcluidasPortapapeles = []
+        carpetaFotosEspejo = Self.rutaDescargasPorDefecto
+        rutaVaultObsidian = Self.rutaVaultPorDefecto
+        temaPanel = .obsidiana
+        temaBarra = .clasico
+        estiloDeIsla = .clasico
+        accesosRapidos = Self.accesosPorDefecto
+        hudSistemaActivo = true
+        diasRetencionAudioReuniones = 30
+        guardarAudioReuniones = true
+        resumirReunionesEnInbox = true
+        idiomaTranscripcionPorDefecto = .espanolMexico
+        preferirMicrofonoInternoConBluetooth = true
     }
 
     // MARK: Accesos rápidos

@@ -80,3 +80,23 @@ public struct CambioDePermiso: Evento, Equatable {
         self.estado = estado
     }
 }
+
+/// Estado del ítem de inicio de sesión administrado con `SMAppService` (SIS-3).
+public enum EstadoDeInicioAlAbrirSesion: String, Sendable, Equatable {
+    case activo
+    case inactivo
+    case requiereAprobacion
+    case noDisponible
+
+    public var requiereAprobacionEnSistema: Bool {
+        self == .requiereAprobacion
+    }
+}
+
+/// Puerto para registrar o desregistrar Notchy como ítem de inicio de sesión (SIS-3).
+public protocol ServicioDeInicioAlAbrirSesion: Sendable {
+    func estado() -> EstadoDeInicioAlAbrirSesion
+    @discardableResult
+    func aplicar(activo: Bool) -> EstadoDeInicioAlAbrirSesion
+    func abrirAjustesDeItemsDeInicio()
+}

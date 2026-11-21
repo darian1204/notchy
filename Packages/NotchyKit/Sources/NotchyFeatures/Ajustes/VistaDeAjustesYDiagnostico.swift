@@ -1,23 +1,32 @@
+import AppKit
 import NotchyCore
 import NotchyDesign
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// Ventana de Ajustes y panel de Permisos y Diagnóstico (ISL-8, SIS-1, SIS-2).
+/// Ventana de Ajustes y panel de Permisos y Diagnóstico (ISL-8, SIS-1, SIS-2, SIS-3, SIS-4).
 public struct VistaDeAjustesYDiagnostico: View {
     private let modelo: ModeloDeAjustesYDiagnostico
     private let alAbrirEnlace: (@MainActor (URL) -> Void)?
     private let alBorrarHistorialPortapapeles: (@MainActor () -> Void)?
+    private let alBorrarTodosLosDatos: (@MainActor () -> Void)?
+    private let alExportarDiagnostico: (@MainActor (String) -> Void)?
     private let alSalir: (@MainActor () -> Void)?
+    @State private var confirmarBorradoGlobal = false
 
     public init(
         modelo: ModeloDeAjustesYDiagnostico,
         alAbrirEnlace: (@MainActor (URL) -> Void)? = nil,
         alBorrarHistorialPortapapeles: (@MainActor () -> Void)? = nil,
+        alBorrarTodosLosDatos: (@MainActor () -> Void)? = nil,
+        alExportarDiagnostico: (@MainActor (String) -> Void)? = nil,
         alSalir: (@MainActor () -> Void)? = nil
     ) {
         self.modelo = modelo
         self.alAbrirEnlace = alAbrirEnlace
         self.alBorrarHistorialPortapapeles = alBorrarHistorialPortapapeles
+        self.alBorrarTodosLosDatos = alBorrarTodosLosDatos
+        self.alExportarDiagnostico = alExportarDiagnostico
         self.alSalir = alSalir
     }
 
@@ -269,7 +278,24 @@ public struct VistaDeAjustesYDiagnostico: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section("Barra de menús") {
+            Section("Inicio y barra de menús") {
+                Toggle("Iniciar Notchy al abrir sesión", isOn: ajustes.iniciarAlAbrirSesion)
+                    .accessibilityLabel("Iniciar Notchy al abrir sesión")
+
+                if modelo.estadoDeInicioAlAbrirSesion.requiereAprobacionEnSistema {
+                    HStack(alignment: .center, spacing: 8) {
+                        Text("macOS requiere aprobar a Notchy en Ítems de inicio para arrancar al abrir sesión.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("Abrir Ítems de inicio…") {
+                            modelo.abrirAjustesDeItemsDeInicio()
+                        }
+                        .controlSize(.small)
+                        .accessibilityLabel("Abrir Ítems de inicio en Ajustes del Sistema")
+                    }
+                }
+
                 Toggle("Mostrar ícono en la barra de menús", isOn: ajustes.iconoEnBarraDeMenus)
                     .accessibilityLabel("Mostrar ícono en la barra de menús")
                 Text("Ofrece acceso rápido al estado de la isla, a esta ventana y a Salir de Notchy.")
@@ -277,12 +303,46 @@ public struct VistaDeAjustesYDiagnostico: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let alSalir {
-                Section {
-                    HStack {
-                        Spacer()
-                        Button("Salir de Notchy", role: .destructive, action: alSalir)
-                            .accessibilityLabel("Salir de Notchy")
+            if alBorrarTodosLosDatos != nil || alSalir != nil {
+                Section("Zona peligrosa") {
+                    if let alBorrarTodosLosDatos {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Restablecer datos locales")
+                                    .font(.body.weight(.medium))
+                                Text(
+                                    "Borra portapapeles, bandeja, reuniones, audios, historial del agente y ajustes. No toca tu vault de Obsidian."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Borrar todos los datos de Notchy…", role: .destructive) {
+                                confirmarBorradoGlobal = true
+                            }
+                            .accessibilityLabel("Borrar todos los datos de Notchy")
+                            .confirmationDialog(
+                                "¿Borrar todos los datos de Notchy?",
+                                isPresented: $confirmarBorradoGlobal,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Borrar todos los datos", role: .destructive) {
+                                    alBorrarTodosLosDatos()
+                                }
+                                Button("Cancelar", role: .cancel) {}
+                            } message: {
+                                Text(
+                                    "Se eliminarán el historial del portapapeles, los archivos en la bandeja, las reuniones, grabaciones y notas de voz, el historial del agente y tus preferencias. Tu vault de Obsidian no se modificará."
+                                )
+                            }
+                        }
+                    }
+                    if let alSalir {
+                        HStack {
+                            Spacer()
+                            Button("Salir de Notchy", role: .destructive, action: alSalir)
+                                .accessibilityLabel("Salir de Notchy")
+                        }
                     }
                 }
             }
@@ -394,10 +454,30 @@ public struct VistaDeAjustesYDiagnostico: View {
                     }
                     .accessibilityLabel("Actualizar diagnóstico")
                     Spacer()
+                    Button("Exportar diagnóstico…") {
+                        exportarDiagnostico()
+                    }
+                    .accessibilityLabel("Exportar diagnóstico sin datos personales")
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func exportarDiagnostico() {
+        let contenido = modelo.construirReporteDeDiagnostico()
+        if let alExportarDiagnostico {
+            alExportarDiagnostico(contenido)
+            return
+        }
+        let panel = NSSavePanel()
+        panel.title = "Exportar diagnóstico de Notchy"
+        panel.nameFieldStringValue = "notchy-diagnostico.json"
+        panel.allowedContentTypes = [.json, .plainText]
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            try? contenido.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 
     private func filaPermiso(_ permiso: PermisoDelSistema) -> some View {

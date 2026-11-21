@@ -11,6 +11,7 @@ import Testing
         #expect(ajustes.pantalla == .conNotch)
         #expect(ajustes.atajo == .controlOpcionEspacio)
         #expect(ajustes.iconoEnBarraDeMenus == false)
+        #expect(ajustes.iniciarAlAbrirSesion == true)
         #expect(ajustes.ordenDeModulos.isEmpty)
         #expect(ajustes.estaActivo("inicio"))
     }
@@ -95,5 +96,29 @@ import Testing
         let almacen = AlmacenEnMemoria()
         almacen.guardar(try JSONEncoder().encode("atajoQueYaNoExiste"), en: "atajo")
         #expect(Ajustes(almacen: almacen).atajo == .controlOpcionEspacio)
+    }
+
+    @Test func restableceTodosLosValoresPorDefecto() {
+        let almacen = AlmacenEnMemoria()
+        let ajustes = Ajustes(almacen: almacen)
+        ajustes.pantalla = .principal
+        ajustes.atajo = .ninguno
+        ajustes.iconoEnBarraDeMenus = true
+        ajustes.iniciarAlAbrirSesion = false
+        ajustes.temaPanel = .bosque
+        ajustes.estiloDeIsla = .tarjetas
+        ajustes.rutaVaultObsidian = "/Users/secreto/MiVault"
+        ajustes.activar("agenda", false)
+
+        ajustes.restablecerValoresPorDefecto()
+
+        #expect(ajustes.pantalla == .conNotch)
+        #expect(ajustes.atajo == .controlOpcionEspacio)
+        #expect(ajustes.iconoEnBarraDeMenus == false)
+        #expect(ajustes.iniciarAlAbrirSesion == true)
+        #expect(ajustes.temaPanel == .obsidiana)
+        #expect(ajustes.estiloDeIsla == .clasico)
+        #expect(ajustes.rutaVaultObsidian == Ajustes.rutaVaultPorDefecto)
+        #expect(ajustes.estaActivo("agenda"))
     }
 }

@@ -203,6 +203,7 @@ struct VistaDeColorPicker: View {
             }
             .buttonStyle(.plain)
             .help("Intercambiar color primario y fondo")
+            .accessibilityLabel("Intercambiar color primario y fondo")
 
             // Muestra de color de fondo (clic para muestrear fondo)
             Button {
@@ -374,6 +375,7 @@ struct VistaDeColorPicker: View {
             }
             .buttonStyle(.plain)
             .help("Limpiar historial de colores")
+            .accessibilityLabel("Limpiar historial de colores")
         }
     }
 

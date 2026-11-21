@@ -28,6 +28,7 @@ struct VistaDeInicioTarjetas: View {
     let fuentes: FuentesDeInicioTarjetas
     /// Acceso rápido que se está cambiando. Mientras no es `nil`, el selector tapa las tarjetas.
     @State private var ranuraEditando: Int?
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
 
     var body: some View {
         HStack(spacing: Medidas.separacion) {
@@ -39,7 +40,7 @@ struct VistaDeInicioTarjetas: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.18), value: ranuraEditando)
+            .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: ranuraEditando)
 
             ColumnaDeAccesosRapidos(fuentes: fuentes, ranuraEditando: $ranuraEditando)
                 .frame(width: 38)
@@ -168,6 +169,7 @@ private struct TarjetaInbox: View {
                 }
                 .buttonStyle(.plain)
                 .help("Abrir 00-inbox/inbox.md en Obsidian")
+                .accessibilityLabel("Abrir inbox en Obsidian")
             }
 
             campo
@@ -260,6 +262,8 @@ private struct ColumnaDeAccesosRapidos: View {
     let fuentes: FuentesDeInicioTarjetas
     @Binding var ranuraEditando: Int?
     @State private var cursorEncima = false
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         let ids = fuentes.ajustes?.accesosRapidos ?? Ajustes.accesosPorDefecto
@@ -291,7 +295,9 @@ private struct ColumnaDeAccesosRapidos: View {
                 .foregroundStyle(color)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
-                    grabando ? Paleta.grabadora.opacity(0.18) : Paleta.superficie,
+                    grabando
+                        ? Paleta.grabadora.opacity(0.18)
+                        : (reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie),
                     in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
                 )
                 .overlay(
@@ -319,7 +325,7 @@ private struct ColumnaDeAccesosRapidos: View {
                 .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: cursorEncima)
+        .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: cursorEncima)
         .help(modulo?.nombre ?? "Acceso vacío")
         .accessibilityLabel(modulo?.nombre ?? "Acceso vacío")
     }
@@ -401,6 +407,8 @@ private struct FichaDePendiente: View {
     let fuentes: FuentesDeInicioTarjetas
     @State private var armado = false
     @State private var tareaDesarmar: Task<Void, Never>?
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         HStack(spacing: 7) {
@@ -435,10 +443,12 @@ private struct FichaDePendiente: View {
         .padding(.trailing, 8)
         .frame(height: 26)
         .background(
-            armado ? Paleta.portapapeles.opacity(0.12) : Color.white.opacity(0.05),
+            armado
+                ? Paleta.portapapeles.opacity(0.12)
+                : (reducirTransparencia ? Paleta.superficieAltaSolida : Color.white.opacity(0.05)),
             in: RoundedRectangle(cornerRadius: 8)
         )
-        .animation(.easeOut(duration: 0.15), value: armado)
+        .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: armado)
         .onChange(of: pendiente.id) { desarmar() }
         .onDisappear { desarmar() }
     }

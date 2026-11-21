@@ -371,6 +371,7 @@ struct VistaDeClima: View {
                 }
                 .buttonStyle(.plain)
                 .help("Actualizar pronóstico")
+                .accessibilityLabel("Actualizar pronóstico")
             }
         }
     }

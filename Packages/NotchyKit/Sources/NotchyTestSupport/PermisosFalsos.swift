@@ -34,3 +34,47 @@ public final class ProveedorDePermisosFalso: ProveedorDePermisos {
         pedidos.withLock { $0 }
     }
 }
+
+/// Servicio falso de inicio al abrir sesión en memoria para pruebas (SIS-3).
+public final class ServicioDeInicioAlAbrirSesionFalso: ServicioDeInicioAlAbrirSesion {
+    private let estadoActual: Mutex<EstadoDeInicioAlAbrirSesion>
+    private let respuestaAlActivar: EstadoDeInicioAlAbrirSesion
+    private let aplicaciones = Mutex<[Bool]>([])
+    private let aperturasAjustes = Mutex<Int>(0)
+
+    public init(
+        inicial: EstadoDeInicioAlAbrirSesion = .inactivo,
+        alActivar: EstadoDeInicioAlAbrirSesion = .activo
+    ) {
+        estadoActual = Mutex(inicial)
+        respuestaAlActivar = alActivar
+    }
+
+    public func estado() -> EstadoDeInicioAlAbrirSesion {
+        estadoActual.withLock { $0 }
+    }
+
+    @discardableResult
+    public func aplicar(activo: Bool) -> EstadoDeInicioAlAbrirSesion {
+        aplicaciones.withLock { $0.append(activo) }
+        let nuevo: EstadoDeInicioAlAbrirSesion = activo ? respuestaAlActivar : .inactivo
+        estadoActual.withLock { $0 = nuevo }
+        return nuevo
+    }
+
+    public func abrirAjustesDeItemsDeInicio() {
+        aperturasAjustes.withLock { $0 += 1 }
+    }
+
+    public func fijarEstado(_ nuevo: EstadoDeInicioAlAbrirSesion) {
+        estadoActual.withLock { $0 = nuevo }
+    }
+
+    public var historialAplicado: [Bool] {
+        aplicaciones.withLock { $0 }
+    }
+
+    public var vecesAbrioAjustes: Int {
+        aperturasAjustes.withLock { $0 }
+    }
+}

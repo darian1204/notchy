@@ -401,6 +401,7 @@ struct VistaDeNotificaciones: View {
             }
             .buttonStyle(.plain)
             .help("Limpiar todas las notificaciones")
+            .accessibilityLabel("Limpiar todas las notificaciones")
         }
     }
 
@@ -475,6 +476,7 @@ struct VistaDeNotificaciones: View {
         }
         .buttonStyle(.plain)
         .help(ayuda)
+        .accessibilityLabel(ayuda)
     }
 
     @ViewBuilder
