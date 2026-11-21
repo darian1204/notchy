@@ -275,9 +275,49 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
             }
             try db.execute(sql: "DELETE FROM transcript_fts")
             try db.execute(sql: "DELETE FROM transcript_segment")
+            try db.execute(sql: "DELETE FROM meeting_note")
             try db.execute(sql: "DELETE FROM meeting")
             try db.execute(sql: "DELETE FROM voice_note")
             return rutas
+        }
+    }
+
+    // MARK: - Notas de reunión (NOT-1, NOT-2)
+
+    public func guardarNotaDeReunion(_ nota: NotaDeReunion) throws {
+        try base.escritor.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO meeting_note (meeting_id, markdown, generada_en, editada_en)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(meeting_id) DO UPDATE SET
+                        markdown = excluded.markdown,
+                        generada_en = excluded.generada_en,
+                        editada_en = excluded.editada_en
+                    """,
+                arguments: [
+                    nota.reunionID,
+                    nota.markdown,
+                    nota.generadaEn.timeIntervalSince1970,
+                    nota.editadaEn?.timeIntervalSince1970,
+                ]
+            )
+        }
+    }
+
+    public func obtenerNotaDeReunion(reunionID: String) throws -> NotaDeReunion? {
+        try base.escritor.read { db in
+            try FilaNotaDeReunion.fetchOne(
+                db,
+                sql: "SELECT * FROM meeting_note WHERE meeting_id = ? LIMIT 1",
+                arguments: [reunionID]
+            )?.aDominio()
+        }
+    }
+
+    public func borrarNotaDeReunion(reunionID: String) throws {
+        try base.escritor.write { db in
+            try db.execute(sql: "DELETE FROM meeting_note WHERE meeting_id = ?", arguments: [reunionID])
         }
     }
 
@@ -501,6 +541,29 @@ private struct FilaGlosario: FetchableRecord {
             malReconocido: malReconocido,
             correcto: correcto,
             activo: activo
+        )
+    }
+}
+
+private struct FilaNotaDeReunion: FetchableRecord {
+    let reunionID: String
+    let markdown: String
+    let generadaEn: Double
+    let editadaEn: Double?
+
+    init(row: Row) {
+        reunionID = row["meeting_id"]
+        markdown = row["markdown"]
+        generadaEn = row["generada_en"]
+        editadaEn = row["editada_en"]
+    }
+
+    func aDominio() -> NotaDeReunion {
+        NotaDeReunion(
+            reunionID: reunionID,
+            markdown: markdown,
+            generadaEn: Date(timeIntervalSince1970: generadaEn),
+            editadaEn: editadaEn.map { Date(timeIntervalSince1970: $0) }
         )
     }
 }

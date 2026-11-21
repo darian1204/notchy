@@ -10,6 +10,7 @@ import Testing
         "v1-meta",
         "v2-portapapeles-y-bandeja",
         "v3-grabadora-y-reuniones",
+        "v4-notas-de-reunion",
     ]
 
     @Test func v1CreaMetaConLaFechaDeCreacion() throws {

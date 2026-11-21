@@ -171,6 +171,102 @@ struct GrabadoraYReunionesFeaturesTests {
         #expect(modelo.notasDeVoz.count == 1)
         #expect(modelo.notasDeVoz.first?.transcripcion == "Recordar prueba con Supabase")
     }
+
+    @Test
+    func resumenAPedidoEdicionYExportacionDeNotaEnHistorial() async throws {
+        let base = try BaseDeDatos.enMemoria()
+        let repo = RepositorioDeGrabadoraYReuniones(base)
+        let captura = CapturaDeAudioFalsa()
+        let escritor = EscritorDeAudioFalso()
+        let transcripcion = TranscripcionFalsa()
+        let resumenFalso = ResumenDeTextoFalso()
+
+        let inicio = Date(timeIntervalSince1970: 1_763_683_200)
+        let reunion = ReunionGrabada(
+            id: "reu-m5",
+            titulo: "Diseño de Notas: M5",
+            inicio: inicio,
+            fin: inicio.addingTimeInterval(20 * 60),
+            estado: .finalizada
+        )
+        try repo.guardarReunion(reunion)
+        try repo.guardarSegmento(
+            SegmentoDeTranscripcion(
+                id: "seg-m5-1",
+                reunionID: "reu-m5",
+                fuente: .microfono,
+                inicioSegundos: 12,
+                finSegundos: 18,
+                texto: "Vamos a guardar las notas de reunión en SQLite."
+            )
+        )
+
+        let modelo = ModeloDeGrabadora(
+            captura: captura,
+            escritor: escritor,
+            transcripcion: transcripcion,
+            resumenDeTexto: resumenFalso,
+            repositorio: repo
+        )
+        modelo.iniciar()
+        #expect(modelo.reunionSeleccionadaID == "reu-m5")
+        #expect(modelo.notaDeReunionSeleccionada == nil)
+
+        // Si Apple Intelligence no está disponible, muestra error
+        resumenFalso.listo = false
+        let fallida = await modelo.resumirReunion(reunion)
+        #expect(fallida == nil)
+        #expect(modelo.errorDeResumen?.contains("Apple Intelligence") == true)
+
+        // Cuando está disponible, resume y guarda en la base
+        resumenFalso.listo = true
+        let generada = try #require(await modelo.resumirReunion(reunion))
+        #expect(modelo.errorDeResumen == nil)
+        #expect(generada.markdown.contains("## Resumen"))
+        #expect(generada.markdown.contains("## Decisiones"))
+        #expect(generada.markdown.contains("## Tareas"))
+        #expect(modelo.notaDeReunionSeleccionada?.editadaEn == nil)
+
+        // Editar nota actualiza editada_en
+        let fechaEdicion = Date(timeIntervalSince1970: 1_763_690_000)
+        let editada = try #require(
+            modelo.guardarEdicionNota(
+                reunionID: "reu-m5",
+                markdown:
+                    "## Resumen\n- Nota editada a mano\n\n## Decisiones\n- Ninguna\n\n## Tareas\n- [ ] Exportar — Darian",
+                ahora: fechaEdicion
+            )
+        )
+        #expect(editada.editadaEn == fechaEdicion)
+        #expect(modelo.notaDeReunionSeleccionada?.editadaEn == fechaEdicion)
+
+        // Exportación a Markdown
+        let exportacion = modelo.construirExportacionMarkdown(para: reunion)
+        #expect(exportacion.nombreArchivo.hasSuffix("-diseno-de-notas-m5.md"))
+        #expect(exportacion.contenido.contains("tipo: reunion"))
+        #expect(exportacion.contenido.contains("# Diseño de Notas: M5"))
+        #expect(exportacion.contenido.contains("- Nota editada a mano"))
+        #expect(
+            exportacion.contenido.contains(
+                "## Transcripción\n**[00:12]** Vamos a guardar las notas de reunión en SQLite."))
+    }
+}
+
+private final class ResumenDeTextoFalso: PuertoDeResumenDeTexto, @unchecked Sendable {
+    var listo = true
+    func disponible() async -> Bool { listo }
+    func resumir(_ texto: String, instrucciones: String) async throws -> String {
+        """
+        ## Resumen
+        - Se acordó guardar en SQLite.
+
+        ## Decisiones
+        - Tabla meeting_note con cascada.
+
+        ## Tareas
+        - [ ] Escribir pruebas — Darian
+        """
+    }
 }
 
 @MainActor

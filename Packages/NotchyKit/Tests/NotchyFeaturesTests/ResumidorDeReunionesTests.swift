@@ -1,5 +1,6 @@
 import Foundation
 import NotchyCore
+import NotchyStorage
 import Testing
 
 @testable import NotchyFeatures
@@ -8,7 +9,16 @@ private struct ModeloFalso: PuertoDeResumenDeTexto {
     var listo = true
     func disponible() async -> Bool { listo }
     func resumir(_ texto: String, instrucciones: String) async throws -> String {
-        "- resumen de \(texto.count) caracteres"
+        """
+        ## Resumen
+        - resumen de \(texto.count) caracteres
+
+        ## Decisiones
+        - Usar SQLite local
+
+        ## Tareas
+        - [ ] Revisar apuntes — Darian
+        """
     }
 }
 
@@ -18,7 +28,7 @@ private final class AlmacenFalso: AlmacenDeAjustes, @unchecked Sendable {
     func guardar(_ dato: Data?, en clave: String) { datos[clave] = dato }
 }
 
-@Suite("Resumen de reuniones al inbox")
+@Suite("Resumen de reuniones en base e inbox (M5)")
 @MainActor
 struct ResumidorDeReunionesTests {
     private func segmentos(_ n: Int) -> [SegmentoDeTranscripcion] {
@@ -36,46 +46,78 @@ struct ResumidorDeReunionesTests {
     private func reunion() -> ReunionGrabada {
         let inicio = Date(timeIntervalSince1970: 1_800_000_000)
         return ReunionGrabada(
+            id: "r",
             titulo: "Lenguajes y autómatas",
             inicio: inicio,
             fin: inicio.addingTimeInterval(45 * 60),
+            estado: .finalizada,
             idioma: .espanolMexico
         )
     }
 
     @Test
-    func escribeElResumenEnElInbox() async {
-        var escrito: String?
-        let resumidor = ResumidorDeReuniones(
+    func guardaSiempreEnLaBaseYMandaAlInboxSoloSiEstaActivo() async throws {
+        let repo = RepositorioDeGrabadoraYReuniones(try BaseDeDatos.enMemoria())
+        let reu = reunion()
+        try repo.guardarReunion(reu)
+
+        var escritoEnInbox: String?
+        let ajustesActivos = Ajustes(almacen: AlmacenFalso())
+        ajustesActivos.resumirReunionesEnInbox = true
+
+        let resumidorActivo = ResumidorDeReuniones(
             bus: BusDeEventos(),
             modelo: ModeloFalso(),
-            ajustes: Ajustes(almacen: AlmacenFalso()),
+            ajustes: ajustesActivos,
+            repositorio: repo,
             segmentosDe: { _ in segmentos(10) },
             escribirEnInbox: { nota in
-                escrito = nota
+                escritoEnInbox = nota
                 return true
             }
         )
-        let nota = await resumidor.procesar(reunion())
+        let nota = await resumidorActivo.procesar(reu)
         #expect(nota != nil)
-        #expect(escrito?.hasPrefix("Resumen de reunión: Lenguajes y autómatas (") == true)
-        #expect(escrito?.contains("45 min)") == true)
-        #expect(escrito?.contains("- resumen de") == true)
+        #expect(escritoEnInbox?.hasPrefix("Resumen de reunión: Lenguajes y autómatas (") == true)
+        #expect(escritoEnInbox?.contains("45 min)") == true)
+        #expect(escritoEnInbox?.contains("## Resumen") == true)
+        #expect(escritoEnInbox?.contains("## Decisiones") == true)
+        #expect(escritoEnInbox?.contains("## Tareas") == true)
+
+        let guardadaEnBase = try #require(try repo.obtenerNotaDeReunion(reunionID: reu.id))
+        #expect(guardadaEnBase.markdown.contains("## Tareas\n- [ ] Revisar apuntes — Darian"))
+
+        // Con el ajuste de inbox apagado, igual guarda en la base pero no escribe al inbox
+        try repo.borrarNotaDeReunion(reunionID: reu.id)
+        escritoEnInbox = nil
+        let ajustesApagados = Ajustes(almacen: AlmacenFalso())
+        ajustesApagados.resumirReunionesEnInbox = false
+
+        let resumidorSinInbox = ResumidorDeReuniones(
+            bus: BusDeEventos(),
+            modelo: ModeloFalso(),
+            ajustes: ajustesApagados,
+            repositorio: repo,
+            segmentosDe: { _ in segmentos(10) },
+            escribirEnInbox: { nota in
+                escritoEnInbox = nota
+                return true
+            }
+        )
+        let soloResumen = await resumidorSinInbox.procesar(reu)
+        #expect(soloResumen != nil)
+        #expect(escritoEnInbox == nil)
+        #expect(try repo.obtenerNotaDeReunion(reunionID: reu.id) != nil)
     }
 
     @Test
-    func noResumeSiEstaApagadoOEsMuyCortoOSinModelo() async {
-        let ajustesApagados = Ajustes(almacen: AlmacenFalso())
-        ajustesApagados.resumirReunionesEnInbox = false
+    func noResumeSiEsMuyCortoOSinModelo() async {
         var escrituras = 0
         let escribir: @MainActor (String) -> Bool = { _ in
             escrituras += 1
             return true
         }
 
-        let apagado = ResumidorDeReuniones(
-            bus: BusDeEventos(), modelo: ModeloFalso(), ajustes: ajustesApagados,
-            segmentosDe: { _ in segmentos(10) }, escribirEnInbox: escribir)
         let corto = ResumidorDeReuniones(
             bus: BusDeEventos(), modelo: ModeloFalso(), ajustes: Ajustes(almacen: AlmacenFalso()),
             segmentosDe: { _ in segmentos(1) }, escribirEnInbox: escribir)
@@ -83,7 +125,6 @@ struct ResumidorDeReunionesTests {
             bus: BusDeEventos(), modelo: ModeloFalso(listo: false), ajustes: Ajustes(almacen: AlmacenFalso()),
             segmentosDe: { _ in segmentos(10) }, escribirEnInbox: escribir)
 
-        #expect(await apagado.procesar(reunion()) == nil)
         #expect(await corto.procesar(reunion()) == nil)
         #expect(await sinModelo.procesar(reunion()) == nil)
         #expect(escrituras == 0)
@@ -105,10 +146,12 @@ struct ResumidorDeReunionesTests {
     }
 
     @Test
-    func uneResumenesLargosEnRondas() async throws {
+    func uneResumenesLargosEnRondasYNormalizaSecciones() async throws {
         let texto = (0..<400).map { "segmento \($0) de una clase larga" }.joined(separator: "\n")
         let resumen = try await RedaccionDeResumen.resumirPorPartes(texto, con: ModeloFalso(), maximo: 500)
         #expect(!resumen.isEmpty)
-        #expect(resumen.count <= 500)
+        #expect(resumen.contains("## Resumen"))
+        #expect(resumen.contains("## Decisiones"))
+        #expect(resumen.contains("## Tareas"))
     }
 }

@@ -137,6 +137,28 @@ public struct ReunionGrabada: Identifiable, Codable, Sendable, Equatable {
     }
 }
 
+/// Nota estructurada de una reunión (resumen, decisiones y tareas), generada o editada (NOT-1, NOT-2).
+public struct NotaDeReunion: Identifiable, Codable, Sendable, Equatable {
+    public let reunionID: String
+    public var markdown: String
+    public let generadaEn: Date
+    public var editadaEn: Date?
+
+    public var id: String { reunionID }
+
+    public init(
+        reunionID: String,
+        markdown: String,
+        generadaEn: Date = .now,
+        editadaEn: Date? = nil
+    ) {
+        self.reunionID = reunionID
+        self.markdown = markdown
+        self.generadaEn = generadaEn
+        self.editadaEn = editadaEn
+    }
+}
+
 /// Segmento de transcripción o marca de tiempo de una reunión (GRB-3, GRB-4, GRB-8).
 public struct SegmentoDeTranscripcion: Identifiable, Codable, Sendable, Equatable {
     public let id: String

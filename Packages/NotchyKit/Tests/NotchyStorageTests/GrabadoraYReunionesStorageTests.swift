@@ -173,6 +173,12 @@ import Testing
                 texto: "Hola mundo"
             )
         )
+        try repo.guardarNotaDeReunion(
+            NotaDeReunion(
+                reunionID: "reu-1",
+                markdown: "## Resumen\n- Hola"
+            )
+        )
 
         let rutas = try repo.borrarTodo()
         #expect(Set(rutas) == Set(["/tmp/nota-1.m4a", "/tmp/reu-1-mic.m4a", "/tmp/reu-1-sis.m4a"]))
@@ -180,5 +186,52 @@ import Testing
         #expect(try repo.listarReuniones().isEmpty)
         #expect(try repo.listarSegmentos(reunionID: "reu-1").isEmpty)
         #expect(try repo.buscarSegmentos(consulta: "Hola").isEmpty)
+        #expect(try repo.obtenerNotaDeReunion(reunionID: "reu-1") == nil)
+    }
+
+    @Test func guardaLeeActualizaYBorraNotaDeReunionConCascada() throws {
+        let repo = RepositorioDeGrabadoraYReuniones(try BaseDeDatos.enMemoria())
+        let inicio = Date(timeIntervalSince1970: 1_750_000_000)
+        try repo.guardarReunion(
+            ReunionGrabada(
+                id: "reu-nota",
+                titulo: "Revisión de M5",
+                inicio: inicio,
+                estado: .finalizada
+            )
+        )
+
+        let generada = Date(timeIntervalSince1970: 1_750_001_000)
+        let notaInicial = NotaDeReunion(
+            reunionID: "reu-nota",
+            markdown: "## Resumen\n- Punto 1\n\n## Decisiones\n- Ninguna\n\n## Tareas\n- Ninguna",
+            generadaEn: generada,
+            editadaEn: nil
+        )
+        try repo.guardarNotaDeReunion(notaInicial)
+
+        let leida = try #require(try repo.obtenerNotaDeReunion(reunionID: "reu-nota"))
+        #expect(leida == notaInicial)
+        #expect(leida.editadaEn == nil)
+
+        let editadaFecha = Date(timeIntervalSince1970: 1_750_002_000)
+        let notaEditada = NotaDeReunion(
+            reunionID: "reu-nota",
+            markdown: "## Resumen\n- Punto 1 editado\n\n## Decisiones\n- Aprobado\n\n## Tareas\n- [ ] Probar — Darian",
+            generadaEn: generada,
+            editadaEn: editadaFecha
+        )
+        try repo.guardarNotaDeReunion(notaEditada)
+        let leidaEditada = try #require(try repo.obtenerNotaDeReunion(reunionID: "reu-nota"))
+        #expect(leidaEditada.markdown == notaEditada.markdown)
+        #expect(leidaEditada.editadaEn == editadaFecha)
+
+        try repo.borrarNotaDeReunion(reunionID: "reu-nota")
+        #expect(try repo.obtenerNotaDeReunion(reunionID: "reu-nota") == nil)
+
+        try repo.guardarNotaDeReunion(notaEditada)
+        #expect(try repo.obtenerNotaDeReunion(reunionID: "reu-nota") != nil)
+        try repo.borrarReunion(id: "reu-nota")
+        #expect(try repo.obtenerNotaDeReunion(reunionID: "reu-nota") == nil)
     }
 }

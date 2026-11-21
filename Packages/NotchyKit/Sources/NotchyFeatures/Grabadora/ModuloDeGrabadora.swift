@@ -2,6 +2,7 @@ import AppKit
 import NotchyCore
 import NotchyDesign
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Módulo de Grabadora y Reuniones (`620 × 238 pt`): transcripción en vivo ("Tú" y "Otros"),
 /// notas de voz `.m4a`, historial con búsqueda sin acentos, retranscripción y glosario (GRB-1 a GRB-8).
@@ -86,6 +87,8 @@ struct VistaDeGrabadora: View {
     @Bindable var modelo: ModeloDeGrabadora
     @State private var nuevoMalReconocido = ""
     @State private var nuevoCorrecto = ""
+    @State private var editandoNota = false
+    @State private var borradorNota = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -546,6 +549,7 @@ struct VistaDeGrabadora: View {
                             let seleccionada = modelo.reunionSeleccionadaID == reunion.id
                             HStack(spacing: 4) {
                                 Button {
+                                    editandoNota = false
                                     modelo.reunionSeleccionadaID = reunion.id
                                 } label: {
                                     VStack(alignment: .leading, spacing: 1) {
@@ -591,21 +595,60 @@ struct VistaDeGrabadora: View {
                         mostrandoBusqueda
                         ? modelo.resultadosBusqueda
                         : modelo.segmentosDeReunionSeleccionada
+                    let reunionSeleccionada = modelo.reunionesGuardadas.first(where: {
+                        $0.id == modelo.reunionSeleccionadaID
+                    })
 
-                    HStack {
-                        Text(
-                            mostrandoBusqueda
-                                ? "Resultados (\(lista.count))"
-                                : "Transcripción (\(lista.count))"
-                        )
-                        .rotulo(Paleta.agenda)
+                    HStack(spacing: 6) {
+                        if mostrandoBusqueda {
+                            Text("Resultados (\(lista.count))")
+                                .rotulo(Paleta.agenda)
+                        } else {
+                            ForEach(SeccionDetalleDeReunion.allCases, id: \.self) { seccion in
+                                let activa = modelo.seccionDetalleHistorial == seccion
+                                let etiqueta =
+                                    seccion == .transcripcion
+                                    ? "Transcripción (\(lista.count))"
+                                    : "Notas"
+                                Button {
+                                    editandoNota = false
+                                    modelo.seccionDetalleHistorial = seccion
+                                } label: {
+                                    Text(etiqueta)
+                                        .font(.system(size: 10, weight: activa ? .semibold : .medium))
+                                        .foregroundStyle(activa ? Paleta.texto : Paleta.textoDeApoyo)
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            activa ? Paleta.superficieAlta : Color.clear,
+                                            in: Capsule()
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
                         Spacer(minLength: 0)
-                        if !mostrandoBusqueda, !lista.isEmpty {
-                            let titulo = modelo.reunionesGuardadas.first(where: {
-                                $0.id == modelo.reunionSeleccionadaID
-                            })?.titulo
+
+                        if let reunion = reunionSeleccionada, !mostrandoBusqueda {
+                            Button(
+                                modelo.resumiendo
+                                    ? "Resumiendo…"
+                                    : (modelo.notaDeReunionSeleccionada == nil ? "Resumir" : "Volver a resumir")
+                            ) {
+                                editandoNota = false
+                                Task { await modelo.resumirReunion(reunion) }
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Paleta.musica)
+                            .disabled(modelo.resumiendo || lista.isEmpty)
+                            .help("Generar resumen estructurado con Apple Intelligence")
+                        }
+
+                        if !mostrandoBusqueda, modelo.seccionDetalleHistorial == .transcripcion, !lista.isEmpty {
                             Button {
-                                modelo.copiarTranscripcion(lista, titulo: titulo)
+                                modelo.copiarTranscripcion(lista, titulo: reunionSeleccionada?.titulo)
                             } label: {
                                 Label(
                                     modelo.transcripcionCopiada ? "Copiada" : "Copiar",
@@ -618,8 +661,10 @@ struct VistaDeGrabadora: View {
                             .help("Copiar la transcripción completa")
                             .accessibilityLabel("Copiar transcripción de la reunión")
                         }
-                        if let id = modelo.reunionSeleccionadaID,
-                            let reunion = modelo.reunionesGuardadas.first(where: { $0.id == id }),
+
+                        if let reunion = reunionSeleccionada,
+                            !mostrandoBusqueda,
+                            modelo.seccionDetalleHistorial == .transcripcion,
                             !reunion.rutasAudioMicrofono.isEmpty || !reunion.rutasAudioSistema.isEmpty
                         {
                             Button(modelo.retranscribiendo ? "Retranscribiendo…" : "Retranscribir") {
@@ -630,23 +675,137 @@ struct VistaDeGrabadora: View {
                             .foregroundStyle(Paleta.grabadora)
                             .disabled(modelo.retranscribiendo)
                         }
-                    }
 
-                    if lista.isEmpty {
-                        Text("Sin segmentos para mostrar.")
-                            .textoDeApoyo()
-                        Spacer(minLength: 0)
-                    } else {
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 4) {
-                                ForEach(lista) { seg in
-                                    filaSegmento(seg)
+                        if let reunion = reunionSeleccionada,
+                            !mostrandoBusqueda,
+                            modelo.seccionDetalleHistorial == .notas
+                        {
+                            if let nota = modelo.notaDeReunionSeleccionada, !editandoNota {
+                                Button("Editar") {
+                                    borradorNota = nota.markdown
+                                    editandoNota = true
                                 }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Paleta.texto)
+
+                                Button {
+                                    modelo.copiarNota(nota.markdown)
+                                } label: {
+                                    Label(
+                                        modelo.notaCopiada ? "Copiada" : "Copiar",
+                                        systemImage: modelo.notaCopiada ? "checkmark" : "doc.on.doc"
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Paleta.agenda)
+                                .help("Copiar nota de la reunión")
+                                .accessibilityLabel("Copiar nota de la reunión")
+                            }
+
+                            if !editandoNota {
+                                Button("Exportar a Markdown…") {
+                                    exportarReunionAMarkdown(reunion)
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Paleta.portapapeles)
+                                .help("Exportar nota y transcripción a un archivo Markdown")
                             }
                         }
                     }
+
+                    if let errorResumen = modelo.errorDeResumen, !mostrandoBusqueda {
+                        Text(errorResumen)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Paleta.portapapeles)
+                            .lineLimit(2)
+                    }
+
+                    if mostrandoBusqueda || modelo.seccionDetalleHistorial == .transcripcion {
+                        if lista.isEmpty {
+                            Text("Sin segmentos para mostrar.")
+                                .textoDeApoyo()
+                            Spacer(minLength: 0)
+                        } else {
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 4) {
+                                    ForEach(lista) { seg in
+                                        filaSegmento(seg)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        vistaDetalleNotas(reunion: reunionSeleccionada)
+                    }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func vistaDetalleNotas(reunion: ReunionGrabada?) -> some View {
+        if let reunion {
+            if editandoNota {
+                VStack(alignment: .leading, spacing: 6) {
+                    TextEditor(text: $borradorNota)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Paleta.texto)
+                        .scrollContentBackground(.hidden)
+                        .padding(6)
+                        .background(Paleta.superficieAlta, in: RoundedRectangle(cornerRadius: 8))
+
+                    HStack(spacing: 6) {
+                        Spacer(minLength: 0)
+                        Button("Cancelar") {
+                            editandoNota = false
+                        }
+                        .buttonStyle(EstiloDePildora())
+
+                        Button("Guardar") {
+                            _ = modelo.guardarEdicionNota(reunionID: reunion.id, markdown: borradorNota)
+                            editandoNota = false
+                        }
+                        .buttonStyle(EstiloDePildora(destacado: true))
+                        .disabled(borradorNota.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            } else if let nota = modelo.notaDeReunionSeleccionada {
+                ScrollView {
+                    Text(nota.markdown)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Paleta.texto)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else if modelo.resumiendo {
+                Text("Generando resumen estructurado con Apple Intelligence…")
+                    .textoDeApoyo()
+                Spacer(minLength: 0)
+            } else {
+                Text("Aún no hay nota para esta reunión. Pulsa «Resumir» para generarla con Apple Intelligence.")
+                    .textoDeApoyo()
+                Spacer(minLength: 0)
+            }
+        } else {
+            Text("Selecciona una reunión del historial.")
+                .textoDeApoyo()
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func exportarReunionAMarkdown(_ reunion: ReunionGrabada) {
+        let exportacion = modelo.construirExportacionMarkdown(para: reunion)
+        let panel = NSSavePanel()
+        panel.title = "Exportar nota de reunión a Markdown"
+        panel.nameFieldStringValue = exportacion.nombreArchivo
+        let tipoMarkdown = UTType(filenameExtension: "md") ?? .plainText
+        panel.allowedContentTypes = [tipoMarkdown, .plainText]
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            try? exportacion.contenido.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 

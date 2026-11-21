@@ -62,6 +62,13 @@ final class Ensamblado {
         base = baseAbierta
 
         let abrirURL: @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }
+        let adaptadorDeResumen = AdaptadorDeResumenLocal()
+        let repositorioDeGrabadora = baseAbierta.map(RepositorioDeGrabadoraYReuniones.init)
+        gestorDeInbox = GestorDeInboxObsidian(
+            ajustes: ajustes,
+            alAbrirURL: abrirURL
+        )
+        let inboxParaResumen = gestorDeInbox
 
         modeloDeAgenda = ModeloDeAgenda(
             calendario: adaptadorDeCalendario,
@@ -69,16 +76,19 @@ final class Ensamblado {
             bus: bus,
             alAbrirURL: abrirURL
         )
-        modeloDeGrabadora = ModeloDeGrabadora(
+        let grabadora = ModeloDeGrabadora(
             captura: adaptadorDeCapturaDeAudio,
             escritor: adaptadorDeEscritorDeAudio,
             transcripcion: adaptadorDeTranscripcion,
-            repositorio: baseAbierta.map(RepositorioDeGrabadoraYReuniones.init),
+            resumenDeTexto: adaptadorDeResumen,
+            escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) },
+            repositorio: repositorioDeGrabadora,
             carpetaAudio: rutasAbiertas?.audio,
             ajustes: ajustes,
             bus: bus,
             alAbrirURL: abrirURL
         )
+        modeloDeGrabadora = grabadora
         modeloDeAhoraSuena = ModeloDeAhoraSuena(
             puerto: adaptadorDeAhoraSuena,
             bus: bus
@@ -130,18 +140,14 @@ final class Ensamblado {
         modeloDeTraductor = ModeloDeTraductor(agente: adaptadorDeAgente)
         modeloDeWindowSnap = ModeloDeWindowSnap(puerto: adaptadorDeWindowSnap)
         modeloDeMonitorSistema = ModeloDeMonitorSistema(puerto: adaptadorDeMonitor)
-        gestorDeInbox = GestorDeInboxObsidian(
-            ajustes: ajustes,
-            alAbrirURL: abrirURL
-        )
-        let repositorioDeResumen = baseAbierta.map(RepositorioDeGrabadoraYReuniones.init)
-        let inboxParaResumen = gestorDeInbox
         resumidorDeReuniones = ResumidorDeReuniones(
             bus: bus,
-            modelo: AdaptadorDeResumenLocal(),
+            modelo: adaptadorDeResumen,
             ajustes: ajustes,
-            segmentosDe: { id in (try? repositorioDeResumen?.listarSegmentos(reunionID: id)) ?? [] },
-            escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) }
+            repositorio: repositorioDeGrabadora,
+            segmentosDe: { id in (try? repositorioDeGrabadora?.listarSegmentos(reunionID: id)) ?? [] },
+            escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) },
+            alGuardarNota: { _ in grabadora.recargarNotaDeReunionSeleccionada() }
         )
 
         registro = RegistroDeModulos(ajustes: ajustes)

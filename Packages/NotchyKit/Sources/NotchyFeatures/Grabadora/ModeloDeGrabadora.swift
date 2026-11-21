@@ -20,6 +20,12 @@ public enum PestanaDeGrabadora: String, CaseIterable, Sendable, Equatable {
     case glosario = "Glosario"
 }
 
+/// Secciones del detalle de una reunión en la pestaña Historial (GRB-4, NOT-1, NOT-2).
+public enum SeccionDetalleDeReunion: String, CaseIterable, Sendable, Equatable {
+    case transcripcion = "Transcripción"
+    case notas = "Notas"
+}
+
 /// Modelo observable de Grabadora y Reuniones con transcripción en vivo, guardado incremental por trozos,
 /// recuperación tras caída, glosario y retención de audio de 30 días (GRB-1 a GRB-8, D-25, RNF-4).
 @MainActor
@@ -49,8 +55,17 @@ public final class ModeloDeGrabadora {
     public private(set) var notasDeVoz: [NotaDeVoz] = []
     public private(set) var reunionesGuardadas: [ReunionGrabada] = []
     public private(set) var segmentosDeReunionSeleccionada: [SegmentoDeTranscripcion] = []
+    public private(set) var notaDeReunionSeleccionada: NotaDeReunion?
+    public var seccionDetalleHistorial: SeccionDetalleDeReunion = .transcripcion
+    public private(set) var resumiendo = false
+    public private(set) var errorDeResumen: String?
+    public private(set) var notaCopiada = false
+    private var tareaAvisoNotaCopiada: Task<Void, Never>?
     public var reunionSeleccionadaID: String? {
-        didSet { cargarSegmentosDeSeleccionada() }
+        didSet {
+            errorDeResumen = nil
+            cargarSegmentosDeSeleccionada()
+        }
     }
     public var consultaBusqueda = "" {
         didSet { actualizarBusqueda() }
@@ -62,6 +77,8 @@ public final class ModeloDeGrabadora {
     @ObservationIgnored private let captura: any PuertoDeCapturaDeAudio
     @ObservationIgnored private let escritor: any PuertoDeEscritorDeAudio
     @ObservationIgnored private let transcripcion: any PuertoDeTranscripcion
+    @ObservationIgnored private let resumenDeTexto: (any PuertoDeResumenDeTexto)?
+    @ObservationIgnored private let escribirEnInbox: (@MainActor (String) -> Bool)?
     @ObservationIgnored private let repositorio: RepositorioDeGrabadoraYReuniones?
     @ObservationIgnored private let carpetaAudio: URL
     @ObservationIgnored private let ajustes: Ajustes
@@ -79,6 +96,8 @@ public final class ModeloDeGrabadora {
         captura: any PuertoDeCapturaDeAudio,
         escritor: any PuertoDeEscritorDeAudio,
         transcripcion: any PuertoDeTranscripcion,
+        resumenDeTexto: (any PuertoDeResumenDeTexto)? = nil,
+        escribirEnInbox: (@MainActor (String) -> Bool)? = nil,
         repositorio: RepositorioDeGrabadoraYReuniones? = nil,
         carpetaAudio: URL? = nil,
         ajustes: Ajustes? = nil,
@@ -89,6 +108,8 @@ public final class ModeloDeGrabadora {
         self.captura = captura
         self.escritor = escritor
         self.transcripcion = transcripcion
+        self.resumenDeTexto = resumenDeTexto
+        self.escribirEnInbox = escribirEnInbox
         self.repositorio = repositorio
         self.carpetaAudio =
             carpetaAudio
@@ -583,9 +604,142 @@ public final class ModeloDeGrabadora {
         notasDeVoz.removeAll()
         reunionesGuardadas.removeAll()
         segmentosDeReunionSeleccionada.removeAll()
+        notaDeReunionSeleccionada = nil
+        errorDeResumen = nil
         resultadosBusqueda.removeAll()
         reunionSeleccionadaID = nil
         consultaBusqueda = ""
+    }
+
+    // MARK: - Notas de reunión: resumen a pedido, edición, copia y exportación (NOT-1, NOT-2)
+
+    /// Resume una reunión del historial a pedido, guarda la nota en la base y (si el ajuste está activo) la envía al inbox.
+    @discardableResult
+    public func resumirReunion(_ reunion: ReunionGrabada) async -> NotaDeReunion? {
+        errorDeResumen = nil
+        guard let resumenDeTexto else {
+            errorDeResumen = "Apple Intelligence no está disponible en este Mac."
+            return nil
+        }
+        let segmentos: [SegmentoDeTranscripcion]
+        if let repositorio, let guardados = try? repositorio.listarSegmentos(reunionID: reunion.id) {
+            segmentos = guardados
+        } else if reunionSeleccionadaID == reunion.id {
+            segmentos = segmentosDeReunionSeleccionada
+        } else {
+            segmentos = []
+        }
+        let texto = Self.textoDeTranscripcion(segmentos)
+        guard !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorDeResumen = "Esta reunión no tiene transcripción para resumir."
+            return nil
+        }
+        resumiendo = true
+        defer { resumiendo = false }
+        guard await resumenDeTexto.disponible() else {
+            errorDeResumen = "Apple Intelligence no está disponible o sigue descargándose."
+            return nil
+        }
+        do {
+            let markdown = try await RedaccionDeResumen.resumirPorPartes(texto, con: resumenDeTexto)
+            guard !markdown.isEmpty else {
+                errorDeResumen = "No se pudo generar el resumen de la reunión."
+                return nil
+            }
+            let nota = NotaDeReunion(
+                reunionID: reunion.id,
+                markdown: markdown,
+                generadaEn: .now,
+                editadaEn: nil
+            )
+            try repositorio?.guardarNotaDeReunion(nota)
+            if reunionSeleccionadaID == reunion.id {
+                notaDeReunionSeleccionada = nota
+            }
+            if ajustes.resumirReunionesEnInbox {
+                let fin = reunion.fin ?? .now
+                let minutos = Int((fin.timeIntervalSince(reunion.inicio) / 60).rounded())
+                let bloqueInbox = RedaccionDeResumen.notaDeInbox(
+                    titulo: reunion.titulo,
+                    inicio: reunion.inicio,
+                    duracionMinutos: minutos,
+                    resumen: markdown
+                )
+                _ = escribirEnInbox?(bloqueInbox)
+            }
+            return nota
+        } catch {
+            errorDeResumen = "No se pudo resumir la reunión: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// Guarda los cambios manuales en la nota de una reunión y actualiza `editada_en` (NOT-2).
+    @discardableResult
+    public func guardarEdicionNota(reunionID: String, markdown: String, ahora: Date = .now) -> NotaDeReunion? {
+        let limpio = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !limpio.isEmpty else { return nil }
+        let existente = (try? repositorio?.obtenerNotaDeReunion(reunionID: reunionID)) ?? notaDeReunionSeleccionada
+        let generada = existente?.generadaEn ?? ahora
+        let actualizada = NotaDeReunion(
+            reunionID: reunionID,
+            markdown: limpio,
+            generadaEn: generada,
+            editadaEn: ahora
+        )
+        try? repositorio?.guardarNotaDeReunion(actualizada)
+        if reunionSeleccionadaID == reunionID {
+            notaDeReunionSeleccionada = actualizada
+        }
+        return actualizada
+    }
+
+    /// Refresca la nota de la reunión seleccionada si el resumidor en segundo plano acaba de guardarla.
+    public func recargarNotaDeReunionSeleccionada() {
+        guard let id = reunionSeleccionadaID, let repositorio else { return }
+        notaDeReunionSeleccionada = try? repositorio.obtenerNotaDeReunion(reunionID: id)
+    }
+
+    /// Copia el Markdown de la nota al portapapeles del sistema y marca `notaCopiada` por 1.5 s.
+    public func copiarNota(_ markdown: String) {
+        let texto = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !texto.isEmpty else { return }
+        let pasta = NSPasteboard.general
+        pasta.clearContents()
+        pasta.setString(texto, forType: .string)
+        notaCopiada = true
+        tareaAvisoNotaCopiada?.cancel()
+        tareaAvisoNotaCopiada = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard !Task.isCancelled else { return }
+            self?.notaCopiada = false
+        }
+    }
+
+    /// Construye el documento Markdown completo y su nombre de archivo sugerido para exportar (NOT-2).
+    public func construirExportacionMarkdown(para reunion: ReunionGrabada) -> (nombreArchivo: String, contenido: String)
+    {
+        let nota: NotaDeReunion?
+        if reunionSeleccionadaID == reunion.id, let actual = notaDeReunionSeleccionada {
+            nota = actual
+        } else {
+            nota = try? repositorio?.obtenerNotaDeReunion(reunionID: reunion.id)
+        }
+        let segmentos: [SegmentoDeTranscripcion]
+        if let repositorio, let guardados = try? repositorio.listarSegmentos(reunionID: reunion.id) {
+            segmentos = guardados
+        } else if reunionSeleccionadaID == reunion.id {
+            segmentos = segmentosDeReunionSeleccionada
+        } else {
+            segmentos = []
+        }
+        let nombre = RedaccionDeResumen.nombreArchivoMarkdown(titulo: reunion.titulo, fecha: reunion.inicio)
+        let contenido = RedaccionDeResumen.markdownExportable(
+            reunion: reunion,
+            notaMarkdown: nota?.markdown,
+            segmentos: segmentos
+        )
+        return (nombre, contenido)
     }
 
     public func abrirArchivo(_ ruta: String) {
@@ -714,9 +868,11 @@ public final class ModeloDeGrabadora {
     private func cargarSegmentosDeSeleccionada() {
         guard let id = reunionSeleccionadaID, let repositorio else {
             segmentosDeReunionSeleccionada = []
+            notaDeReunionSeleccionada = nil
             return
         }
         segmentosDeReunionSeleccionada = (try? repositorio.listarSegmentos(reunionID: id)) ?? []
+        notaDeReunionSeleccionada = try? repositorio.obtenerNotaDeReunion(reunionID: id)
     }
 
     private func actualizarBusqueda() {

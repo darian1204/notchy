@@ -105,6 +105,15 @@ enum Migraciones {
                 )
             }
         }
+        migrador.registerMigration("v4-notas-de-reunion") { db in
+            try db.create(table: "meeting_note") { tabla in
+                tabla.primaryKey("meeting_id", .text)
+                    .references("meeting", onDelete: .cascade)
+                tabla.column("markdown", .text).notNull()
+                tabla.column("generada_en", .double).notNull()
+                tabla.column("editada_en", .double)
+            }
+        }
         return migrador
     }
 
