@@ -56,6 +56,19 @@ import Testing
         #expect(elementos.isEmpty)
     }
 
+    @Test func copiadoDeImagenSinTextoMuestraRutaOImagen() {
+        let conRuta = ElementoDePortapapeles(
+            creado: ahora.addingTimeInterval(-60), tipo: .imagen, texto: "",
+            rutaArchivo: "/tmp/captura.png", huella: "h1", bytes: 120)
+        let sinRuta = ElementoDePortapapeles(
+            creado: ahora.addingTimeInterval(-60), tipo: .imagen, texto: "   ",
+            rutaArchivo: nil, huella: "h2", bytes: 120)
+        let elemRuta = CalculoDeFlujo.elementos(.init(ultimoCopiado: conRuta, ahora: ahora))
+        let elemSinRuta = CalculoDeFlujo.elementos(.init(ultimoCopiado: sinRuta, ahora: ahora))
+        #expect(elemRuta.first?.detalle == "captura.png")
+        #expect(elemSinRuta.first?.detalle == "Imagen")
+    }
+
     @Test func cronometroConHoras() {
         #expect(CalculoDeFlujo.cronometro(3725) == "1:02:05")
         #expect(CalculoDeFlujo.cronometro(-3) == "0:00")

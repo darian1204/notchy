@@ -2,6 +2,7 @@ import AppKit
 import NotchyCore
 import NotchyDesign
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Datos que el Inicio en estilo tarjetas lee de otros módulos. Todo es opcional: sin un modelo,
 /// su parte se muestra vacía en vez de romper.
@@ -179,7 +180,7 @@ private struct TarjetaInbox: View {
                     Image(systemName: "doc.on.clipboard")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Paleta.portapapeles)
-                    Text(copiado.texto.trimmingCharacters(in: .whitespacesAndNewlines)).lineLimit(1)
+                    Text(copiado.resumenCorto).lineLimit(1)
                     Spacer(minLength: 4)
                     Text("copiado").textoDeApoyo()
                 } accion: {
@@ -281,6 +282,8 @@ private struct ColumnaDeAccesosRapidos: View {
                 ranuraEditando = indice
             } else if let modulo {
                 fuentes.alAbrirModulo?(modulo.id)
+            } else {
+                ranuraEditando = indice
             }
         } label: {
             Image(systemName: modulo?.icono ?? "plus")
@@ -467,6 +470,7 @@ private struct FichaDePendiente: View {
 /// suelta el archivo donde caiga. Sin `Button` encima, para que el arrastre no compita con el clic.
 private struct TarjetaBandejaReciente: View {
     let fuentes: FuentesDeInicioTarjetas
+    @State private var arrastrandoSobreArchivos = false
 
     var body: some View {
         let urls = ColumnaArchivosInicio.urlsRecientes(
@@ -504,6 +508,29 @@ private struct TarjetaBandejaReciente: View {
                 }
                 Spacer(minLength: 0)
             }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(
+                    arrastrandoSobreArchivos ? Paleta.agenda : Color.clear,
+                    style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                )
+        )
+        .onDrop(of: [.fileURL], isTargeted: $arrastrandoSobreArchivos) { proveedores in
+            let bandeja = fuentes.bandeja
+            Task { @MainActor in
+                var urlsSoltadas: [URL] = []
+                for proveedor in proveedores {
+                    let url: URL? = await withCheckedContinuation { continuacion in
+                        _ = proveedor.loadObject(ofClass: URL.self) { url, _ in
+                            continuacion.resume(returning: url)
+                        }
+                    }
+                    if let url { urlsSoltadas.append(url) }
+                }
+                bandeja?.agregarEnSegundoPlano(urlsSoltadas)
+            }
+            return true
         }
     }
 }

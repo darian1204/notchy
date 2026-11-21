@@ -70,7 +70,7 @@ enum CalculoDeFlujo {
             lista.append(
                 ElementoDeFlujo(
                     id: "portapapeles", titulo: "Portapapeles",
-                    detalle: copiado.texto.trimmingCharacters(in: .whitespacesAndNewlines),
+                    detalle: copiado.resumenCorto,
                     valor: minutos == 0 ? "ahora" : "hace \(minutos) min", simbolo: "doc.on.clipboard",
                     color: Paleta.hexPortapapeles, modulo: "portapapeles"))
         }

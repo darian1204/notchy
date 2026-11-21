@@ -88,13 +88,15 @@ struct BarraDeTarjetas: View {
                     .font(.system(size: 10, weight: .semibold))
                 Text(pestana.nombre)
                     .font(.system(size: 11, weight: .medium))
-                if let insignia = modulo?.insignia {
-                    Text("\(insignia)")
-                        .font(.system(size: 9, weight: .bold).monospacedDigit())
-                        .foregroundStyle(Paleta.fondo)
-                        .padding(.horizontal, 4)
-                        .frame(minWidth: 14, minHeight: 14)
-                        .background(Paleta.portapapeles, in: Capsule())
+                TimelineView(.periodic(from: .now, by: 30)) { _ in
+                    if let insignia = modulo?.insignia {
+                        Text("\(insignia)")
+                            .font(.system(size: 9, weight: .bold).monospacedDigit())
+                            .foregroundStyle(Paleta.fondo)
+                            .padding(.horizontal, 4)
+                            .frame(minWidth: 14, minHeight: 14)
+                            .background(Paleta.portapapeles, in: Capsule())
+                    }
                 }
             }
             .foregroundStyle(activa ? Paleta.texto : Paleta.textoDeApoyo)

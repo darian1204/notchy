@@ -160,8 +160,11 @@ public final class ControladorDePanel {
         let zona = geometria.zonaDeCursor(estado: coordinador.estado, tamano: coordinador.tamano)
         let dentro = GeometriaDeIsla.contiene(zona, NSEvent.mouseLocation)
         // En reposo no hay nada que pulsar: los clics sobre el notch pasan a la barra de menús.
-        panel.ignoresMouseEvents = !(dentro && coordinador.estado != .reposo)
-        if !dentro && panel.isKeyWindow {
+        let interactivo = dentro && coordinador.estado != .reposo
+        panel.ignoresMouseEvents = !interactivo
+        if case .expandido = coordinador.estado, dentro, !panel.isKeyWindow {
+            panel.makeKey()
+        } else if (!dentro || coordinador.estado == .reposo) && panel.isKeyWindow {
             panel.resignKey()
         }
         guard dentro != cursorDentro else { return }

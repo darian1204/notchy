@@ -62,6 +62,20 @@ public struct ElementoDePortapapeles: Sendable, Equatable, Identifiable, Codable
         self.fijado = fijado
         self.bytes = bytes
     }
+
+    /// Texto legible para chips y tarjetas de resumen, incluso si es imagen o archivo sin texto.
+    public var resumenCorto: String {
+        let limpio = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+        if tipo == .texto || tipo == .enlace {
+            return limpio.isEmpty ? tipo.etiqueta : limpio
+        }
+        if !limpio.isEmpty { return limpio }
+        if let rutaArchivo, !rutaArchivo.isEmpty {
+            let nombre = URL(fileURLWithPath: rutaArchivo).lastPathComponent
+            if !nombre.isEmpty { return nombre }
+        }
+        return tipo == .imagen ? "Imagen" : "Archivo"
+    }
 }
 
 /// Lectura cruda del portapapeles del sistema antes de decidir si se guarda.

@@ -78,7 +78,11 @@ public struct VistaDeAjustesYDiagnostico: View {
                             .padding(.top, 4)
                         ForEach(0..<Ajustes.cantidadDeAccesos, id: \.self) { indice in
                             Picker("Acceso \(indice + 1)", selection: accesoRapido(indice)) {
-                                ForEach(modulosParaAccesos(modelo.modulosOrdenados)) { modulo in
+                                ForEach(
+                                    modulosParaAccesos(modelo.modulosOrdenados).filter {
+                                        modelo.estaModuloActivo($0.id)
+                                    }
+                                ) { modulo in
                                     Label(modulo.nombre, systemImage: modulo.icono).tag(modulo.id)
                                 }
                             }

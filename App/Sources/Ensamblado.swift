@@ -168,7 +168,7 @@ final class Ensamblado {
                 screenTime: modeloDeScreenTime,
                 monitor: modeloDeMonitorSistema,
                 grabadora: modeloDeGrabadora,
-                modulosDisponibles: { [registro] in registro.todos.map(\.identidad) }
+                modulosDisponibles: { [registro] in registro.activos.map(\.identidad) }
             ))
         registro.registrar(
             ModuloDeFlujo(
