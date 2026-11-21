@@ -162,6 +162,21 @@ final class Ensamblado {
                 bandeja: modeloDeBandeja,
                 airdrop: modeloDeAirDrop,
                 inbox: gestorDeInbox,
+                alAbrirModulo: { id in coordinadorCapturado.recibir(.elegirModulo(id)) },
+                ajustes: ajustes,
+                clima: modeloDeClima,
+                screenTime: modeloDeScreenTime,
+                monitor: modeloDeMonitorSistema,
+                grabadora: modeloDeGrabadora,
+                modulosDisponibles: { [registro] in registro.todos.map(\.identidad) }
+            ))
+        registro.registrar(
+            ModuloDeFlujo(
+                agenda: modeloDeAgenda,
+                grabadora: modeloDeGrabadora,
+                bandeja: modeloDeBandeja,
+                portapapeles: modeloDePortapapeles,
+                ahoraSuena: modeloDeAhoraSuena,
                 alAbrirModulo: { id in coordinadorCapturado.recibir(.elegirModulo(id)) }
             ))
         registro.registrar(ModuloDeAgenda(modelo: modeloDeAgenda))

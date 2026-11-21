@@ -66,6 +66,9 @@ public final class CoordinadorDeIsla {
                 expandido: nil
             )
         }
+        if case .expandido = estado, registro.ajustes.estiloDeIsla == .tarjetas {
+            return geometria.tamanoEnTarjetas(expandido: moduloAbierto?.tamanoExpandido)
+        }
         return geometria.tamano(de: estado, expandido: moduloAbierto?.tamanoExpandido)
     }
 

@@ -47,6 +47,15 @@ import Testing
         }
     }
 
+    @Test func elEstiloTarjetasCabeEnElPanelFijo() {
+        let masAlto =
+            [Medidas.portapapeles, Medidas.grabadora, Medidas.clima, Medidas.inicioTarjetas]
+            .map(\.height).max() ?? 0
+        #expect(Medidas.anchoTarjetas + 2 * Medidas.hombro <= Medidas.panel.width)
+        #expect(masAlto + Medidas.altoDePuntos <= Medidas.panel.height)
+        #expect(2 * Medidas.anchoDePestanas + Medidas.notch.width + 2 * Medidas.margenLateral <= Medidas.anchoTarjetas)
+    }
+
     @Test func leeUnColorHexadecimal() {
         let color = ColorHex.componentes(0x5AA9FF)
         #expect(abs(color.rojo - 90.0 / 255) < 0.0001)

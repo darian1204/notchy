@@ -11,6 +11,8 @@ public enum Paleta {
     public static let superficie = Color.white.opacity(0.075)
     public static let superficieAlta = Color.white.opacity(0.14)
     public static let borde = Color.white.opacity(0.14)
+    /// Borde de las tarjetas del estilo tarjetas: apenas se nota sobre la superficie.
+    public static let bordeSuave = Color.white.opacity(0.10)
 
     public static let hexAgenda: UInt32 = 0x5AA9FF
     public static let hexGrabadora: UInt32 = 0xFF5D55

@@ -69,6 +69,10 @@ public protocol ModuloDeIsla: AnyObject {
     /// Vista completa cuando el módulo muestra un aviso temporal (`440 × 82`).
     var vistaDeAviso: AnyView? { get }
     var salud: SaludDeModulo { get }
+    /// Número que se muestra junto a su pestaña en el estilo tarjetas (Flujo). `nil` = sin número.
+    var insignia: Int? { get }
+    /// Si tiene ícono en la barra del estilo clásico. Flujo solo existe como pestaña.
+    var enBarraClasica: Bool { get }
     /// Empieza a trabajar. Lo llama el registro al activarse el módulo; no debe bloquear.
     func arrancar()
     /// Suelta todo lo que tomó. Lo llama el registro al apagarse el módulo o al salir.
@@ -80,6 +84,8 @@ extension ModuloDeIsla {
     public var orejaDerechaCompacta: AnyView? { nil }
     public var vistaDeAviso: AnyView? { nil }
     public var salud: SaludDeModulo { .listo }
+    public var insignia: Int? { nil }
+    public var enBarraClasica: Bool { true }
     public func arrancar() {}
     public func detener() {}
 }
@@ -88,6 +94,9 @@ extension ModuloDeIsla {
 public enum ModulosBase {
     /// El que abre el hover.
     public static let inicio = "inicio"
+    /// Pestaña del estilo tarjetas con lo que está activo ahora.
+    public static let flujo = "flujo"
+    public static let agente = "agente"
 }
 
 /// La isla cambió de estado. `moduloAbierto` es `nil` cuando no está expandida.

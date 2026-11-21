@@ -23,6 +23,13 @@ import Testing
         #expect(conNotch.tamano(de: .expandido(modulo: "inicio"), expandido: Medidas.inicio) == Medidas.inicio)
     }
 
+    @Test func enTarjetasTodoSeAbreAlMismoAnchoConLaFilaDePuntos() {
+        let portapapeles = conNotch.tamanoEnTarjetas(expandido: Medidas.portapapeles)
+        #expect(portapapeles == CGSize(width: 680, height: Medidas.portapapeles.height + Medidas.altoDePuntos))
+        #expect(conNotch.tamanoEnTarjetas(expandido: nil) == CGSize(width: 680, height: 210))
+        #expect(conNotch.tamanoEnTarjetas(expandido: CGSize(width: 620, height: 400)).height == Medidas.panel.height)
+    }
+
     @Test func lasOrejasSeSumanAlNotchReal() {
         var pantalla = PantallaDeIsla.porDefecto
         pantalla.notch = CGSize(width: 200, height: 38)

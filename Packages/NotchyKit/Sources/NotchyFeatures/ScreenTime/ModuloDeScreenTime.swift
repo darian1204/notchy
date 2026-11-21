@@ -344,7 +344,7 @@ struct VistaDeScreenTime: View {
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(modelo.totalesPorCategoria.prefix(5), id: \.categoria) { item in
+                    ForEach(modelo.totalesPorCategoria.prefix(4), id: \.categoria) { item in
                         HStack(spacing: 6) {
                             Circle()
                                 .fill(Color(hex: item.categoria.hexColor))
@@ -537,7 +537,9 @@ struct VistaDeScreenTime: View {
             Text(ModeloDeScreenTime.formatearDuracionCorta(uso.segundos))
                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
                 .foregroundStyle(Paleta.texto)
-                .frame(width: 42, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 50, alignment: .trailing)
 
             Text("\(uso.cambiosDeApp)x")
                 .font(.system(size: 9.5, weight: .medium).monospacedDigit())

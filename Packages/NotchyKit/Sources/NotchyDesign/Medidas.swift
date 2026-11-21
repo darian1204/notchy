@@ -25,12 +25,22 @@ public enum Medidas {
     public static let windowSnap = CGSize(width: 620, height: 224)
     public static let monitorSistema = CGSize(width: 620, height: 238)
 
-    /// Tamaño del panel fijo (D-04): cabe el estado más grande del diseño más los hombros.
-    public static let panel = CGSize(width: 640 + 2 * hombro, height: 244)
+    /// Estilo tarjetas: todos los módulos se abren a este ancho, con la fila de puntos bajo el notch.
+    public static let anchoTarjetas: CGFloat = 680
+    public static let altoDePuntos: CGFloat = 8
+    /// Inicio en estilo tarjetas, sin contar la fila de puntos (la suma la isla).
+    public static let inicioTarjetas = CGSize(width: anchoTarjetas, height: 202)
+    /// Ancho de cada píldora de pestañas; las dos miden igual para que la barra sea simétrica.
+    public static let anchoDePestanas: CGFloat = 204
+
+    /// Tamaño del panel fijo (D-04): cabe el estado más grande de los dos estilos más los hombros.
+    public static let panel = CGSize(width: anchoTarjetas + 2 * hombro, height: 252)
 
     public static let radioCompacto: CGFloat = 12
     public static let radioExpandido: CGFloat = 24
     public static let radioDeTarjeta: CGFloat = 14
+    /// Radio de las tarjetas del estilo tarjetas: concéntrico con la isla (24 − 12 de margen).
+    public static let radioDeTarjetaInterna: CGFloat = 12
     /// Curva de las esquinas de arriba, para fundirse con la barra de menús.
     public static let hombro: CGFloat = 10
 

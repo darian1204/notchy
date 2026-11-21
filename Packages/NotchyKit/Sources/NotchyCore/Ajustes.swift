@@ -69,6 +69,19 @@ public final class Ajustes {
     public var temaBarra: TemaDeBarra {
         didSet { alCambiar(temaBarra, oldValue, .temaBarra) }
     }
+    /// Estilo de la isla abierta: clásico o tarjetas.
+    public var estiloDeIsla: EstiloDeIsla {
+        didSet { alCambiar(estiloDeIsla, oldValue, .estiloDeIsla) }
+    }
+    /// Los 3 accesos rápidos del Inicio en estilo tarjetas, por id de módulo.
+    public var accesosRapidos: [String] {
+        didSet {
+            // Asignar dentro de su propio didSet no vuelve a llamarlo.
+            let limpios = Self.normalizarAccesos(accesosRapidos)
+            if limpios != accesosRapidos { accesosRapidos = limpios }
+            alCambiar(accesosRapidos, oldValue, .accesosRapidos)
+        }
+    }
     /// Mostrar el HUD de volumen, brillo y batería en el notch.
     public var hudSistemaActivo: Bool {
         didSet { alCambiar(hudSistemaActivo, oldValue, .hudSistemaActivo) }
@@ -118,6 +131,8 @@ public final class Ajustes {
         rutaVaultObsidian = Self.leer(.rutaVaultObsidian, de: almacen) ?? Self.rutaVaultPorDefecto
         temaPanel = Self.leer(.temaPanel, de: almacen) ?? .obsidiana
         temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
+        estiloDeIsla = Self.leer(.estiloDeIsla, de: almacen) ?? .clasico
+        accesosRapidos = Self.normalizarAccesos(Self.leer(.accesosRapidos, de: almacen) ?? Self.accesosPorDefecto)
         hudSistemaActivo = Self.leer(.hudSistemaActivo, de: almacen) ?? true
         diasRetencionAudioReuniones = Self.leer(.diasRetencionAudioReuniones, de: almacen) ?? 30
         guardarAudioReuniones = Self.leer(.guardarAudioReuniones, de: almacen) ?? true
@@ -170,6 +185,34 @@ public final class Ajustes {
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox
+        case estiloDeIsla, accesosRapidos
+    }
+
+    // MARK: Accesos rápidos
+
+    public static let cantidadDeAccesos = 3
+    public static let accesosPorDefecto = ["colorpicker", "espejo", "grabadora"]
+
+    /// Siempre 3 ids distintos y no vacíos; lo que falte se rellena con los de por defecto.
+    static func normalizarAccesos(_ ids: [String]) -> [String] {
+        var resultado: [String] = []
+        for id in ids + accesosPorDefecto where !id.isEmpty && !resultado.contains(id) {
+            resultado.append(id)
+            if resultado.count == cantidadDeAccesos { break }
+        }
+        return resultado
+    }
+
+    /// Pone `id` en la posición `indice`. Si ya estaba en otra, intercambia los dos.
+    public func cambiarAcceso(en indice: Int, por id: String) {
+        guard accesosRapidos.indices.contains(indice), !id.isEmpty else { return }
+        var nuevos = accesosRapidos
+        if let anterior = nuevos.firstIndex(of: id) {
+            nuevos.swapAt(anterior, indice)
+        } else {
+            nuevos[indice] = id
+        }
+        accesosRapidos = nuevos
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {
