@@ -142,7 +142,9 @@ public final class GestorDeInboxObsidian {
 public final class ModuloDeInicio: ModuloDeIsla {
     public let identidad = IdentidadDeModulo(
         id: ModulosBase.inicio, nombre: "Inicio", icono: "house.fill", color: 0xFFFFFF, lado: .izquierda)
-    public let tamanoExpandido = Medidas.inicio
+    public var tamanoExpandido: CGSize {
+        ajustes?.estiloDeIsla == .tarjetas ? Medidas.inicioTarjetas : Medidas.inicio
+    }
     private let agenda: ModeloDeAgenda?
     private let ahoraSuena: ModeloDeAhoraSuena?
     private let portapapeles: ModeloDePortapapeles?
@@ -150,6 +152,12 @@ public final class ModuloDeInicio: ModuloDeIsla {
     private let airdrop: ModeloDeAirDrop?
     private let inbox: GestorDeInboxObsidian?
     private let alAbrirModulo: (@MainActor (String) -> Void)?
+    private let ajustes: Ajustes?
+    private let clima: ModeloDeClima?
+    private let screenTime: ModeloDeScreenTime?
+    private let monitor: ModeloDeMonitorSistema?
+    private let grabadora: ModeloDeGrabadora?
+    private let modulosDisponibles: (@MainActor () -> [IdentidadDeModulo])?
 
     public init(
         agenda: ModeloDeAgenda? = nil,
@@ -158,8 +166,20 @@ public final class ModuloDeInicio: ModuloDeIsla {
         bandeja: ModeloDeBandeja? = nil,
         airdrop: ModeloDeAirDrop? = nil,
         inbox: GestorDeInboxObsidian? = nil,
-        alAbrirModulo: (@MainActor (String) -> Void)? = nil
+        alAbrirModulo: (@MainActor (String) -> Void)? = nil,
+        ajustes: Ajustes? = nil,
+        clima: ModeloDeClima? = nil,
+        screenTime: ModeloDeScreenTime? = nil,
+        monitor: ModeloDeMonitorSistema? = nil,
+        grabadora: ModeloDeGrabadora? = nil,
+        modulosDisponibles: (@MainActor () -> [IdentidadDeModulo])? = nil
     ) {
+        self.ajustes = ajustes
+        self.clima = clima
+        self.screenTime = screenTime
+        self.monitor = monitor
+        self.grabadora = grabadora
+        self.modulosDisponibles = modulosDisponibles
         self.agenda = agenda
         self.ahoraSuena = ahoraSuena
         self.portapapeles = portapapeles
@@ -170,7 +190,17 @@ public final class ModuloDeInicio: ModuloDeIsla {
     }
 
     public var vistaExpandida: AnyView {
-        AnyView(
+        if ajustes?.estiloDeIsla == .tarjetas {
+            return AnyView(
+                VistaDeInicioTarjetas(
+                    fuentes: FuentesDeInicioTarjetas(
+                        agenda: agenda, ahoraSuena: ahoraSuena, portapapeles: portapapeles, bandeja: bandeja,
+                        airdrop: airdrop, inbox: inbox, clima: clima, screenTime: screenTime, monitor: monitor,
+                        grabadora: grabadora, ajustes: ajustes, modulosDisponibles: modulosDisponibles,
+                        alAbrirModulo: alAbrirModulo
+                    )))
+        }
+        return AnyView(
             VistaDeInicio(
                 ahoraSuena: ahoraSuena,
                 portapapeles: portapapeles,
@@ -224,16 +254,18 @@ struct VistaDeInicio: View {
     }
 }
 
-private struct ColumnaMusicaInicio: View {
+struct ColumnaMusicaInicio: View {
     let ahoraSuena: ModeloDeAhoraSuena?
     let alAbrirMusica: @MainActor () -> Void
+    /// Lado de la carátula; el estilo tarjetas usa una más chica para dejar sitio a la franja de estado.
+    var caratula: CGFloat = 62
 
     var body: some View {
         let estado = ahoraSuena?.estadoActual
         return VStack(alignment: .leading, spacing: 6) {
             Button(action: alAbrirMusica) {
                 HStack(spacing: 10) {
-                    CaratulaDeCancion(datos: estado?.caratulaPNG, tamano: 62, radio: 12)
+                    CaratulaDeCancion(datos: estado?.caratulaPNG, tamano: caratula, radio: caratula < 62 ? 10 : 12)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(estado?.titulo ?? "Nada sonando")
                             .font(.system(size: 13, weight: .bold))
@@ -310,34 +342,44 @@ private struct ColumnaMusicaInicio: View {
 
 /// Columna central "Files": muestra únicamente las imágenes/miniaturas sin descripción, incluyendo
 /// lo que hay en Bandeja, AirDrop y Portapapeles (imágenes y archivos), listo para arrastrar o abrir.
-private struct ColumnaArchivosInicio: View {
+struct ColumnaArchivosInicio: View {
     let portapapeles: ModeloDePortapapeles?
     let bandeja: ModeloDeBandeja?
     let airdrop: ModeloDeAirDrop?
     let alAbrirBandeja: @MainActor () -> Void
+    /// Lado de cada miniatura en la cuadrícula; el estilo tarjetas usa una más chica.
+    var miniatura: CGFloat = 58
+    private var espacio: CGFloat { miniatura < 58 ? 5 : 8 }
     @State private var arrastrandoSobreArchivos = false
 
     /// Hasta 4 archivos visibles. Se detiene en cuanto junta 4 para no revisar en disco
     /// todo el historial del portapapeles en cada redibujo.
     private var urlsVisuales: [URL] {
+        Self.urlsRecientes(portapapeles: portapapeles, bandeja: bandeja, airdrop: airdrop, limite: 4)
+    }
+
+    /// Archivos que existen en disco, sin repetir: primero la Bandeja, luego lo copiado y lo recibido por AirDrop.
+    static func urlsRecientes(
+        portapapeles: ModeloDePortapapeles?, bandeja: ModeloDeBandeja?, airdrop: ModeloDeAirDrop?, limite: Int
+    ) -> [URL] {
         var lista: [URL] = []
         var vistas = Set<String>()
         func agregar(_ url: URL) {
-            guard lista.count < 4 else { return }
+            guard lista.count < limite else { return }
             let p = url.standardizedFileURL.path
             guard !vistas.contains(p), FileManager.default.fileExists(atPath: p) else { return }
             vistas.insert(p)
             lista.append(url)
         }
-        for b in bandeja?.elementos ?? [] where lista.count < 4 {
+        for b in bandeja?.elementos ?? [] where lista.count < limite {
             agregar(b.urlParaArrastrar)
         }
-        for c in portapapeles?.elementos ?? [] where lista.count < 4 {
+        for c in portapapeles?.elementos ?? [] where lista.count < limite {
             if let ruta = c.rutaArchivo {
                 agregar(URL(fileURLWithPath: ruta))
             }
         }
-        for a in airdrop?.recibidos ?? [] where lista.count < 4 {
+        for a in airdrop?.recibidos ?? [] where lista.count < limite {
             agregar(a.url)
         }
         return lista
@@ -365,7 +407,7 @@ private struct ColumnaArchivosInicio: View {
                 Button {
                     NSWorkspace.shared.open(unica)
                 } label: {
-                    MiniaturaDeArchivo(url: unica, tamano: 96)
+                    MiniaturaDeArchivo(url: unica, tamano: min(96, miniatura * 1.65))
                         .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
                 }
                 .buttonStyle(.plain)
@@ -374,12 +416,15 @@ private struct ColumnaArchivosInicio: View {
                 }
             } else {
                 // Cuadrícula de hasta 4 imágenes/miniaturas sin texto de descripción
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: espacio), GridItem(.flexible(), spacing: espacio)],
+                    spacing: espacio
+                ) {
                     ForEach(urls, id: \.path) { url in
                         Button {
                             NSWorkspace.shared.open(url)
                         } label: {
-                            MiniaturaDeArchivo(url: url, tamano: 58)
+                            MiniaturaDeArchivo(url: url, tamano: miniatura)
                                 .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
                         }
                         .buttonStyle(.plain)
@@ -388,7 +433,7 @@ private struct ColumnaArchivosInicio: View {
                         }
                     }
                 }
-                .padding(6)
+                .padding(miniatura < 58 ? 0 : 6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

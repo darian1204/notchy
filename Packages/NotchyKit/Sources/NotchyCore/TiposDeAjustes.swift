@@ -104,3 +104,27 @@ public enum TemaDeBarra: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 }
+
+/// Cómo se ve la isla abierta. Los dos conviven; se elige en Ajustes.
+public enum EstiloDeIsla: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Barra con un ícono por módulo y columnas separadas por líneas.
+    case clasico
+    /// Pestañas en las orejas, buscador ⌘K y tarjetas.
+    case tarjetas
+
+    public var id: String { rawValue }
+
+    public var nombre: String {
+        switch self {
+        case .clasico: "Clásico"
+        case .tarjetas: "Tarjetas"
+        }
+    }
+
+    public var descripcion: String {
+        switch self {
+        case .clasico: "Un ícono por módulo arriba y columnas en el Inicio."
+        case .tarjetas: "Pestañas en las orejas, buscador ⌘K y tarjetas en el Inicio."
+        }
+    }
+}

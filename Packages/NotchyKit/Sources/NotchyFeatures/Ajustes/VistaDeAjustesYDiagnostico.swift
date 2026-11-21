@@ -43,11 +43,54 @@ public struct VistaDeAjustesYDiagnostico: View {
         }
     }
 
+    private func accesoRapido(_ indice: Int) -> Binding<String> {
+        Binding(
+            get: {
+                modelo.ajustes.accesosRapidos.indices.contains(indice) ? modelo.ajustes.accesosRapidos[indice] : ""
+            },
+            set: { modelo.ajustes.cambiarAcceso(en: indice, por: $0) }
+        )
+    }
+
     private func pestanaTemas(ajustes: Bindable<Ajustes>) -> some View {
         let columnasPanel = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
         let columnasBarra = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
         return Form {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Estilo de la isla")
+                        .font(.headline)
+                    Picker("Estilo", selection: ajustes.estiloDeIsla) {
+                        ForEach(EstiloDeIsla.allCases) { estilo in
+                            Text(estilo.nombre).tag(estilo)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(modelo.ajustes.estiloDeIsla.descripcion)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if modelo.ajustes.estiloDeIsla == .tarjetas {
+                        Text("ACCESOS RÁPIDOS DEL INICIO")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        ForEach(0..<Ajustes.cantidadDeAccesos, id: \.self) { indice in
+                            Picker("Acceso \(indice + 1)", selection: accesoRapido(indice)) {
+                                ForEach(modulosParaAccesos(modelo.modulosOrdenados)) { modulo in
+                                    Label(modulo.nombre, systemImage: modulo.icono).tag(modulo.id)
+                                }
+                            }
+                        }
+                        Text("También desde la isla: pasa el cursor por un acceso y toca el lápiz.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
             Section {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Siete temas para el panel y nueve para la barra")

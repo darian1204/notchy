@@ -7,6 +7,8 @@ import SwiftUI
 public struct VistaDeIsla: View {
     private let coordinador: CoordinadorDeIsla
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    /// Paleta ⌘K del estilo tarjetas. Se cierra sola al cerrar la isla o cambiar de módulo.
+    @State private var paletaAbierta = false
 
     public init(coordinador: CoordinadorDeIsla) {
         self.coordinador = coordinador
@@ -42,6 +44,7 @@ public struct VistaDeIsla: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.estado)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.hudActual)
+        .onChange(of: coordinador.estado) { paletaAbierta = false }
     }
 
     /// En reposo la isla es el notch: sin hombros, para no asomarse sobre la barra de menús.
@@ -91,7 +94,47 @@ public struct VistaDeIsla: View {
         }
     }
 
-    private func contenido(de modulo: any ModuloDeIsla) -> some View {
+    @ViewBuilder private func contenido(de modulo: any ModuloDeIsla) -> some View {
+        if coordinador.registro.ajustes.estiloDeIsla == .tarjetas {
+            contenidoEnTarjetas(de: modulo)
+        } else {
+            contenidoClasico(de: modulo)
+        }
+    }
+
+    /// Estilo tarjetas: barra simétrica, puntos bajo el notch y la paleta ⌘K encima del módulo.
+    private func contenidoEnTarjetas(de modulo: any ModuloDeIsla) -> some View {
+        VStack(spacing: 0) {
+            BarraDeTarjetas(coordinador: coordinador, paletaAbierta: paletaAbierta) {
+                paletaAbierta.toggle()
+            }
+            .frame(height: coordinador.geometria.tamanoDeReposo.height)
+            PuntosDePagina(activa: paletaAbierta ? nil : PestanaDeTarjetas.de(modulo: modulo.identidad.id))
+                .frame(height: Medidas.altoDePuntos)
+            ZStack {
+                modulo.vistaExpandida
+                    .opacity(paletaAbierta ? 0 : 1)
+                if paletaAbierta {
+                    PaletaDeModulos(coordinador: coordinador) { paletaAbierta = false }
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                }
+            }
+            .padding(.horizontal, Medidas.margenLateral)
+            .padding(.top, Medidas.margenSuperior)
+            .padding(.bottom, Medidas.margenInferior)
+            .frame(height: altoDelCuerpoEnTarjetas, alignment: .top)
+            .clipped()
+            .animation(Movimiento.entradaDeContenido(reducir: reducirMovimiento), value: paletaAbierta)
+        }
+        // Si un módulo pide más alto del que hay, se recorta abajo; la barra nunca sube fuera de la pantalla.
+        .frame(width: coordinador.tamano.width, height: coordinador.tamano.height, alignment: .top)
+    }
+
+    private var altoDelCuerpoEnTarjetas: CGFloat {
+        max(0, coordinador.tamano.height - coordinador.geometria.tamanoDeReposo.height - Medidas.altoDePuntos)
+    }
+
+    private func contenidoClasico(de modulo: any ModuloDeIsla) -> some View {
         VStack(spacing: 0) {
             BarraDeModulos(coordinador: coordinador)
                 .frame(height: coordinador.geometria.tamanoDeReposo.height)
@@ -200,7 +243,7 @@ struct BarraDeModulos: View {
     let coordinador: CoordinadorDeIsla
 
     var body: some View {
-        let modulos = coordinador.registro.activos.map(\.identidad)
+        let modulos = coordinador.registro.activos.filter(\.enBarraClasica).map(\.identidad)
         HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 2) {

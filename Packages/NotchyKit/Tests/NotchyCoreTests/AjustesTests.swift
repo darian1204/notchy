@@ -42,6 +42,34 @@ import Testing
         #expect(avisos == 1)
     }
 
+    @Test func estiloYAccesosPorDefectoYPersisten() {
+        let almacen = AlmacenEnMemoria()
+        let ajustes = Ajustes(almacen: almacen)
+        #expect(ajustes.estiloDeIsla == .clasico)
+        #expect(ajustes.accesosRapidos == ["colorpicker", "espejo", "grabadora"])
+
+        ajustes.estiloDeIsla = .tarjetas
+        ajustes.cambiarAcceso(en: 1, por: "clima")
+
+        let otra = Ajustes(almacen: almacen)
+        #expect(otra.estiloDeIsla == .tarjetas)
+        #expect(otra.accesosRapidos == ["colorpicker", "clima", "grabadora"])
+    }
+
+    @Test func cambiarAUnAccesoRepetidoIntercambia() {
+        let ajustes = Ajustes(almacen: AlmacenEnMemoria())
+        ajustes.cambiarAcceso(en: 0, por: "grabadora")
+        #expect(ajustes.accesosRapidos == ["grabadora", "espejo", "colorpicker"])
+        ajustes.cambiarAcceso(en: 9, por: "clima")
+        #expect(ajustes.accesosRapidos == ["grabadora", "espejo", "colorpicker"])
+    }
+
+    @Test func losAccesosSeNormalizan() {
+        let ajustes = Ajustes(almacen: AlmacenEnMemoria())
+        ajustes.accesosRapidos = ["clima", "clima", ""]
+        #expect(ajustes.accesosRapidos == ["clima", "colorpicker", "espejo"])
+    }
+
     @Test func ordenaConocidosPrimeroYNuevosAlFinal() {
         let ajustes = Ajustes(almacen: AlmacenEnMemoria())
         ajustes.ordenDeModulos = ["agenda", "borrado", "inicio"]

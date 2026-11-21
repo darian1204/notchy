@@ -17,6 +17,28 @@ public struct Tarjeta<Contenido: View>: View {
     }
 }
 
+/// Tarjeta del estilo tarjetas: superficie tenue, borde fino y radio concéntrico con la isla.
+public struct TarjetaConBorde<Contenido: View>: View {
+    private let relleno: CGFloat
+    private let contenido: Contenido
+
+    public init(relleno: CGFloat = 10, @ViewBuilder _ contenido: () -> Contenido) {
+        self.relleno = relleno
+        self.contenido = contenido()
+    }
+
+    public var body: some View {
+        contenido
+            .padding(relleno)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna))
+            .overlay(
+                RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
+                    .strokeBorder(Paleta.bordeSuave, lineWidth: 1)
+            )
+    }
+}
+
 /// Botón en píldora de 26 pt.
 public struct EstiloDePildora: ButtonStyle {
     private let destacado: Bool

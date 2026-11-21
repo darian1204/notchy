@@ -56,6 +56,15 @@ public struct GeometriaDeIsla: Equatable, Sendable {
         }
     }
 
+    /// En estilo tarjetas todo se abre al mismo ancho y suma la fila de puntos bajo el notch.
+    public func tamanoEnTarjetas(expandido: CGSize?) -> CGSize {
+        let base = expandido ?? Medidas.inicioTarjetas
+        return CGSize(
+            width: max(Medidas.anchoTarjetas, base.width),
+            height: min(base.height + Medidas.altoDePuntos, Medidas.panel.height)
+        )
+    }
+
     /// Marco del panel fijo (D-04): siempre del tamaño mayor, centrado y pegado al techo.
     public var marcoDelPanel: CGRect {
         zona(Medidas.panel)
