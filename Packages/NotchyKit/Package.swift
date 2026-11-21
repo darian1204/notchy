@@ -26,7 +26,8 @@ let capas: [(nombre: String, dependencias: [Target.Dependency])] = [
 
 // Lo que cada carpeta de pruebas necesita además de su capa.
 let extrasDePruebas: [String: [Target.Dependency]] = [
-    "NotchyStorage": [grdb]
+    "NotchyStorage": [grdb],
+    "NotchyAgent": [mcp],
 ]
 
 var targets: [Target] = []

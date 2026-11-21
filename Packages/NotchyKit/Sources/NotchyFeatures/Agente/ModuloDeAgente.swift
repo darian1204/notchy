@@ -17,8 +17,10 @@ public final class ModeloDeAgente {
         didSet { defaults.set(modeloSeleccionado, forKey: Self.claveModelo) }
     }
     public private(set) var sesionID: String?
+    public let corredorDePermisos: CorredorDePermisos
 
     @ObservationIgnored private let puerto: any PuertoAgenteOpenCode
+    @ObservationIgnored private let servidorMCP: (any PuertoServidorMCPAgente)?
     @ObservationIgnored private let ajustes: Ajustes?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var tareaActual: Task<Void, Never>?
@@ -27,10 +29,15 @@ public final class ModeloDeAgente {
     public init(
         puerto: any PuertoAgenteOpenCode,
         ajustes: Ajustes? = nil,
+        corredorDePermisos: CorredorDePermisos? = nil,
+        servidorMCP: (any PuertoServidorMCPAgente)? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.puerto = puerto
         self.ajustes = ajustes
+        let corredor = corredorDePermisos ?? CorredorDePermisos(ajustes: ajustes)
+        self.corredorDePermisos = corredor
+        self.servidorMCP = servidorMCP
         self.defaults = defaults
         self.modeloSeleccionado = ProveedoresDelAgente.resolver(
             elegido: defaults.string(forKey: Self.claveModelo),
@@ -42,6 +49,19 @@ public final class ModeloDeAgente {
                 texto: "Hola. Estoy conectado a OpenCode y a tu vault. ¿En qué te ayudo?"
             )
         ]
+        corredor.alDenegar = { [weak self] _ in
+            self?.mensajes.append(MensajeDeAgente(rol: .herramienta, texto: "Negado"))
+        }
+    }
+
+    public func arrancar() async {
+        try? await servidorMCP?.arrancar()
+        await cargarModelos()
+    }
+
+    public func detener() async {
+        cancelar()
+        await servidorMCP?.detener()
     }
 
     public var salud: SaludDeModulo {
@@ -178,11 +198,12 @@ public final class ModuloDeAgente: ModuloDeIsla {
     }
 
     public func arrancar() {
-        Task { await modelo.cargarModelos() }
+        Task { await modelo.arrancar() }
     }
 
     public func detener() {
         modelo.cancelar()
+        Task { await modelo.detener() }
     }
 }
 
@@ -196,6 +217,9 @@ struct VistaDeAgente: View {
         VStack(alignment: .leading, spacing: 7) {
             barraSuperior
             areaMensajes
+            if let solicitud = modelo.corredorDePermisos.solicitudActual {
+                tarjetaDePermiso(solicitud)
+            }
             barraEntrada
         }
         .padding(.horizontal, 4)
@@ -346,6 +370,64 @@ struct VistaDeAgente: View {
 
             if !esUsuario { Spacer(minLength: 24) }
         }
+    }
+
+    private func tarjetaDePermiso(_ solicitud: SolicitudDePermisoAgente) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Paleta.agente)
+                Text("Permiso requerido: \(solicitud.herramienta)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Paleta.texto)
+                Spacer(minLength: 0)
+            }
+
+            Text(solicitud.resumenArgumentos)
+                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                .foregroundStyle(Paleta.textoDeApoyo)
+                .lineLimit(2)
+
+            HStack(spacing: 6) {
+                Button("Negar") {
+                    modelo.corredorDePermisos.responder(.negar)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Color(hex: 0xFF453A).opacity(0.85), in: Capsule())
+
+                Button("Permitir") {
+                    modelo.corredorDePermisos.responder(.permitirUnaVez)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Paleta.texto)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Paleta.superficieSolida, in: Capsule())
+
+                Button("Siempre") {
+                    modelo.corredorDePermisos.responder(.siempre)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Paleta.agente, in: Capsule())
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Paleta.agente.opacity(0.6), lineWidth: 1)
+        )
     }
 
     private var barraEntrada: some View {

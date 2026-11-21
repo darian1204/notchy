@@ -1,4 +1,5 @@
 import AppKit
+import NotchyAgent
 import NotchyCore
 import NotchyFeatures
 import NotchyIsland
@@ -133,9 +134,34 @@ final class Ensamblado {
         modeloDeClima = ModeloDeClima()
         modeloDeNotificaciones = ModeloDeNotificaciones(
             bus: bus, sistema: AdaptadorDeNotificacionesDelSistema())
+        let corredorPermisosAgente = CorredorDePermisos(ajustes: ajustes)
+        let herramientasDelAgente = AdaptadorHerramientasDelAgente(
+            agenda: modeloDeAgenda,
+            portapapeles: modeloDePortapapeles,
+            puertoPortapapeles: adaptadorDePortapapeles,
+            bandeja: modeloDeBandeja,
+            grabadora: grabadora,
+            repositorioGrabadora: repositorioDeGrabadora,
+            ahoraSuena: modeloDeAhoraSuena,
+            inbox: gestorDeInbox
+        )
+        let servidorMCP = ServidorMCPDeNotchy(
+            herramientas: herramientasDelAgente,
+            corredorDePermisos: corredorPermisosAgente
+        )
+        let adaptadorAgenteCapturado = adaptadorDeAgente
+        let coordinadorMCP = CoordinadorServidorMCPAgente(
+            servidor: servidorMCP,
+            rutas: rutasAbiertas,
+            alConfigurarOpenCode: { urlConfig in
+                adaptadorAgenteCapturado.rutaConfigOpenCode = urlConfig.path
+            }
+        )
         modeloDeAgente = ModeloDeAgente(
             puerto: adaptadorDeAgente,
-            ajustes: ajustes
+            ajustes: ajustes,
+            corredorDePermisos: corredorPermisosAgente,
+            servidorMCP: coordinadorMCP
         )
         modeloDeTraductor = ModeloDeTraductor(agente: adaptadorDeAgente)
         modeloDeWindowSnap = ModeloDeWindowSnap(puerto: adaptadorDeWindowSnap)
@@ -311,5 +337,128 @@ final class Ensamblado {
             log.error("No se pudo abrir la base de datos: \(error.localizedDescription, privacy: .public)")
             return (nil, nil)
         }
+    }
+}
+
+/// Implementación en la capa de ensamblado de las herramientas de lectura y escritura del agente MCP (AGT-3, AGT-4).
+@MainActor
+final class AdaptadorHerramientasDelAgente: PuertoDeHerramientasDelAgente {
+    private let agenda: ModeloDeAgenda
+    private let portapapeles: ModeloDePortapapeles
+    private let puertoPortapapeles: AdaptadorDePortapapeles
+    private let bandeja: ModeloDeBandeja
+    private let grabadora: ModeloDeGrabadora
+    private let repositorioGrabadora: RepositorioDeGrabadoraYReuniones?
+    private let ahoraSuenaModelo: ModeloDeAhoraSuena
+    private let inbox: GestorDeInboxObsidian
+
+    init(
+        agenda: ModeloDeAgenda,
+        portapapeles: ModeloDePortapapeles,
+        puertoPortapapeles: AdaptadorDePortapapeles,
+        bandeja: ModeloDeBandeja,
+        grabadora: ModeloDeGrabadora,
+        repositorioGrabadora: RepositorioDeGrabadoraYReuniones?,
+        ahoraSuena: ModeloDeAhoraSuena,
+        inbox: GestorDeInboxObsidian
+    ) {
+        self.agenda = agenda
+        self.portapapeles = portapapeles
+        self.puertoPortapapeles = puertoPortapapeles
+        self.bandeja = bandeja
+        self.grabadora = grabadora
+        self.repositorioGrabadora = repositorioGrabadora
+        self.ahoraSuenaModelo = ahoraSuena
+        self.inbox = inbox
+    }
+
+    func agendaHoy() async -> [ItemAgendaHoyAgente] {
+        if agenda.eventosDelMes.isEmpty && agenda.pendientes.isEmpty {
+            await agenda.recargar()
+        }
+        let formateadorHora = DateFormatter()
+        formateadorHora.locale = Locale(identifier: "es_MX")
+        formateadorHora.dateFormat = "HH:mm"
+
+        var items: [ItemAgendaHoyAgente] = agenda.eventosDeHoy.map { evento in
+            let hora = evento.todoElDia ? "Todo el día" : formateadorHora.string(from: evento.inicio)
+            return ItemAgendaHoyAgente(
+                tipo: "evento",
+                hora: hora,
+                titulo: evento.titulo,
+                ubicacion: evento.ubicacion
+            )
+        }
+
+        for pendiente in agenda.pendientes where !pendiente.completado {
+            let hora = pendiente.vencimiento.map { formateadorHora.string(from: $0) } ?? "Pendiente"
+            items.append(
+                ItemAgendaHoyAgente(
+                    tipo: "recordatorio",
+                    hora: hora,
+                    titulo: pendiente.titulo,
+                    ubicacion: pendiente.lista
+                )
+            )
+        }
+        return items
+    }
+
+    func portapapelesRecientes(limite: Int) -> [String] {
+        let tope = min(max(limite, 1), 20)
+        return
+            portapapeles.elementos
+            .filter { $0.tipo == .texto || $0.tipo == .enlace }
+            .prefix(tope)
+            .map(\.texto)
+    }
+
+    func bandejaArchivos() -> [String] {
+        bandeja.elementos.map { URL(fileURLWithPath: $0.nombre).lastPathComponent }
+    }
+
+    func reunionesRecientes(limite: Int) -> [ReunionRecienteAgente] {
+        let tope = min(max(limite, 1), 20)
+        let formateador = ISO8601DateFormatter()
+        let lista = Array(grabadora.reunionesGuardadas.prefix(tope))
+        return lista.map { reunion in
+            let nota = (try? repositorioGrabadora?.obtenerNotaDeReunion(reunionID: reunion.id))?.markdown
+            return ReunionRecienteAgente(
+                titulo: reunion.titulo,
+                fecha: formateador.string(from: reunion.inicio),
+                duracionSegundos: Int(reunion.duracionSegundos.rounded()),
+                notaMarkdown: nota
+            )
+        }
+    }
+
+    func ahoraSuena() -> AhoraSuenaAgente? {
+        guard let estado = ahoraSuenaModelo.estadoActual else { return nil }
+        return AhoraSuenaAgente(
+            titulo: estado.titulo,
+            artista: estado.artista,
+            album: estado.album,
+            appOrigen: estado.appOrigen,
+            reproduciendo: estado.reproduciendo
+        )
+    }
+
+    func inboxAgregar(texto: String) throws -> String {
+        guard inbox.agregarLinea(texto) else {
+            throw NotchyError.datos("No se pudo escribir en inbox.md")
+        }
+        return "Guardado en inbox.md"
+    }
+
+    func portapapelesCopiar(texto: String) throws -> String {
+        let elemento = ElementoDePortapapeles(
+            tipo: .texto,
+            texto: texto,
+            huella: "agente:\(texto.hashValue)",
+            bytes: texto.utf8.count
+        )
+        puertoPortapapeles.escribir(elemento)
+        portapapeles.revisarSiCambio()
+        return "Copiado al portapapeles"
     }
 }

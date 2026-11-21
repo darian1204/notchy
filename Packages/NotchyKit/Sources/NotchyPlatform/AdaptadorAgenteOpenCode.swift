@@ -6,8 +6,15 @@ import OSLog
 @MainActor
 public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
     private let log = Registro.de(.agente)
+    /// Ruta al archivo `opencode.json` generado en Application Support con permisos 0600 (AGT-7).
+    public var rutaConfigOpenCode: String?
+    /// Nombre del agente definido en `opencode.json`.
+    public var nombreAgente: String? = "notchy"
 
-    public init() {}
+    public init(rutaConfigOpenCode: String? = nil, nombreAgente: String? = "notchy") {
+        self.rutaConfigOpenCode = rutaConfigOpenCode
+        self.nombreAgente = nombreAgente
+    }
 
     public func estaDisponible() -> Bool {
         DetectorDeOpenCode.detectar().estaListo
@@ -60,6 +67,9 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
         }
 
         var argumentos = ["run", "--format", "json"]
+        if let nombreAgente, !nombreAgente.isEmpty {
+            argumentos.append(contentsOf: ["--agent", nombreAgente])
+        }
         if let modelo, !modelo.isEmpty {
             argumentos.append(contentsOf: ["-m", modelo])
         }
@@ -70,6 +80,7 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
             argumentos.append(contentsOf: ["--dir", directorio])
         }
         argumentos.append(prompt)
+        let rutaConfig = rutaConfigOpenCode
 
         return try await Task.detached {
             let proceso = Process()
@@ -78,6 +89,9 @@ public final class AdaptadorAgenteOpenCode: PuertoAgenteOpenCode {
             var entorno = ProcessInfo.processInfo.environment
             let pathActual = entorno["PATH"] ?? "/usr/bin:/bin"
             entorno["PATH"] = "/opt/homebrew/bin:/usr/local/bin:\(pathActual)"
+            if let rutaConfig, !rutaConfig.isEmpty {
+                entorno["OPENCODE_CONFIG"] = rutaConfig
+            }
             proceso.environment = entorno
 
             let pipeSalida = Pipe()

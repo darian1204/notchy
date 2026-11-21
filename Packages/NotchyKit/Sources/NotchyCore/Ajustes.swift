@@ -116,6 +116,16 @@ public final class Ajustes {
             )
         }
     }
+    /// Herramientas de escritura del agente MCP que el usuario autorizó con "Siempre" (AGT-4).
+    public var herramientasAgenteSiemprePermitidas: Set<String> {
+        didSet {
+            alCambiar(
+                herramientasAgenteSiemprePermitidas,
+                oldValue,
+                .herramientasAgenteSiemprePermitidas
+            )
+        }
+    }
 
     @ObservationIgnored private let almacen: any AlmacenDeAjustes
     @ObservationIgnored private var observadores: [@MainActor () -> Void] = []
@@ -146,6 +156,8 @@ public final class Ajustes {
             Self.leer(.idiomaTranscripcionPorDefecto, de: almacen) ?? .espanolMexico
         preferirMicrofonoInternoConBluetooth =
             Self.leer(.preferirMicrofonoInternoConBluetooth, de: almacen) ?? true
+        herramientasAgenteSiemprePermitidas =
+            Self.leer(.herramientasAgenteSiemprePermitidas, de: almacen) ?? []
     }
 
     public var urlCarpetaInboxObsidian: URL {
@@ -190,7 +202,7 @@ public final class Ajustes {
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox
-        case estiloDeIsla, accesosRapidos
+        case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas
     }
 
     /// Restaura todas las preferencias a sus valores por defecto y limpia el almacén.
@@ -219,6 +231,7 @@ public final class Ajustes {
         resumirReunionesEnInbox = true
         idiomaTranscripcionPorDefecto = .espanolMexico
         preferirMicrofonoInternoConBluetooth = true
+        herramientasAgenteSiemprePermitidas = []
     }
 
     // MARK: Accesos rápidos
