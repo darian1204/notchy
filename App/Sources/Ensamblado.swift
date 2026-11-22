@@ -64,6 +64,7 @@ final class Ensamblado {
 
         let abrirURL: @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }
         let adaptadorDeResumen = AdaptadorDeResumenLocal()
+        let adaptadorDeDiarizacion = AdaptadorDeDiarizacion(carpetaModelos: rutasAbiertas?.modelos)
         let repositorioDeGrabadora = baseAbierta.map(RepositorioDeGrabadoraYReuniones.init)
         gestorDeInbox = GestorDeInboxObsidian(
             ajustes: ajustes,
@@ -81,6 +82,7 @@ final class Ensamblado {
             captura: adaptadorDeCapturaDeAudio,
             escritor: adaptadorDeEscritorDeAudio,
             transcripcion: adaptadorDeTranscripcion,
+            diarizacion: adaptadorDeDiarizacion,
             resumenDeTexto: adaptadorDeResumen,
             escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) },
             repositorio: repositorioDeGrabadora,

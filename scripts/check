@@ -19,7 +19,7 @@ permitido=(
     NotchyCore ""
     NotchyDesign ""
     NotchyStorage "NotchyCore GRDB"
-    NotchyPlatform "NotchyCore"
+    NotchyPlatform "NotchyCore FluidAudio"
     NotchyIsland "NotchyCore NotchyDesign"
     NotchyFeatures "NotchyCore NotchyStorage NotchyDesign"
     NotchyAgent "NotchyCore NotchyStorage MCP"
@@ -31,7 +31,7 @@ for carpeta in Packages/NotchyKit/Sources/*(/); do
         falla "la capa $capa no está en la regla de scripts/check"
         continue
     fi
-    /usr/bin/grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(Notchy[A-Za-z]*|GRDB|MCP)' $carpeta |
+    /usr/bin/grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(Notchy[A-Za-z]*|GRDB|MCP|FluidAudio)' $carpeta |
         while IFS= read -r linea; do
             modulo=$(print -- $linea | sed -E 's/.*import[[:space:]]+([A-Za-z]+).*/\1/')
             [[ " ${permitido[$capa]} " == *" $modulo "* ]] || falla "$capa no puede importar $modulo ($linea)"

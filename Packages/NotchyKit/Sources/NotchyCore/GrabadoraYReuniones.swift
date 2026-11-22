@@ -169,6 +169,8 @@ public struct SegmentoDeTranscripcion: Identifiable, Codable, Sendable, Equatabl
     public var texto: String
     public var confianza: Double?
     public var esFinal: Bool
+    /// Identificador o nombre del hablante asignado por diarización (ej. `"Persona 1"`).
+    public var hablante: String?
 
     public init(
         id: String = UUID().uuidString,
@@ -178,7 +180,8 @@ public struct SegmentoDeTranscripcion: Identifiable, Codable, Sendable, Equatabl
         finSegundos: Double,
         texto: String,
         confianza: Double? = nil,
-        esFinal: Bool = true
+        esFinal: Bool = true,
+        hablante: String? = nil
     ) {
         self.id = id
         self.reunionID = reunionID
@@ -188,11 +191,26 @@ public struct SegmentoDeTranscripcion: Identifiable, Codable, Sendable, Equatabl
         self.texto = texto
         self.confianza = confianza
         self.esFinal = esFinal
+        self.hablante = hablante
     }
 
     public var marcaDeTiempoFormateada: String {
         let total = max(0, Int(inicioSegundos.rounded(.down)))
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
+    /// Nombre visible del hablante para mostrar en la transcripción, copiar o exportar.
+    public func etiquetaDeHablante(nombres: [String: String] = [:]) -> String {
+        guard fuente == .microfono else { return fuente.etiqueta }
+        if let hablante = hablante?.trimmingCharacters(in: .whitespacesAndNewlines), !hablante.isEmpty {
+            if let personalizado = nombres[hablante]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !personalizado.isEmpty
+            {
+                return personalizado
+            }
+            return hablante
+        }
+        return fuente.etiqueta
     }
 }
 
@@ -599,6 +617,151 @@ public protocol PuertoDeTranscripcion: AnyObject {
         archivos: [(fuente: FuenteDeAudio, url: URL)],
         idioma: IdiomaDeTranscripcion
     ) async throws -> [ResultadoDeTranscripcion]
+}
+
+// MARK: - Diarización de hablantes en el micrófono
+
+/// Tramo temporal detectado para un hablante en el audio del micrófono, en segundos desde el inicio de la reunión.
+public struct TramoDeHablante: Sendable, Codable, Equatable {
+    public let hablanteID: String
+    public let inicio: Double
+    public let fin: Double
+
+    public init(hablanteID: String, inicio: Double, fin: Double) {
+        self.hablanteID = hablanteID
+        self.inicio = max(0, inicio)
+        self.fin = max(self.inicio, fin)
+    }
+}
+
+/// Resultado puro de asignar tramos de diarización a los segmentos de transcripción de una reunión.
+public struct AsignacionDeHablantes: Sendable, Equatable {
+    public let segmentos: [SegmentoDeTranscripcion]
+    /// Nombres iniciales por identificador normalizado (`["Persona 1": "Persona 1", ...]`) en orden de aparición.
+    public let hablantes: [String]
+
+    public init(segmentos: [SegmentoDeTranscripcion], hablantes: [String]) {
+        self.segmentos = segmentos
+        self.hablantes = hablantes
+    }
+}
+
+/// Lógica pura de asignación de hablantes por solapamiento temporal y numeración en orden de aparición.
+public enum AsignadorDeHablantes {
+    /// Asigna a cada segmento de fuente `.microfono` el hablante con mayor solapamiento temporal
+    /// y renombra los hablantes detectados en orden de aparición a `"Persona 1"`, `"Persona 2"`, etc.
+    /// Los segmentos de fuente `.sistema` conservan `hablante = nil` (siguen siendo `"Otros"`).
+    public static func asignar(
+        segmentos: [SegmentoDeTranscripcion],
+        tramos: [TramoDeHablante]
+    ) -> AsignacionDeHablantes {
+        guard !segmentos.isEmpty else {
+            return AsignacionDeHablantes(segmentos: [], hablantes: [])
+        }
+        guard !tramos.isEmpty else {
+            let limpios = segmentos.map { seg -> SegmentoDeTranscripcion in
+                var copia = seg
+                if copia.fuente != .microfono {
+                    copia.hablante = nil
+                }
+                return copia
+            }
+            return AsignacionDeHablantes(segmentos: limpios, hablantes: [])
+        }
+
+        // 1. Para cada segmento de micrófono, encontrar el hablante crudo con mayor solapamiento > 0.
+        var crudosPorIndice: [Int: String] = [:]
+        var ordenAparicionCrudos: [String] = []
+
+        let indicesOrdenados = segmentos.indices.sorted {
+            if segmentos[$0].inicioSegundos != segmentos[$1].inicioSegundos {
+                return segmentos[$0].inicioSegundos < segmentos[$1].inicioSegundos
+            }
+            return $0 < $1
+        }
+
+        for indice in indicesOrdenados {
+            let seg = segmentos[indice]
+            guard seg.fuente == .microfono else { continue }
+            if let mejorCrudo = hablanteConMayorSolapamiento(segmento: seg, tramos: tramos) {
+                crudosPorIndice[indice] = mejorCrudo
+                if !ordenAparicionCrudos.contains(mejorCrudo) {
+                    ordenAparicionCrudos.append(mejorCrudo)
+                }
+            }
+        }
+
+        // 2. Renombrar hablantes en orden de aparición a "Persona 1", "Persona 2"...
+        var mapaNombres: [String: String] = [:]
+        var listaHablantes: [String] = []
+        for (i, crudo) in ordenAparicionCrudos.enumerated() {
+            let etiqueta = "Persona \(i + 1)"
+            mapaNombres[crudo] = etiqueta
+            listaHablantes.append(etiqueta)
+        }
+
+        // 3. Construir segmentos actualizados.
+        var resultado: [SegmentoDeTranscripcion] = []
+        resultado.reserveCapacity(segmentos.count)
+        for (indice, var seg) in segmentos.enumerated() {
+            if seg.fuente == .microfono {
+                if let crudo = crudosPorIndice[indice], let etiqueta = mapaNombres[crudo] {
+                    seg.hablante = etiqueta
+                } else {
+                    seg.hablante = nil
+                }
+            } else {
+                seg.hablante = nil
+            }
+            resultado.append(seg)
+        }
+
+        return AsignacionDeHablantes(segmentos: resultado, hablantes: listaHablantes)
+    }
+
+    private static func hablanteConMayorSolapamiento(
+        segmento: SegmentoDeTranscripcion,
+        tramos: [TramoDeHablante]
+    ) -> String? {
+        let inicioSeg = segmento.inicioSegundos
+        let finSeg = max(inicioSeg + 0.05, segmento.finSegundos)
+        var acumuladoPorHablante: [String: Double] = [:]
+        var primerInicioPorHablante: [String: Double] = [:]
+
+        for tramo in tramos {
+            let id = tramo.hablanteID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty else { continue }
+            let inicioComun = max(inicioSeg, tramo.inicio)
+            let finComun = min(finSeg, tramo.fin)
+            let solapamiento = finComun - inicioComun
+            guard solapamiento > 0 else { continue }
+            acumuladoPorHablante[id, default: 0] += solapamiento
+            if let previo = primerInicioPorHablante[id] {
+                primerInicioPorHablante[id] = min(previo, tramo.inicio)
+            } else {
+                primerInicioPorHablante[id] = tramo.inicio
+            }
+        }
+
+        guard !acumuladoPorHablante.isEmpty else { return nil }
+        return acumuladoPorHablante.max { a, b in
+            if abs(a.value - b.value) > 1e-6 {
+                return a.value < b.value
+            }
+            let inicioA = primerInicioPorHablante[a.key] ?? .greatestFiniteMagnitude
+            let inicioB = primerInicioPorHablante[b.key] ?? .greatestFiniteMagnitude
+            if inicioA != inicioB {
+                return inicioA > inicioB
+            }
+            return a.key > b.key
+        }?.key
+    }
+}
+
+/// Puerto de separación de voces (diarización offline en el dispositivo) sobre los trozos de audio del micrófono.
+public protocol PuertoDeDiarizacion: Sendable {
+    func disponible() async -> Bool
+    func diarizar(archivos: [URL]) async throws -> [TramoDeHablante]
 }
 
 // MARK: - Eventos entre módulos (M4)

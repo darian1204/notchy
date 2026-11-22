@@ -231,7 +231,74 @@ import Testing
 
         try repo.guardarNotaDeReunion(notaEditada)
         #expect(try repo.obtenerNotaDeReunion(reunionID: "reu-nota") != nil)
+        #expect(try repo.idsDeReunionesConNota() == Set(["reu-nota"]))
         try repo.borrarReunion(id: "reu-nota")
         #expect(try repo.obtenerNotaDeReunion(reunionID: "reu-nota") == nil)
+        #expect(try repo.idsDeReunionesConNota().isEmpty)
+    }
+
+    @Test func guardaRenombraYLimpiaHablantesDeReunion() throws {
+        let repo = RepositorioDeGrabadoraYReuniones(try BaseDeDatos.enMemoria())
+        try repo.guardarReunion(
+            ReunionGrabada(
+                id: "reu-diar",
+                titulo: "Reunión presencial",
+                inicio: .now,
+                estado: .finalizada
+            )
+        )
+        let seg1 = SegmentoDeTranscripcion(
+            id: "sd-1",
+            reunionID: "reu-diar",
+            fuente: .microfono,
+            inicioSegundos: 1,
+            finSegundos: 5,
+            texto: "Hola, soy la primera persona."
+        )
+        let seg2 = SegmentoDeTranscripcion(
+            id: "sd-2",
+            reunionID: "reu-diar",
+            fuente: .microfono,
+            inicioSegundos: 6,
+            finSegundos: 10,
+            texto: "Hola, soy la segunda persona."
+        )
+        try repo.guardarSegmento(seg1)
+        try repo.guardarSegmento(seg2)
+
+        var s1Asignado = seg1
+        s1Asignado.hablante = "Persona 1"
+        var s2Asignado = seg2
+        s2Asignado.hablante = "Persona 2"
+
+        try repo.guardarAsignacionDeHablantes(
+            reunionID: "reu-diar",
+            segmentos: [s1Asignado, s2Asignado],
+            hablantes: ["Persona 1", "Persona 2"]
+        )
+
+        let leidos = try repo.listarSegmentos(reunionID: "reu-diar")
+        #expect(leidos.map(\.hablante) == ["Persona 1", "Persona 2"])
+        let nombresIniciales = try repo.listarNombresDeHablantes(reunionID: "reu-diar")
+        #expect(nombresIniciales["Persona 1"] == "Persona 1")
+        #expect(nombresIniciales["Persona 2"] == "Persona 2")
+
+        try repo.renombrarHablante(reunionID: "reu-diar", hablanteID: "Persona 1", nombre: "Yo")
+        let nombresActualizados = try repo.listarNombresDeHablantes(reunionID: "reu-diar")
+        #expect(nombresActualizados["Persona 1"] == "Yo")
+        #expect(nombresActualizados["Persona 2"] == "Persona 2")
+
+        // El borrado de la reunión limpia los hablantes
+        try repo.borrarReunion(id: "reu-diar")
+        #expect(try repo.listarNombresDeHablantes(reunionID: "reu-diar").isEmpty)
+
+        // Y el borrado global también limpia meeting_speaker
+        try repo.guardarReunion(
+            ReunionGrabada(id: "reu-diar-2", titulo: "Otra", inicio: .now, estado: .finalizada)
+        )
+        try repo.renombrarHablante(reunionID: "reu-diar-2", hablanteID: "Persona 1", nombre: "Ana")
+        #expect(try repo.listarNombresDeHablantes(reunionID: "reu-diar-2")["Persona 1"] == "Ana")
+        _ = try repo.borrarTodo()
+        #expect(try repo.listarNombresDeHablantes(reunionID: "reu-diar-2").isEmpty)
     }
 }

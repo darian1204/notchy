@@ -11,13 +11,14 @@ if estricto {
 
 let grdb: Target.Dependency = .product(name: "GRDB", package: "GRDB.swift")
 let mcp: Target.Dependency = .product(name: "MCP", package: "swift-sdk")
+let fluidAudio: Target.Dependency = .product(name: "FluidAudio", package: "FluidAudio")
 
 // Capa y de qué depende. La misma regla la revisa scripts/check contra los import.
 let capas: [(nombre: String, dependencias: [Target.Dependency])] = [
     ("NotchyCore", []),
     ("NotchyDesign", []),
     ("NotchyStorage", ["NotchyCore", grdb]),
-    ("NotchyPlatform", ["NotchyCore"]),
+    ("NotchyPlatform", ["NotchyCore", fluidAudio]),
     ("NotchyIsland", ["NotchyCore", "NotchyDesign"]),
     ("NotchyFeatures", ["NotchyCore", "NotchyStorage", "NotchyDesign"]),
     ("NotchyAgent", ["NotchyCore", "NotchyStorage", mcp]),
@@ -48,6 +49,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk", from: "0.12.1"),
+        .package(url: "https://github.com/FluidInference/FluidAudio", exact: "0.18.4", traits: ["Diarizer"]),
     ],
     targets: targets,
     swiftLanguageModes: [.v6]

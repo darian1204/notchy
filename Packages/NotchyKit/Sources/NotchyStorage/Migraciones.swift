@@ -132,6 +132,18 @@ enum Migraciones {
                 tabla.column("fecha", .double).notNull().indexed()
             }
         }
+        migrador.registerMigration("v6-diarizacion-de-reuniones") { db in
+            try db.alter(table: "transcript_segment") { tabla in
+                tabla.add(column: "hablante", .text)
+            }
+            try db.create(table: "meeting_speaker") { tabla in
+                tabla.column("reunion_id", .text).notNull().indexed()
+                    .references("meeting", onDelete: .cascade)
+                tabla.column("hablante_id", .text).notNull()
+                tabla.column("nombre", .text).notNull()
+                tabla.primaryKey(["reunion_id", "hablante_id"])
+            }
+        }
         return migrador
     }
 

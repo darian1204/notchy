@@ -22,11 +22,12 @@ public struct RutasDeDatos: Sendable, Equatable {
     public var portapapeles: URL { raiz.appending(path: "clipboard", directoryHint: .isDirectory) }
     public var bandeja: URL { raiz.appending(path: "tray", directoryHint: .isDirectory) }
     public var audio: URL { raiz.appending(path: "audio", directoryHint: .isDirectory) }
+    public var modelos: URL { raiz.appending(path: "models", directoryHint: .isDirectory) }
     public var configOpenCode: URL { raiz.appending(path: "opencode.json") }
     public var promptAgenteOpenCode: URL { raiz.appending(path: "prompt-agente.md") }
 
     public func crearCarpetas() throws {
-        for carpeta in [raiz, portapapeles, bandeja, audio] {
+        for carpeta in [raiz, portapapeles, bandeja, audio, modelos] {
             try FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
         }
     }

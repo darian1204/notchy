@@ -19,6 +19,30 @@ struct CopiarTranscripcionTests {
         let tu = FuenteDeAudio.microfono.etiqueta
         let otros = FuenteDeAudio.sistema.etiqueta
         #expect(texto == "Sync\n\n[00:05] \(tu): Hola equipo\n[01:12] \(otros): Buenas")
+
+        let conHablantes = [
+            SegmentoDeTranscripcion(
+                reunionID: "r",
+                fuente: .microfono,
+                inicioSegundos: 5,
+                finSegundos: 8,
+                texto: "Hola equipo",
+                hablante: "Persona 1"
+            ),
+            SegmentoDeTranscripcion(
+                reunionID: "r",
+                fuente: .microfono,
+                inicioSegundos: 12,
+                finSegundos: 15,
+                texto: "Qué tal",
+                hablante: "Persona 2"
+            ),
+        ]
+        let textoConNombres = ModeloDeGrabadora.textoDeTranscripcion(
+            conHablantes,
+            nombresHablantes: ["Persona 1": "Yo"]
+        )
+        #expect(textoConNombres == "[00:05] Yo: Hola equipo\n[00:12] Persona 2: Qué tal")
     }
 
     @Test

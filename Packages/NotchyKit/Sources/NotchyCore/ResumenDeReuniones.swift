@@ -244,11 +244,12 @@ public enum RedaccionDeResumen {
     }
 
     /// Arma el archivo Markdown completo con frontmatter YAML compatible con Obsidian, `# Título`,
-    /// la nota estructurada y `## Transcripción` con segmentos `**[mm:ss]** texto` (NOT-2).
+    /// la nota estructurada y `## Transcripción` con segmentos `**[mm:ss] Hablante:** texto` (NOT-2).
     public static func markdownExportable(
         reunion: ReunionGrabada,
         notaMarkdown: String?,
         segmentos: [SegmentoDeTranscripcion],
+        nombresHablantes: [String: String] = [:],
         zonaHoraria: TimeZone = .current
     ) -> String {
         let tituloLimpio = reunion.titulo.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -277,7 +278,8 @@ public enum RedaccionDeResumen {
         for seg in segmentos {
             let texto = seg.texto.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !texto.isEmpty else { continue }
-            lineasTranscripcion.append("**[\(seg.marcaDeTiempoFormateada)]** \(texto)")
+            let nombre = seg.etiquetaDeHablante(nombres: nombresHablantes)
+            lineasTranscripcion.append("**[\(seg.marcaDeTiempoFormateada)] \(nombre):** \(texto)")
         }
         let bloqueTranscripcion =
             lineasTranscripcion.isEmpty

@@ -102,6 +102,10 @@ public final class Ajustes {
     public var resumirReunionesEnInbox: Bool {
         didSet { alCambiar(resumirReunionesEnInbox, oldValue, .resumirReunionesEnInbox) }
     }
+    /// Si al terminar una reunión se separan las voces del micrófono con diarización en el dispositivo.
+    public var separarVocesEnReuniones: Bool {
+        didSet { alCambiar(separarVocesEnReuniones, oldValue, .separarVocesEnReuniones) }
+    }
     /// Idioma inicial para la transcripción en vivo (GRB-3).
     public var idiomaTranscripcionPorDefecto: IdiomaDeTranscripcion {
         didSet { alCambiar(idiomaTranscripcionPorDefecto, oldValue, .idiomaTranscripcionPorDefecto) }
@@ -152,6 +156,7 @@ public final class Ajustes {
         diasRetencionAudioReuniones = Self.leer(.diasRetencionAudioReuniones, de: almacen) ?? 30
         guardarAudioReuniones = Self.leer(.guardarAudioReuniones, de: almacen) ?? true
         resumirReunionesEnInbox = Self.leer(.resumirReunionesEnInbox, de: almacen) ?? true
+        separarVocesEnReuniones = Self.leer(.separarVocesEnReuniones, de: almacen) ?? true
         idiomaTranscripcionPorDefecto =
             Self.leer(.idiomaTranscripcionPorDefecto, de: almacen) ?? .espanolMexico
         preferirMicrofonoInternoConBluetooth =
@@ -201,7 +206,7 @@ public final class Ajustes {
             appsExcluidasPortapapeles
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
-        case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox
+        case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox, separarVocesEnReuniones
         case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas
     }
 
@@ -229,6 +234,7 @@ public final class Ajustes {
         diasRetencionAudioReuniones = 30
         guardarAudioReuniones = true
         resumirReunionesEnInbox = true
+        separarVocesEnReuniones = true
         idiomaTranscripcionPorDefecto = .espanolMexico
         preferirMicrofonoInternoConBluetooth = true
         herramientasAgenteSiemprePermitidas = []

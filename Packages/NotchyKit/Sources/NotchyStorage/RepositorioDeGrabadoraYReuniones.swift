@@ -257,6 +257,8 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
             )?.aDominio()
             try db.execute(sql: "DELETE FROM transcript_fts WHERE reunion_id = ?", arguments: [id])
             try db.execute(sql: "DELETE FROM transcript_segment WHERE reunion_id = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM meeting_speaker WHERE reunion_id = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM meeting_note WHERE meeting_id = ?", arguments: [id])
             try db.execute(sql: "DELETE FROM meeting WHERE id = ?", arguments: [id])
             return existente
         }
@@ -275,6 +277,7 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
             }
             try db.execute(sql: "DELETE FROM transcript_fts")
             try db.execute(sql: "DELETE FROM transcript_segment")
+            try db.execute(sql: "DELETE FROM meeting_speaker")
             try db.execute(sql: "DELETE FROM meeting_note")
             try db.execute(sql: "DELETE FROM meeting")
             try db.execute(sql: "DELETE FROM voice_note")
@@ -321,6 +324,99 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
         }
     }
 
+    /// Devuelve el conjunto de identificadores de reuniones que tienen una nota guardada.
+    public func idsDeReunionesConNota() throws -> Set<String> {
+        try base.escritor.read { db in
+            let ids = try String.fetchAll(db, sql: "SELECT meeting_id FROM meeting_note")
+            return Set(ids)
+        }
+    }
+
+    // MARK: - Hablantes de reunión (diarización y renombrado)
+
+    /// Guarda la asignación de hablantes en los segmentos de una reunión y registra los hablantes en `meeting_speaker`,
+    /// conservando cualquier nombre personalizado previo o inicializándolo con el identificador normalizado.
+    public func guardarAsignacionDeHablantes(
+        reunionID: String,
+        segmentos: [SegmentoDeTranscripcion],
+        hablantes: [String] = []
+    ) throws {
+        try base.escritor.write { db in
+            var idsDetectados = Set(hablantes)
+            for seg in segmentos where seg.reunionID == reunionID {
+                try db.execute(
+                    sql: "UPDATE transcript_segment SET hablante = ? WHERE id = ? AND reunion_id = ?",
+                    arguments: [seg.hablante, seg.id, reunionID]
+                )
+                if let h = seg.hablante?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty {
+                    idsDetectados.insert(h)
+                }
+            }
+            if idsDetectados.isEmpty {
+                try db.execute(sql: "DELETE FROM meeting_speaker WHERE reunion_id = ?", arguments: [reunionID])
+            } else {
+                let existentes = try Row.fetchAll(
+                    db,
+                    sql: "SELECT hablante_id, nombre FROM meeting_speaker WHERE reunion_id = ?",
+                    arguments: [reunionID]
+                )
+                var mapaExistentes: [String: String] = [:]
+                for fila in existentes {
+                    let hid: String = fila["hablante_id"]
+                    let nom: String = fila["nombre"]
+                    mapaExistentes[hid] = nom
+                }
+                try db.execute(sql: "DELETE FROM meeting_speaker WHERE reunion_id = ?", arguments: [reunionID])
+                for hid in idsDetectados.sorted() {
+                    let nombre = mapaExistentes[hid] ?? hid
+                    try db.execute(
+                        sql: """
+                            INSERT INTO meeting_speaker (reunion_id, hablante_id, nombre)
+                            VALUES (?, ?, ?)
+                            """,
+                        arguments: [reunionID, hid, nombre]
+                    )
+                }
+            }
+        }
+    }
+
+    /// Renombra un hablante de una reunión (por ejemplo `"Persona 1"` → `"Yo"`).
+    public func renombrarHablante(reunionID: String, hablanteID: String, nombre: String) throws {
+        let idLimpio = hablanteID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nombreLimpio = nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !idLimpio.isEmpty, !nombreLimpio.isEmpty else { return }
+        try base.escritor.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO meeting_speaker (reunion_id, hablante_id, nombre)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(reunion_id, hablante_id) DO UPDATE SET
+                        nombre = excluded.nombre
+                    """,
+                arguments: [reunionID, idLimpio, nombreLimpio]
+            )
+        }
+    }
+
+    /// Devuelve el mapa `[hablante_id: nombre]` de los hablantes de una reunión.
+    public func listarNombresDeHablantes(reunionID: String) throws -> [String: String] {
+        try base.escritor.read { db in
+            let filas = try Row.fetchAll(
+                db,
+                sql: "SELECT hablante_id, nombre FROM meeting_speaker WHERE reunion_id = ?",
+                arguments: [reunionID]
+            )
+            var resultado: [String: String] = [:]
+            for fila in filas {
+                let hid: String = fila["hablante_id"]
+                let nom: String = fila["nombre"]
+                resultado[hid] = nom
+            }
+            return resultado
+        }
+    }
+
     // MARK: - Glosario de correcciones (GRB-5, D-09)
 
     public func listarGlosario() throws -> [EntradaDeGlosario] {
@@ -360,15 +456,16 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
         try db.execute(
             sql: """
                 INSERT INTO transcript_segment
-                (id, reunion_id, fuente, inicio, fin, texto, confianza, es_final)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, reunion_id, fuente, inicio, fin, texto, confianza, es_final, hablante)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     fuente = excluded.fuente,
                     inicio = excluded.inicio,
                     fin = excluded.fin,
                     texto = excluded.texto,
                     confianza = excluded.confianza,
-                    es_final = excluded.es_final
+                    es_final = excluded.es_final,
+                    hablante = excluded.hablante
                 """,
             arguments: [
                 segmento.id,
@@ -379,6 +476,7 @@ public struct RepositorioDeGrabadoraYReuniones: Sendable {
                 segmento.texto,
                 segmento.confianza,
                 segmento.esFinal,
+                segmento.hablante,
             ]
         )
         try db.execute(sql: "DELETE FROM transcript_fts WHERE id = ?", arguments: [segmento.id])
@@ -496,6 +594,7 @@ private struct FilaSegmento: FetchableRecord {
     let texto: String
     let confianza: Double?
     let esFinal: Bool
+    let hablante: String?
 
     init(row: Row) {
         id = row["id"]
@@ -506,6 +605,7 @@ private struct FilaSegmento: FetchableRecord {
         texto = row["texto"]
         confianza = row["confianza"]
         esFinal = row["es_final"]
+        hablante = row["hablante"]
     }
 
     func aDominio() -> SegmentoDeTranscripcion {
@@ -517,7 +617,8 @@ private struct FilaSegmento: FetchableRecord {
             finSegundos: fin,
             texto: texto,
             confianza: confianza,
-            esFinal: esFinal
+            esFinal: esFinal,
+            hablante: hablante
         )
     }
 }

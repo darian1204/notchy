@@ -89,6 +89,8 @@ struct VistaDeGrabadora: View {
     @State private var nuevoCorrecto = ""
     @State private var editandoNota = false
     @State private var borradorNota = ""
+    @State private var hablanteEditandoID: String?
+    @State private var borradorNombreHablante = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -364,12 +366,65 @@ struct VistaDeGrabadora: View {
         .accessibilityLabel("Copiar transcripción de la reunión")
     }
 
-    private func filaSegmento(_ seg: SegmentoDeTranscripcion) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Text(seg.fuente.etiqueta)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(colorParaFuente(seg.fuente))
-                .frame(width: 38, alignment: .leading)
+    private func filaSegmento(_ seg: SegmentoDeTranscripcion, enHistorial: Bool = false) -> some View {
+        let etiqueta = modelo.nombreVisibleDeHablante(para: seg)
+        let color = colorParaSegmento(seg)
+        let puedeRenombrar = enHistorial && seg.fuente == .microfono
+        let claveHablante = seg.hablante ?? "Persona 1"
+
+        return HStack(alignment: .firstTextBaseline, spacing: 7) {
+            if puedeRenombrar {
+                Button {
+                    borradorNombreHablante = etiqueta
+                    hablanteEditandoID = claveHablante
+                } label: {
+                    Text(etiqueta)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(color)
+                        .lineLimit(1)
+                        .frame(minWidth: 38, maxWidth: 72, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .help("Renombrar hablante (\(etiqueta))")
+                .popover(
+                    isPresented: Binding(
+                        get: { hablanteEditandoID == claveHablante },
+                        set: { if !$0 { hablanteEditandoID = nil } }
+                    )
+                ) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Renombrar hablante")
+                            .font(.system(size: 11, weight: .semibold))
+                        TextField("Nombre (ej. Yo o Ana)", text: $borradorNombreHablante)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 11))
+                            .frame(width: 160)
+                            .onSubmit {
+                                guardarRenombradoDeHablante(claveHablante, reunionID: seg.reunionID)
+                            }
+                        HStack(spacing: 6) {
+                            Spacer(minLength: 0)
+                            Button("Cancelar") {
+                                hablanteEditandoID = nil
+                            }
+                            .controlSize(.small)
+                            Button("Guardar") {
+                                guardarRenombradoDeHablante(claveHablante, reunionID: seg.reunionID)
+                            }
+                            .controlSize(.small)
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(borradorNombreHablante.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+                    .padding(10)
+                }
+            } else {
+                Text(etiqueta)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .frame(minWidth: 38, maxWidth: 64, alignment: .leading)
+            }
             Text(seg.marcaDeTiempoFormateada)
                 .font(.system(size: 10).monospacedDigit())
                 .foregroundStyle(Paleta.textoDeApoyo)
@@ -379,6 +434,35 @@ struct VistaDeGrabadora: View {
                 .foregroundStyle(seg.esFinal ? Paleta.texto : Paleta.textoDeApoyo)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func guardarRenombradoDeHablante(_ hablanteID: String, reunionID: String) {
+        let limpio = borradorNombreHablante.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !limpio.isEmpty else { return }
+        modelo.renombrarHablante(reunionID: reunionID, hablanteID: hablanteID, nuevoNombre: limpio)
+        hablanteEditandoID = nil
+    }
+
+    private func colorParaSegmento(_ seg: SegmentoDeTranscripcion) -> Color {
+        guard seg.fuente == .microfono else {
+            return colorParaFuente(seg.fuente)
+        }
+        guard let hablante = seg.hablante, !hablante.isEmpty else {
+            return Paleta.grabadora
+        }
+        let coloresHablantes: [Color] = [
+            Paleta.grabadora,
+            Paleta.musica,
+            Paleta.bandeja,
+            Paleta.clima,
+            Paleta.espejo,
+            Paleta.notificaciones,
+        ]
+        if let numero = Int(hablante.split(separator: " ").last ?? ""), numero >= 1 {
+            return coloresHablantes[(numero - 1) % coloresHablantes.count]
+        }
+        let hash = abs(hablante.hashValue)
+        return coloresHablantes[hash % coloresHablantes.count]
     }
 
     private func colorParaFuente(_ fuente: FuenteDeAudio) -> Color {
@@ -547,16 +631,25 @@ struct VistaDeGrabadora: View {
                     LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(modelo.reunionesGuardadas) { reunion in
                             let seleccionada = modelo.reunionSeleccionadaID == reunion.id
+                            let tieneNota = modelo.tieneNotaGuardada(reunion.id)
                             HStack(spacing: 4) {
                                 Button {
                                     editandoNota = false
                                     modelo.reunionSeleccionadaID = reunion.id
                                 } label: {
                                     VStack(alignment: .leading, spacing: 1) {
-                                        Text(reunion.titulo)
-                                            .font(.system(size: 11, weight: seleccionada ? .bold : .medium))
-                                            .foregroundStyle(Paleta.texto)
-                                            .lineLimit(1)
+                                        HStack(spacing: 4) {
+                                            Text(reunion.titulo)
+                                                .font(.system(size: 11, weight: seleccionada ? .bold : .medium))
+                                                .foregroundStyle(Paleta.texto)
+                                                .lineLimit(1)
+                                            if tieneNota {
+                                                Image(systemName: "doc.text")
+                                                    .font(.system(size: 9, weight: .semibold))
+                                                    .foregroundStyle(Paleta.musica)
+                                                    .help("Tiene nota guardada")
+                                            }
+                                        }
                                         Text("\(reunion.estado.etiqueta) · \(reunion.idioma.etiquetaCorta)")
                                             .font(.system(size: 9))
                                             .foregroundStyle(Paleta.textoDeApoyo)
@@ -606,6 +699,9 @@ struct VistaDeGrabadora: View {
                         } else {
                             ForEach(SeccionDetalleDeReunion.allCases, id: \.self) { seccion in
                                 let activa = modelo.seccionDetalleHistorial == seccion
+                                let esNotas = seccion == .notas
+                                let hayNota = modelo.notaDeReunionSeleccionada != nil
+                                let icono = esNotas ? "doc.text" : "text.quote"
                                 let etiqueta =
                                     seccion == .transcripcion
                                     ? "Transcripción (\(lista.count))"
@@ -614,15 +710,24 @@ struct VistaDeGrabadora: View {
                                     editandoNota = false
                                     modelo.seccionDetalleHistorial = seccion
                                 } label: {
-                                    Text(etiqueta)
-                                        .font(.system(size: 10, weight: activa ? .semibold : .medium))
-                                        .foregroundStyle(activa ? Paleta.texto : Paleta.textoDeApoyo)
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 2)
-                                        .background(
-                                            activa ? Paleta.superficieAlta : Color.clear,
-                                            in: Capsule()
-                                        )
+                                    HStack(spacing: 4) {
+                                        Image(systemName: icono)
+                                            .font(.system(size: 10, weight: .semibold))
+                                        Text(etiqueta)
+                                            .font(.system(size: 11, weight: .semibold))
+                                        if esNotas && hayNota {
+                                            Circle()
+                                                .fill(Paleta.musica)
+                                                .frame(width: 5, height: 5)
+                                        }
+                                    }
+                                    .foregroundStyle(activa ? Paleta.texto : Paleta.textoDeApoyo)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(
+                                        activa ? Paleta.superficieAlta : Color.clear,
+                                        in: Capsule()
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -665,6 +770,29 @@ struct VistaDeGrabadora: View {
                         if let reunion = reunionSeleccionada,
                             !mostrandoBusqueda,
                             modelo.seccionDetalleHistorial == .transcripcion,
+                            !reunion.rutasAudioMicrofono.isEmpty
+                        {
+                            Button {
+                                Task { _ = await modelo.separarVocesDeReunion(reunion) }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if modelo.diarizando {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                    }
+                                    Text(modelo.diarizando ? "Separando voces…" : "Separar voces")
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Paleta.bandeja)
+                            .disabled(modelo.diarizando || modelo.retranscribiendo)
+                            .help("Separar hablantes del micrófono en el dispositivo")
+                        }
+
+                        if let reunion = reunionSeleccionada,
+                            !mostrandoBusqueda,
+                            modelo.seccionDetalleHistorial == .transcripcion,
                             !reunion.rutasAudioMicrofono.isEmpty || !reunion.rutasAudioSistema.isEmpty
                         {
                             Button(modelo.retranscribiendo ? "Retranscribiendo…" : "Retranscribir") {
@@ -673,7 +801,7 @@ struct VistaDeGrabadora: View {
                             .buttonStyle(.plain)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Paleta.grabadora)
-                            .disabled(modelo.retranscribiendo)
+                            .disabled(modelo.retranscribiendo || modelo.diarizando)
                         }
 
                         if let reunion = reunionSeleccionada,
@@ -716,7 +844,18 @@ struct VistaDeGrabadora: View {
                         }
                     }
 
-                    if let errorResumen = modelo.errorDeResumen, !mostrandoBusqueda {
+                    if let estadoDiarizacion = modelo.estadoDiarizacion, !mostrandoBusqueda {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text(estadoDiarizacion)
+                                .font(.system(size: 10))
+                                .foregroundStyle(Paleta.bandeja)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    if let errorResumen = modelo.errorDeResumen ?? modelo.mensajeDeError, !mostrandoBusqueda {
                         Text(errorResumen)
                             .font(.system(size: 10))
                             .foregroundStyle(Paleta.portapapeles)
@@ -732,7 +871,7 @@ struct VistaDeGrabadora: View {
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 4) {
                                     ForEach(lista) { seg in
-                                        filaSegmento(seg)
+                                        filaSegmento(seg, enHistorial: !mostrandoBusqueda)
                                     }
                                 }
                             }

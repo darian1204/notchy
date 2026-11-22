@@ -12,6 +12,7 @@ import Testing
         "v3-grabadora-y-reuniones",
         "v4-notas-de-reunion",
         "v5-agente-historial",
+        "v6-diarizacion-de-reuniones",
     ]
 
     @Test func v1CreaMetaConLaFechaDeCreacion() throws {

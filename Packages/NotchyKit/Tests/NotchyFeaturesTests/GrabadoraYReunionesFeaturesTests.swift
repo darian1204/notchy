@@ -211,6 +211,8 @@ struct GrabadoraYReunionesFeaturesTests {
         modelo.iniciar()
         #expect(modelo.reunionSeleccionadaID == "reu-m5")
         #expect(modelo.notaDeReunionSeleccionada == nil)
+        #expect(modelo.seccionDetalleHistorial == .transcripcion)
+        #expect(modelo.idsDeReunionesConNota.isEmpty)
 
         // Si Apple Intelligence no está disponible, muestra error
         resumenFalso.listo = false
@@ -218,7 +220,7 @@ struct GrabadoraYReunionesFeaturesTests {
         #expect(fallida == nil)
         #expect(modelo.errorDeResumen?.contains("Apple Intelligence") == true)
 
-        // Cuando está disponible, resume y guarda en la base
+        // Cuando está disponible, resume, guarda en la base y abre la pestaña Notas
         resumenFalso.listo = true
         let generada = try #require(await modelo.resumirReunion(reunion))
         #expect(modelo.errorDeResumen == nil)
@@ -226,6 +228,22 @@ struct GrabadoraYReunionesFeaturesTests {
         #expect(generada.markdown.contains("## Decisiones"))
         #expect(generada.markdown.contains("## Tareas"))
         #expect(modelo.notaDeReunionSeleccionada?.editadaEn == nil)
+        #expect(modelo.seccionDetalleHistorial == .notas)
+        #expect(modelo.tieneNotaGuardada("reu-m5"))
+
+        // Al cambiar a una reunión sin nota abre en Transcripción; al volver a una con nota abre en Notas
+        let reunionSinNota = ReunionGrabada(
+            id: "reu-sin-nota",
+            titulo: "Sin nota",
+            inicio: inicio.addingTimeInterval(3600),
+            estado: .finalizada
+        )
+        try repo.guardarReunion(reunionSinNota)
+        modelo.recargarDatos()
+        modelo.reunionSeleccionadaID = "reu-sin-nota"
+        #expect(modelo.seccionDetalleHistorial == .transcripcion)
+        modelo.reunionSeleccionadaID = "reu-m5"
+        #expect(modelo.seccionDetalleHistorial == .notas)
 
         // Editar nota actualiza editada_en
         let fechaEdicion = Date(timeIntervalSince1970: 1_763_690_000)
@@ -248,24 +266,121 @@ struct GrabadoraYReunionesFeaturesTests {
         #expect(exportacion.contenido.contains("- Nota editada a mano"))
         #expect(
             exportacion.contenido.contains(
-                "## Transcripción\n**[00:12]** Vamos a guardar las notas de reunión en SQLite."))
+                "## Transcripción\n**[00:12] Tú:** Vamos a guardar las notas de reunión en SQLite."))
+    }
+
+    @Test
+    func diarizaPrimeroYResumeDespuesConNombresDeHablante() async throws {
+        let base = try BaseDeDatos.enMemoria()
+        let repo = RepositorioDeGrabadoraYReuniones(base)
+        let captura = CapturaDeAudioFalsa()
+        let escritor = EscritorDeAudioFalso()
+        let transcripcion = TranscripcionFalsa()
+        let diarizacion = DiarizacionFalsa()
+        let resumenFalso = ResumenDeTextoFalso()
+        let bus = BusDeEventos()
+        let carpeta = FileManager.default.temporaryDirectory.appending(path: "notchy-diar-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: carpeta) }
+
+        let modelo = ModeloDeGrabadora(
+            captura: captura,
+            escritor: escritor,
+            transcripcion: transcripcion,
+            diarizacion: diarizacion,
+            resumenDeTexto: resumenFalso,
+            repositorio: repo,
+            carpetaAudio: carpeta,
+            bus: bus
+        )
+        let resumidor = ResumidorDeReuniones(
+            bus: bus,
+            modelo: resumenFalso,
+            ajustes: Ajustes(almacen: AlmacenEnMemoriaGrabadoraTests()),
+            repositorio: repo,
+            segmentosDe: { id in (try? repo.listarSegmentos(reunionID: id)) ?? [] },
+            escribirEnInbox: { _ in true },
+            alGuardarNota: { _ in modelo.recargarNotaDeReunionSeleccionada() }
+        )
+        resumidor.arrancar()
+        defer { resumidor.detener() }
+
+        modelo.iniciar()
+        await modelo.iniciarReunion(tituloPersonalizado: "Reunión en persona")
+
+        // Crear el archivo ficticio en la ruta del escritor para que la diarización lo encuentre
+        if let rutaMic = escritor.rutasMicrofono.first {
+            FileManager.default.createFile(atPath: rutaMic, contents: Data([0, 1, 2]))
+        }
+
+        diarizacion.tramos = [
+            TramoDeHablante(hablanteID: "spk-a", inicio: 0, fin: 6),
+            TramoDeHablante(hablanteID: "spk-b", inicio: 6, fin: 15),
+        ]
+
+        transcripcion.emitir(
+            ResultadoDeTranscripcion(
+                fuente: .microfono,
+                texto: String(
+                    repeating: "Revisamos la arquitectura completa de la aplicación y los módulos. ", count: 3),
+                esFinal: true
+            )
+        )
+        try await Task.sleep(for: .milliseconds(20))
+
+        await modelo.detenerGrabacion()
+        try await Task.sleep(for: .milliseconds(80))
+
+        #expect(diarizacion.llamadas == 1)
+        #expect(modelo.segmentosDeReunionSeleccionada.first?.hablante == "Persona 1")
+        #expect(resumenFalso.ultimoTextoRecibido?.contains("Persona 1:") == true)
+        #expect(modelo.notaDeReunionSeleccionada != nil)
+        #expect(modelo.seccionDetalleHistorial == .notas)
+
+        if let reunionGuardada = modelo.reunionesGuardadas.first {
+            modelo.renombrarHablante(reunionID: reunionGuardada.id, hablanteID: "Persona 1", nuevoNombre: "Darian")
+            #expect(modelo.nombresHablantesDeReunionSeleccionada["Persona 1"] == "Darian")
+            if let seg = modelo.segmentosDeReunionSeleccionada.first {
+                #expect(modelo.nombreVisibleDeHablante(para: seg) == "Darian")
+            }
+        }
+    }
+}
+
+private final class AlmacenEnMemoriaGrabadoraTests: AlmacenDeAjustes, @unchecked Sendable {
+    private var datos: [String: Data] = [:]
+    func leer(_ clave: String) -> Data? { datos[clave] }
+    func guardar(_ dato: Data?, en clave: String) { datos[clave] = dato }
+}
+
+private final class DiarizacionFalsa: PuertoDeDiarizacion, @unchecked Sendable {
+    var listo = true
+    var tramos: [TramoDeHablante] = []
+    var llamadas = 0
+
+    func disponible() async -> Bool { listo }
+    func diarizar(archivos: [URL]) async throws -> [TramoDeHablante] {
+        llamadas += 1
+        return tramos
     }
 }
 
 private final class ResumenDeTextoFalso: PuertoDeResumenDeTexto, @unchecked Sendable {
     var listo = true
+    var ultimoTextoRecibido: String?
     func disponible() async -> Bool { listo }
     func resumir(_ texto: String, instrucciones: String) async throws -> String {
-        """
-        ## Resumen
-        - Se acordó guardar en SQLite.
+        ultimoTextoRecibido = texto
+        return """
+            ## Resumen
+            - Se acordó guardar en SQLite.
 
-        ## Decisiones
-        - Tabla meeting_note con cascada.
+            ## Decisiones
+            - Tabla meeting_note con cascada.
 
-        ## Tareas
-        - [ ] Escribir pruebas — Darian
-        """
+            ## Tareas
+            - [ ] Escribir pruebas — Darian
+            """
     }
 }
 

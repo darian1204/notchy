@@ -244,6 +244,7 @@ public final class ModeloDeAjustesYDiagnostico {
                 diasRetencionAudioReuniones: ajustes.diasRetencionAudioReuniones,
                 guardarAudioReuniones: ajustes.guardarAudioReuniones,
                 resumirReunionesEnInbox: ajustes.resumirReunionesEnInbox,
+                separarVocesEnReuniones: ajustes.separarVocesEnReuniones,
                 idiomaTranscripcionPorDefecto: ajustes.idiomaTranscripcionPorDefecto.rawValue,
                 preferirMicrofonoInternoConBluetooth: ajustes.preferirMicrofonoInternoConBluetooth,
                 accesosRapidos: ajustes.accesosRapidos
@@ -307,6 +308,7 @@ private struct AjustesNoSensiblesExportados: Codable, Sendable {
     let diasRetencionAudioReuniones: Int
     let guardarAudioReuniones: Bool
     let resumirReunionesEnInbox: Bool
+    let separarVocesEnReuniones: Bool
     let idiomaTranscripcionPorDefecto: String
     let preferirMicrofonoInternoConBluetooth: Bool
     let accesosRapidos: [String]

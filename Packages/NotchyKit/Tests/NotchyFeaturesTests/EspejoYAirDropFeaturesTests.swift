@@ -354,7 +354,7 @@ extension EspejoYAirDropFeaturesTests {
         // 1) Sin red usa respaldo Apple y muestra el aviso
         puerto.redDisponible = false
         modelo.enviarPrompt("¿Qué tengo hoy?")
-        try await Task.sleep(for: .milliseconds(80))
+        try await esperarHasta { modelo.mensajes.last?.texto == "Respuesta local de Apple" }
         #expect(modelo.avisoDeRespaldoLocal == "Sin red: respondo con el modelo de Apple")
         #expect(modelo.mensajes.contains { $0.texto == "Sin red: respondo con el modelo de Apple" })
         #expect(modelo.mensajes.last?.texto == "Respuesta local de Apple")
@@ -365,7 +365,7 @@ extension EspejoYAirDropFeaturesTests {
         puerto.redDisponible = true
         modelo.modeloSeleccionado = "opencode/big-pickle"
         modelo.enviarPrompt("Continúa")
-        try await Task.sleep(for: .milliseconds(80))
+        try await esperarHasta { modelo.sesionID == "ses_prueba_123" }
         #expect(puerto.ultimoPromptEnviado?.contains("Contexto reciente de la conversación") == true)
         #expect(modelo.sesionID == "ses_prueba_123")
 
@@ -387,5 +387,14 @@ extension EspejoYAirDropFeaturesTests {
         let modeloMonitor = ModeloDeMonitorSistema(puerto: monitor)
         #expect(modeloMonitor.metricas.bateriaPorcentaje == 82)
         #expect(MetricasDelSistema.formatearVelocidadRed(15_360) == "15.00 KB/s")
+    }
+}
+
+/// Espera a que se cumpla una condición del MainActor (hasta 3 s) en vez de dormir un tiempo fijo.
+@MainActor
+private func esperarHasta(_ condicion: @MainActor () -> Bool) async throws {
+    for _ in 0..<300 {
+        if condicion() { return }
+        try await Task.sleep(for: .milliseconds(10))
     }
 }

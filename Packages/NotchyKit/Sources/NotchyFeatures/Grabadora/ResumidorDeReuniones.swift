@@ -15,6 +15,7 @@ public final class ResumidorDeReuniones {
     private let ajustes: Ajustes
     private let repositorio: RepositorioDeGrabadoraYReuniones?
     private let segmentosDe: @MainActor (String) -> [SegmentoDeTranscripcion]
+    private let nombresDeHablantesDe: @MainActor (String) -> [String: String]
     private let escribirEnInbox: @MainActor (String) -> Bool
     private let alGuardarNota: (@MainActor (NotaDeReunion) -> Void)?
     private let log = Registro.de(.grabadora)
@@ -26,6 +27,7 @@ public final class ResumidorDeReuniones {
         ajustes: Ajustes,
         repositorio: RepositorioDeGrabadoraYReuniones? = nil,
         segmentosDe: @escaping @MainActor (String) -> [SegmentoDeTranscripcion],
+        nombresDeHablantesDe: (@MainActor (String) -> [String: String])? = nil,
         escribirEnInbox: @escaping @MainActor (String) -> Bool,
         alGuardarNota: (@MainActor (NotaDeReunion) -> Void)? = nil
     ) {
@@ -34,6 +36,11 @@ public final class ResumidorDeReuniones {
         self.ajustes = ajustes
         self.repositorio = repositorio
         self.segmentosDe = segmentosDe
+        self.nombresDeHablantesDe =
+            nombresDeHablantesDe
+            ?? { [repositorio] id in
+                (try? repositorio?.listarNombresDeHablantes(reunionID: id)) ?? [:]
+            }
         self.escribirEnInbox = escribirEnInbox
         self.alGuardarNota = alGuardarNota
     }
@@ -57,7 +64,11 @@ public final class ResumidorDeReuniones {
     /// Resume la reunión, guarda siempre la nota en la base y devuelve el texto resumido (o la nota de inbox si el ajuste está activo).
     @discardableResult
     func procesar(_ reunion: ReunionGrabada) async -> String? {
-        let texto = ModeloDeGrabadora.textoDeTranscripcion(segmentosDe(reunion.id))
+        let nombres = nombresDeHablantesDe(reunion.id)
+        let texto = ModeloDeGrabadora.textoDeTranscripcion(
+            segmentosDe(reunion.id),
+            nombresHablantes: nombres
+        )
         guard texto.count >= Self.minimoDeCaracteres else { return nil }
         guard await modelo.disponible() else {
             log.info("Apple Intelligence no está disponible; no se resume la reunión.")

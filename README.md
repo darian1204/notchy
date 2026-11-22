@@ -129,13 +129,13 @@ Nada. Notchy es un proyecto personal que comparto con amigos. No tiene anuncios 
 <details>
 <summary><b>¿Necesito internet?</b></summary>
 
-La mayoría de los módulos funcionan sin conexión. El clima y el asistente sí necesitan internet.
+La mayoría de los módulos funcionan sin conexión. El clima y el asistente sí necesitan internet. La separación de voces en reuniones usa internet solo la primera vez para descargar a tu Mac los modelos locales de CoreML (FluidAudio).
 </details>
 
 <details>
 <summary><b>¿Mis reuniones se suben a algún servidor?</b></summary>
 
-No. El audio, la transcripción y el resumen se guardan y procesan en tu Mac.
+No. El audio, la transcripción, la separación de voces (diarización local con FluidAudio/CoreML) y el resumen se guardan y procesan en tu Mac; la única conexión de red de la grabadora es la descarga única de los modelos de diarización la primera vez que se usa.
 </details>
 
 <details>

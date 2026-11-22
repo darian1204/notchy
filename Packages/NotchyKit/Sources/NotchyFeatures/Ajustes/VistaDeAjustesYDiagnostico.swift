@@ -269,6 +269,14 @@ public struct VistaDeAjustesYDiagnostico: View {
             }
 
             Section("Reuniones") {
+                Toggle("Separar voces del micrófono en reuniones", isOn: ajustes.separarVocesEnReuniones)
+                    .accessibilityLabel("Separar voces del micrófono en reuniones")
+                Text(
+                    "Distingue entre varios hablantes en reuniones en persona (Persona 1, Persona 2…) en tu Mac. La primera vez descarga los modelos."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 Toggle("Resumir cada reunión en el inbox de Obsidian", isOn: ajustes.resumirReunionesEnInbox)
                     .accessibilityLabel("Resumir cada reunión en el inbox de Obsidian")
                 Text(

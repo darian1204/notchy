@@ -54,10 +54,14 @@ public final class ModeloDeGrabadora {
 
     public private(set) var notasDeVoz: [NotaDeVoz] = []
     public private(set) var reunionesGuardadas: [ReunionGrabada] = []
+    public private(set) var idsDeReunionesConNota: Set<String> = []
     public private(set) var segmentosDeReunionSeleccionada: [SegmentoDeTranscripcion] = []
+    public private(set) var nombresHablantesDeReunionSeleccionada: [String: String] = [:]
     public private(set) var notaDeReunionSeleccionada: NotaDeReunion?
     public var seccionDetalleHistorial: SeccionDetalleDeReunion = .transcripcion
     public private(set) var resumiendo = false
+    public private(set) var diarizando = false
+    public private(set) var estadoDiarizacion: String?
     public private(set) var errorDeResumen: String?
     public private(set) var notaCopiada = false
     private var tareaAvisoNotaCopiada: Task<Void, Never>?
@@ -77,6 +81,7 @@ public final class ModeloDeGrabadora {
     @ObservationIgnored private let captura: any PuertoDeCapturaDeAudio
     @ObservationIgnored private let escritor: any PuertoDeEscritorDeAudio
     @ObservationIgnored private let transcripcion: any PuertoDeTranscripcion
+    @ObservationIgnored private let diarizacion: (any PuertoDeDiarizacion)?
     @ObservationIgnored private let resumenDeTexto: (any PuertoDeResumenDeTexto)?
     @ObservationIgnored private let escribirEnInbox: (@MainActor (String) -> Bool)?
     @ObservationIgnored private let repositorio: RepositorioDeGrabadoraYReuniones?
@@ -96,6 +101,7 @@ public final class ModeloDeGrabadora {
         captura: any PuertoDeCapturaDeAudio,
         escritor: any PuertoDeEscritorDeAudio,
         transcripcion: any PuertoDeTranscripcion,
+        diarizacion: (any PuertoDeDiarizacion)? = nil,
         resumenDeTexto: (any PuertoDeResumenDeTexto)? = nil,
         escribirEnInbox: (@MainActor (String) -> Bool)? = nil,
         repositorio: RepositorioDeGrabadoraYReuniones? = nil,
@@ -108,6 +114,7 @@ public final class ModeloDeGrabadora {
         self.captura = captura
         self.escritor = escritor
         self.transcripcion = transcripcion
+        self.diarizacion = diarizacion
         self.resumenDeTexto = resumenDeTexto
         self.escribirEnInbox = escribirEnInbox
         self.repositorio = repositorio
@@ -168,6 +175,7 @@ public final class ModeloDeGrabadora {
         do {
             notasDeVoz = try repositorio.listarNotasDeVoz()
             reunionesGuardadas = try repositorio.listarReuniones()
+            idsDeReunionesConNota = (try? repositorio.idsDeReunionesConNota()) ?? []
             let entradas = try repositorio.listarGlosario()
             if !entradas.isEmpty {
                 glosario = entradas
@@ -180,6 +188,14 @@ public final class ModeloDeGrabadora {
         } catch {
             log.error("No se pudieron cargar las grabaciones: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    public func tieneNotaGuardada(_ reunionID: String) -> Bool {
+        idsDeReunionesConNota.contains(reunionID)
+    }
+
+    public func nombreVisibleDeHablante(para segmento: SegmentoDeTranscripcion) -> String {
+        segmento.etiquetaDeHablante(nombres: nombresHablantesDeReunionSeleccionada)
     }
 
     // MARK: - Reuniones con transcripción en vivo (GRB-2 a GRB-8)
@@ -364,10 +380,12 @@ public final class ModeloDeGrabadora {
         Task { await publicarEstadoDeGrabacion() }
     }
 
-    /// Texto plano de una transcripción: `[mm:ss] Tú: …`, una línea por segmento, con título opcional.
-    public nonisolated static func textoDeTranscripcion(_ segmentos: [SegmentoDeTranscripcion], titulo: String? = nil)
-        -> String
-    {
+    /// Texto plano de una transcripción: `[mm:ss] Tú: …` (o el nombre del hablante), una línea por segmento, con título opcional.
+    public nonisolated static func textoDeTranscripcion(
+        _ segmentos: [SegmentoDeTranscripcion],
+        titulo: String? = nil,
+        nombresHablantes: [String: String] = [:]
+    ) -> String {
         var lineas: [String] = []
         if let titulo = titulo?.trimmingCharacters(in: .whitespacesAndNewlines), !titulo.isEmpty {
             lineas.append(titulo)
@@ -376,14 +394,19 @@ public final class ModeloDeGrabadora {
         for seg in segmentos {
             let texto = seg.texto.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !texto.isEmpty else { continue }
-            lineas.append("[\(seg.marcaDeTiempoFormateada)] \(seg.fuente.etiqueta): \(texto)")
+            let etiqueta = seg.etiquetaDeHablante(nombres: nombresHablantes)
+            lineas.append("[\(seg.marcaDeTiempoFormateada)] \(etiqueta): \(texto)")
         }
         return lineas.joined(separator: "\n")
     }
 
     /// Copia la transcripción al portapapeles del sistema y marca `transcripcionCopiada` por 1.5 s.
     public func copiarTranscripcion(_ segmentos: [SegmentoDeTranscripcion], titulo: String? = nil) {
-        let texto = Self.textoDeTranscripcion(segmentos, titulo: titulo)
+        let texto = Self.textoDeTranscripcion(
+            segmentos,
+            titulo: titulo,
+            nombresHablantes: nombresHablantesDeReunionSeleccionada
+        )
         guard !texto.isEmpty else { return }
         let pasta = NSPasteboard.general
         pasta.clearContents()
@@ -465,6 +488,9 @@ public final class ModeloDeGrabadora {
                 reunion.desfaseInicialMs = estadisticasCaptura.desfaseInicialMs
                 reunionActual = nil
                 try? repositorio?.guardarReunion(reunion)
+                if ajustes.separarVocesEnReuniones {
+                    await ejecutarDiarizacionAutomatica(para: reunion)
+                }
                 reunionSeleccionadaID = reunion.id
                 if let bus {
                     await bus.publicar(ReunionTerminada(reunion: reunion))
@@ -582,6 +608,7 @@ public final class ModeloDeGrabadora {
             try? FileManager.default.removeItem(atPath: ruta)
         }
         reunionesGuardadas.removeAll { $0.id == reunion.id }
+        idsDeReunionesConNota.remove(reunion.id)
         if reunionSeleccionadaID == reunion.id {
             reunionSeleccionadaID = reunionesGuardadas.first?.id
         }
@@ -603,12 +630,125 @@ public final class ModeloDeGrabadora {
         }
         notasDeVoz.removeAll()
         reunionesGuardadas.removeAll()
+        idsDeReunionesConNota.removeAll()
         segmentosDeReunionSeleccionada.removeAll()
+        nombresHablantesDeReunionSeleccionada.removeAll()
         notaDeReunionSeleccionada = nil
         errorDeResumen = nil
         resultadosBusqueda.removeAll()
         reunionSeleccionadaID = nil
         consultaBusqueda = ""
+    }
+
+    // MARK: - Separación de voces (diarización en el micrófono)
+
+    /// Separa las voces del micrófono de una reunión grabada usando el puerto de diarización y actualiza los segmentos.
+    @discardableResult
+    public func separarVocesDeReunion(_ reunion: ReunionGrabada) async -> Bool {
+        guard let diarizacion else {
+            mensajeDeError = "La separación de voces no está disponible en este Mac."
+            return false
+        }
+        let urls =
+            reunion.rutasAudioMicrofono
+            .map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !urls.isEmpty else {
+            mensajeDeError = "Esta reunión no tiene archivos de audio del micrófono guardados."
+            return false
+        }
+        guard await diarizacion.disponible() else {
+            mensajeDeError = "La separación de voces no está disponible."
+            return false
+        }
+        diarizando = true
+        estadoDiarizacion = "Separando voces (la primera vez descarga los modelos)…"
+        defer {
+            diarizando = false
+            estadoDiarizacion = nil
+        }
+        do {
+            let tramos = try await diarizacion.diarizar(archivos: urls)
+            let existentes: [SegmentoDeTranscripcion]
+            if let repositorio, let guardados = try? repositorio.listarSegmentos(reunionID: reunion.id) {
+                existentes = guardados
+            } else if reunionSeleccionadaID == reunion.id {
+                existentes = segmentosDeReunionSeleccionada
+            } else {
+                existentes = []
+            }
+            let asignacion = AsignadorDeHablantes.asignar(segmentos: existentes, tramos: tramos)
+            try repositorio?.guardarAsignacionDeHablantes(
+                reunionID: reunion.id,
+                segmentos: asignacion.segmentos,
+                hablantes: asignacion.hablantes
+            )
+            if reunionSeleccionadaID == reunion.id {
+                segmentosDeReunionSeleccionada = asignacion.segmentos
+                if let repositorio, let nombres = try? repositorio.listarNombresDeHablantes(reunionID: reunion.id) {
+                    nombresHablantesDeReunionSeleccionada = nombres
+                } else {
+                    var mapa: [String: String] = [:]
+                    for h in asignacion.hablantes { mapa[h] = h }
+                    nombresHablantesDeReunionSeleccionada = mapa
+                }
+            }
+            mensajeDeError = nil
+            return true
+        } catch {
+            log.error("Fallo al separar voces de la reunión: \(error.localizedDescription, privacy: .public)")
+            mensajeDeError = "No se pudieron separar las voces: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// Renombra un hablante de la reunión seleccionada y persiste el cambio para todos sus segmentos.
+    public func renombrarHablante(reunionID: String, hablanteID: String, nuevoNombre: String) {
+        let idLimpio = hablanteID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nombreLimpio = nuevoNombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !idLimpio.isEmpty, !nombreLimpio.isEmpty else { return }
+        try? repositorio?.renombrarHablante(
+            reunionID: reunionID,
+            hablanteID: idLimpio,
+            nombre: nombreLimpio
+        )
+        if reunionSeleccionadaID == reunionID {
+            if let repositorio, let nombres = try? repositorio.listarNombresDeHablantes(reunionID: reunionID) {
+                nombresHablantesDeReunionSeleccionada = nombres
+            } else {
+                nombresHablantesDeReunionSeleccionada[idLimpio] = nombreLimpio
+            }
+        }
+    }
+
+    private func ejecutarDiarizacionAutomatica(para reunion: ReunionGrabada) async {
+        guard let diarizacion else { return }
+        let urls =
+            reunion.rutasAudioMicrofono
+            .map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !urls.isEmpty else { return }
+        guard await diarizacion.disponible() else { return }
+        diarizando = true
+        estadoDiarizacion = "Separando voces…"
+        defer {
+            diarizando = false
+            estadoDiarizacion = nil
+        }
+        do {
+            let tramos = try await diarizacion.diarizar(archivos: urls)
+            guard let repositorio else { return }
+            let existentes = try repositorio.listarSegmentos(reunionID: reunion.id)
+            let asignacion = AsignadorDeHablantes.asignar(segmentos: existentes, tramos: tramos)
+            try repositorio.guardarAsignacionDeHablantes(
+                reunionID: reunion.id,
+                segmentos: asignacion.segmentos,
+                hablantes: asignacion.hablantes
+            )
+        } catch {
+            log.error(
+                "No se pudo separar las voces al terminar la reunión: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Notas de reunión: resumen a pedido, edición, copia y exportación (NOT-1, NOT-2)
@@ -629,7 +769,10 @@ public final class ModeloDeGrabadora {
         } else {
             segmentos = []
         }
-        let texto = Self.textoDeTranscripcion(segmentos)
+        let nombres =
+            (try? repositorio?.listarNombresDeHablantes(reunionID: reunion.id))
+            ?? (reunionSeleccionadaID == reunion.id ? nombresHablantesDeReunionSeleccionada : [:])
+        let texto = Self.textoDeTranscripcion(segmentos, nombresHablantes: nombres)
         guard !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorDeResumen = "Esta reunión no tiene transcripción para resumir."
             return nil
@@ -653,8 +796,10 @@ public final class ModeloDeGrabadora {
                 editadaEn: nil
             )
             try repositorio?.guardarNotaDeReunion(nota)
+            idsDeReunionesConNota.insert(reunion.id)
             if reunionSeleccionadaID == reunion.id {
                 notaDeReunionSeleccionada = nota
+                seccionDetalleHistorial = .notas
             }
             if ajustes.resumirReunionesEnInbox {
                 let fin = reunion.fin ?? .now
@@ -688,6 +833,7 @@ public final class ModeloDeGrabadora {
             editadaEn: ahora
         )
         try? repositorio?.guardarNotaDeReunion(actualizada)
+        idsDeReunionesConNota.insert(reunionID)
         if reunionSeleccionadaID == reunionID {
             notaDeReunionSeleccionada = actualizada
         }
@@ -696,8 +842,13 @@ public final class ModeloDeGrabadora {
 
     /// Refresca la nota de la reunión seleccionada si el resumidor en segundo plano acaba de guardarla.
     public func recargarNotaDeReunionSeleccionada() {
-        guard let id = reunionSeleccionadaID, let repositorio else { return }
+        guard let repositorio else { return }
+        idsDeReunionesConNota = (try? repositorio.idsDeReunionesConNota()) ?? idsDeReunionesConNota
+        guard let id = reunionSeleccionadaID else { return }
         notaDeReunionSeleccionada = try? repositorio.obtenerNotaDeReunion(reunionID: id)
+        if notaDeReunionSeleccionada != nil {
+            seccionDetalleHistorial = .notas
+        }
     }
 
     /// Copia el Markdown de la nota al portapapeles del sistema y marca `notaCopiada` por 1.5 s.
@@ -733,11 +884,15 @@ public final class ModeloDeGrabadora {
         } else {
             segmentos = []
         }
+        let nombres =
+            (try? repositorio?.listarNombresDeHablantes(reunionID: reunion.id))
+            ?? (reunionSeleccionadaID == reunion.id ? nombresHablantesDeReunionSeleccionada : [:])
         let nombre = RedaccionDeResumen.nombreArchivoMarkdown(titulo: reunion.titulo, fecha: reunion.inicio)
         let contenido = RedaccionDeResumen.markdownExportable(
             reunion: reunion,
             notaMarkdown: nota?.markdown,
-            segmentos: segmentos
+            segmentos: segmentos,
+            nombresHablantes: nombres
         )
         return (nombre, contenido)
     }
@@ -868,11 +1023,21 @@ public final class ModeloDeGrabadora {
     private func cargarSegmentosDeSeleccionada() {
         guard let id = reunionSeleccionadaID, let repositorio else {
             segmentosDeReunionSeleccionada = []
+            nombresHablantesDeReunionSeleccionada = [:]
             notaDeReunionSeleccionada = nil
+            seccionDetalleHistorial = .transcripcion
             return
         }
         segmentosDeReunionSeleccionada = (try? repositorio.listarSegmentos(reunionID: id)) ?? []
+        nombresHablantesDeReunionSeleccionada = (try? repositorio.listarNombresDeHablantes(reunionID: id)) ?? [:]
         notaDeReunionSeleccionada = try? repositorio.obtenerNotaDeReunion(reunionID: id)
+        if notaDeReunionSeleccionada != nil {
+            idsDeReunionesConNota.insert(id)
+            seccionDetalleHistorial = .notas
+        } else {
+            idsDeReunionesConNota.remove(id)
+            seccionDetalleHistorial = .transcripcion
+        }
     }
 
     private func actualizarBusqueda() {
