@@ -73,19 +73,21 @@ struct VistaPreviaDeVidrio: View {
     @ViewBuilder private func fondoDeIsla(_ forma: UnevenRoundedRectangle) -> some View {
         let color = Color(hex: tema.hexBase)
         if vidrio.fondo {
-            forma
-                .fill(
+            ZStack {
+                forma.fill(vidrio.capa(color, minimo: 0.12))
+                forma.fill(
                     LinearGradient(
                         stops: [
                             .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.12),
-                            .init(color: .black.opacity(0), location: 1),
+                            .init(color: .black, location: 0.1),
+                            .init(color: .black.opacity(0), location: 0.25),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 )
-                .glassEffect(vidrio.materialDeFondo(color: color), in: forma)
+            }
+            .glassEffect(vidrio.material(), in: forma)
         } else {
             forma.fill(LinearGradient(colors: [.black, color], startPoint: .top, endPoint: .bottom))
         }
