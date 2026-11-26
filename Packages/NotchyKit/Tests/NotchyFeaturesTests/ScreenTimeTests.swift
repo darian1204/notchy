@@ -8,13 +8,15 @@ import Testing
 private final class Mundo {
     var ahora: Date
     var sinUsar: TimeInterval = 0
+    var video = false
     init(_ ahora: Date) { self.ahora = ahora }
 }
 
 @MainActor
 struct ScreenTimeTests {
     private func modelo(_ mundo: Mundo, _ defaults: UserDefaults) -> ModeloDeScreenTime {
-        ModeloDeScreenTime(defaults: defaults, ahora: { mundo.ahora }, segundosSinUsar: { mundo.sinUsar })
+        ModeloDeScreenTime(
+            defaults: defaults, ahora: { mundo.ahora }, segundosSinUsar: { mundo.sinUsar }, hayVideo: { mundo.video })
     }
 
     private func defaultsDePrueba() -> (UserDefaults, String) {
@@ -85,5 +87,18 @@ struct ScreenTimeTests {
         primero.registrarTiempoManual(bundleID: "com.apple.Safari", nombre: "Safari", segundos: 600)
         let segundo = modelo(mundo, defaults)
         #expect(segundo.usosPorApp.map(\.bundleId) == ["com.apple.Safari"])
+    }
+
+    @Test func conUnVideoCuentaAunqueNoSeToqueNada() {
+        let (defaults, nombre) = defaultsDePrueba()
+        defer { defaults.removePersistentDomain(forName: nombre) }
+        let mundo = Mundo(fecha(26, 21))
+        let modelo = modelo(mundo, defaults)
+        mundo.sinUsar = 1800
+        mundo.video = true
+        modelo.tic()
+        mundo.ahora += 10
+        modelo.tic()
+        #expect(modelo.usosPorApp.reduce(0) { $0 + $1.segundos } == 10)
     }
 }
