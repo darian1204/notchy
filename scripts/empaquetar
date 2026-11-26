@@ -55,15 +55,15 @@ tell application "Finder"
     set current view of ventana to icon view
     set toolbar visible of ventana to false
     set statusbar visible of ventana to false
-    set bounds of ventana to {200, 120, 860, 520}
+    set bounds of ventana to {200, 120, 860, 600}
     set opciones to icon view options of ventana
     set arrangement of opciones to not arranged
     set icon size of opciones to 112
     set text size of opciones to 13
-    set position of item "Notchy.app" of ventana to {150, 150}
-    set position of item "Aplicaciones" of ventana to {500, 150}
+    set position of item "Notchy.app" of ventana to {150, 140}
+    set position of item "Aplicaciones" of ventana to {500, 140}
     try
-        set position of item "Instrucciones de instalación.pdf" of ventana to {325, 300}
+        set position of item "Instrucciones de instalación.pdf" of ventana to {325, 320}
     end try
     update disco without registering applications
     delay 1
@@ -71,7 +71,8 @@ tell application "Finder"
 end tell
 APPLESCRIPT
 sync
-hdiutil detach "$MONTAJE" -quiet
+osascript -e 'tell application "Finder"' -e 'try' -e 'close window "Notchy"' -e 'end try' -e 'end tell' > /dev/null 2>&1
+hdiutil detach "$MONTAJE" -quiet -force
 hdiutil convert $RAIZ/build/notchy-rw.dmg -format UDZO -o $DIST/Notchy.dmg > /dev/null 2>&1
 rm -f $RAIZ/build/notchy-rw.dmg
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" $APP_RELEASE/Contents/Info.plist)

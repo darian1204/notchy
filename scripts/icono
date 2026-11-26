@@ -27,4 +27,6 @@ cat > $SET/Contents.json << 'JSON'
   "info" : { "author" : "xcode", "version" : 1 }
 }
 JSON
-print -- "AppIcon generado en $SET"
+# La portada de las instrucciones usa el mismo ícono.
+sips -z 512 512 $TMP/icono-raw.png --out $RAIZ/docs/instalacion/capturas/icono.png > /dev/null
+print -- "AppIcon generado en $SET (y la portada de docs/instalacion)"
