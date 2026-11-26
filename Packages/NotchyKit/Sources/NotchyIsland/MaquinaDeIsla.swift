@@ -39,6 +39,8 @@ public struct MaquinaDeIsla: Sendable {
         case mostrarAviso(modulo: String)
         /// Los módulos activos, en orden. Cambia con los ajustes.
         case modulosDisponibles([String])
+        /// Ajustes abiertos: la isla se queda abierta para ver los cambios al momento.
+        case fijar(Bool)
     }
 
     public static let retardoAlAbrir: Duration = .milliseconds(120)
@@ -55,6 +57,8 @@ public struct MaquinaDeIsla: Sendable {
     public private(set) var cursorDentro = false
     /// Abierta con el atajo o desde un menú: no depende del cursor, así que Esc debe poder cerrarla.
     public private(set) var abiertaSinCursor = false
+    /// Mientras está fijada, ni el cursor, ni un clic fuera, ni Esc la cierran; el atajo sí.
+    public private(set) var fijada = false
     private var expandido: String?
     /// Último módulo abierto, recordado durante `memoriaDelUltimoModulo` tras cerrar.
     private var recordado: String?
@@ -91,6 +95,7 @@ public struct MaquinaDeIsla: Sendable {
             guard let expandido else {
                 return [.cancelar(.abrir)]
             }
+            if fijada { return [.cancelar(.abrir)] }
             let espera = expandido == "espejo" ? Self.retardoAlCerrarEspejo : Self.retardoAlCerrar
             return [.cancelar(.abrir), .programar(.cerrar, espera)]
 
@@ -100,7 +105,7 @@ public struct MaquinaDeIsla: Sendable {
             return [.cancelar(.olvidar)]
 
         case .vencio(.cerrar):
-            return cursorDentro ? [] : cerrar()
+            return cursorDentro || fijada ? [] : cerrar()
 
         case .vencio(.aviso):
             aviso = nil
@@ -111,7 +116,18 @@ public struct MaquinaDeIsla: Sendable {
             return []
 
         case .clicFuera, .escape:
-            return cerrar()
+            return fijada ? [] : cerrar()
+
+        case .fijar(true):
+            fijada = true
+            guard expandido == nil else { return [.cancelar(.cerrar)] }
+            abrir(moduloAlAbrir, sinCursor: !cursorDentro)
+            return [.cancelar(.abrir), .cancelar(.cerrar), .cancelar(.olvidar)]
+
+        case .fijar(false):
+            fijada = false
+            guard expandido != nil, !cursorDentro else { return [] }
+            return [.programar(.cerrar, Self.retardoAlCerrar)]
 
         case .atajo:
             if expandido != nil {

@@ -245,4 +245,48 @@ import Testing
         _ = maquina.recibir(.vencio(.aviso))
         #expect(maquina.estado == .reposo)
     }
+
+    @Test func fijadaSeAbreYNoSeCierraConCursorClicNiEsc() {
+        var maquina = maquina()
+        _ = maquina.recibir(.fijar(true))
+        #expect(maquina.estado == .expandido(modulo: "inicio"))
+        _ = maquina.recibir(.cursorEntro)
+        let efectos = maquina.recibir(.cursorSalio)
+        #expect(!efectos.contains(.programar(.cerrar, MaquinaDeIsla.retardoAlCerrar)))
+        _ = maquina.recibir(.vencio(.cerrar))
+        _ = maquina.recibir(.clicFuera)
+        _ = maquina.recibir(.escape)
+        #expect(maquina.estado == .expandido(modulo: "inicio"))
+    }
+
+    @Test func fijadaRespetaElModuloAbierto() {
+        var maquina = maquina()
+        _ = maquina.recibir(.elegirModulo("agenda"))
+        _ = maquina.recibir(.fijar(true))
+        #expect(maquina.estado == .expandido(modulo: "agenda"))
+    }
+
+    @Test func elAtajoCierraAunqueEsteFijada() {
+        var maquina = maquina()
+        _ = maquina.recibir(.fijar(true))
+        _ = maquina.recibir(.atajo)
+        #expect(maquina.estado == .reposo)
+    }
+
+    @Test func alSoltarlaSinCursorProgramaElCierre() {
+        var maquina = maquina()
+        _ = maquina.recibir(.fijar(true))
+        let efectos = maquina.recibir(.fijar(false))
+        #expect(efectos.contains(.programar(.cerrar, MaquinaDeIsla.retardoAlCerrar)))
+        _ = maquina.recibir(.vencio(.cerrar))
+        #expect(maquina.estado == .reposo)
+    }
+
+    @Test func alSoltarlaConElCursorEncimaSigueAbierta() {
+        var maquina = maquina()
+        _ = maquina.recibir(.fijar(true))
+        _ = maquina.recibir(.cursorEntro)
+        #expect(maquina.recibir(.fijar(false)).isEmpty)
+        #expect(maquina.estado == .expandido(modulo: "inicio"))
+    }
 }
