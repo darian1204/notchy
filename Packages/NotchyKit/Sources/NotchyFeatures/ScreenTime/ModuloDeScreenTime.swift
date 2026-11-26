@@ -19,10 +19,30 @@ public final class ModeloDeScreenTime {
     @ObservationIgnored private var observadorActivacion: NSObjectProtocol?
     @ObservationIgnored private var tareaReloj: Task<Void, Never>?
     @ObservationIgnored private var inicioSesionActual: Date = .now
+    @ObservationIgnored private let ahora: @MainActor () -> Date
+    @ObservationIgnored private let segundosSinUsar: @MainActor () -> TimeInterval
+    /// Día al que pertenecen `usosPorApp`. Al cambiar de día se empieza de cero.
+    @ObservationIgnored private var diaCargado = ""
+    @ObservationIgnored private var ultimoTic: Date?
 
-    public init(defaults: UserDefaults = .standard) {
+    /// Cada cuánto se suma tiempo a la app del frente.
+    static let intervaloDeTic: TimeInterval = 10
+    /// Sin teclado ni ratón por más de esto, no se cuenta (te fuiste o la pantalla se apagó).
+    static let limiteDeInactividad: TimeInterval = 5 * 60
+    /// Apps que no son uso real: la pantalla de bloqueo y el protector de pantalla.
+    static let appsQueNoCuentan: Set<String> = ["com.apple.loginwindow", "com.apple.ScreenSaver.Engine"]
+
+    public init(
+        defaults: UserDefaults = .standard,
+        ahora: @escaping @MainActor () -> Date = { .now },
+        segundosSinUsar: @escaping @MainActor () -> TimeInterval = {
+            CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+        }
+    ) {
         self.defaults = defaults
-        cargarOSembrarDatosDeHoy()
+        self.ahora = ahora
+        self.segundosSinUsar = segundosSinUsar
+        cargarDatosDeHoy()
     }
 
     public func iniciar() {
@@ -40,9 +60,9 @@ public final class ModeloDeScreenTime {
         }
         tareaReloj = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(Self.intervaloDeTic))
                 guard !Task.isCancelled, let self else { break }
-                self.acumularTiempo(segundos: 10)
+                self.tic()
             }
         }
     }
@@ -163,18 +183,35 @@ public final class ModeloDeScreenTime {
         let nombre = app.localizedName ?? "App"
         let bundleID = app.bundleIdentifier ?? "app.\(nombre.lowercased())"
         if bundleID != appActualBundleID {
-            let transcurrido = Date.now.timeIntervalSince(inicioSesionActual)
-            if transcurrido > sesionMasLargaSegundos {
-                sesionMasLargaSegundos = transcurrido
+            // La sesión más larga se mide con el tiempo contado, no con el reloj: así no entra el
+            // rato con la Mac bloqueada o dormida.
+            if segundosSesionActual > sesionMasLargaSegundos {
+                sesionMasLargaSegundos = segundosSesionActual
             }
             appActualNombre = nombre
             appActualBundleID = bundleID
-            inicioSesionActual = .now
+            inicioSesionActual = ahora()
             segundosSesionActual = 0
         }
-        if contarCambio {
-            registrarTiempoManual(bundleID: bundleID, nombre: nombre, segundos: 5, cambios: 1)
+        // Un cambio de app no es tiempo de uso: antes sumaba 5 s por cambio.
+        if contarCambio, !Self.appsQueNoCuentan.contains(bundleID) {
+            asegurarDiaActual()
+            registrarTiempoManual(bundleID: bundleID, nombre: nombre, segundos: 0, cambios: 1)
         }
+    }
+
+    /// Suma el tiempo real desde el último tic, solo si la Mac está en uso.
+    public func tic() {
+        let momento = ahora()
+        defer { ultimoTic = momento }
+        asegurarDiaActual()
+        guard let ultimoTic else { return }
+        let transcurrido = momento.timeIntervalSince(ultimoTic)
+        // Un hueco largo es que la Mac durmió: ese tiempo no se usó.
+        guard transcurrido > 0, transcurrido <= Self.intervaloDeTic * 3 else { return }
+        guard segundosSinUsar() < Self.limiteDeInactividad else { return }
+        guard !Self.appsQueNoCuentan.contains(appActualBundleID) else { return }
+        acumularTiempo(segundos: min(transcurrido, Self.intervaloDeTic))
     }
 
     private func acumularTiempo(segundos: TimeInterval) {
@@ -190,82 +227,41 @@ public final class ModeloDeScreenTime {
         )
     }
 
-    private var claveDeHoy: String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return "notchy.screentime.\(f.string(from: .now))"
+    private var claveDeHoy: String { "notchy.screentime." + Self.dia(de: ahora()) }
+
+    static func dia(de fecha: Date) -> String {
+        let partes = Calendar.current.dateComponents([.year, .month, .day], from: fecha)
+        return String(format: "%04d-%02d-%02d", partes.year ?? 0, partes.month ?? 0, partes.day ?? 0)
     }
 
-    private func cargarOSembrarDatosDeHoy() {
-        if let datos = defaults.data(forKey: claveDeHoy),
-            let guardados = try? JSONDecoder().decode([UsoDeAppScreenTime].self, from: datos),
-            !guardados.isEmpty
-        {
-            usosPorApp = guardados
-            if let frontal = NSWorkspace.shared.frontmostApplication {
-                appActualNombre = frontal.localizedName ?? "Finder"
-                appActualBundleID = frontal.bundleIdentifier ?? "com.apple.finder"
-            }
+    /// Si ya es otro día, empieza de cero en vez de arrastrar los totales del anterior.
+    private func asegurarDiaActual() {
+        guard Self.dia(de: ahora()) != diaCargado else { return }
+        cargarDatosDeHoy()
+    }
+
+    /// Lee lo guardado de hoy. Descarta registros imposibles (más tiempo que el que lleva el día), que
+    /// dejó la versión que arrastraba los totales de un día a otro. No inventa datos.
+    private func cargarDatosDeHoy() {
+        diaCargado = Self.dia(de: ahora())
+        segundosSesionActual = 0
+        sesionMasLargaSegundos = 0
+        usosPorApp = []
+        if let frontal = NSWorkspace.shared.frontmostApplication {
+            appActualNombre = frontal.localizedName ?? "App"
+            appActualBundleID = frontal.bundleIdentifier ?? "app.desconocida"
+        }
+        guard let datos = defaults.data(forKey: claveDeHoy),
+            let guardados = try? JSONDecoder().decode([UsoDeAppScreenTime].self, from: datos)
+        else { return }
+        let reales = guardados.filter { !Self.appsQueNoCuentan.contains($0.bundleId) }
+        let total = reales.reduce(0) { $0 + $1.segundos }
+        let llevaElDia = ahora().timeIntervalSince(Calendar.current.startOfDay(for: ahora()))
+        guard total <= llevaElDia + 60 else {
+            defaults.removeObject(forKey: claveDeHoy)
             return
         }
-
-        // Sembrar a partir de las apps abiertas hoy en el sistema para ofrecer métricas reales al instante
-        let inicioHoy = Calendar.current.startOfDay(for: .now)
-        let abiertas = NSWorkspace.shared.runningApplications.filter {
-            $0.activationPolicy == .regular && $0.localizedName != nil
-        }
-
-        var sembrados: [UsoDeAppScreenTime] = []
-        for (indice, app) in abiertas.prefix(6).enumerated() {
-            let nombre = app.localizedName ?? "App"
-            let bundleID = app.bundleIdentifier ?? "app.\(indice)"
-            let desde = max(app.launchDate ?? inicioHoy, inicioHoy)
-            let activo = min(max(Date.now.timeIntervalSince(desde) * 0.28, Double((7 - indice) * 240)), 3200)
-            let cambios = max(3, (7 - indice) * 5)
-            sembrados.append(
-                UsoDeAppScreenTime(
-                    bundleId: bundleID,
-                    nombre: nombre,
-                    categoria: Self.categorizar(bundleID: bundleID, nombre: nombre),
-                    segundos: activo,
-                    cambiosDeApp: cambios
-                )
-            )
-        }
-
-        if sembrados.isEmpty {
-            sembrados = [
-                UsoDeAppScreenTime(
-                    bundleId: "com.apple.dt.Xcode",
-                    nombre: "Xcode",
-                    categoria: .desarrollo,
-                    segundos: 2460,
-                    cambiosDeApp: 19
-                ),
-                UsoDeAppScreenTime(
-                    bundleId: "md.obsidian",
-                    nombre: "Obsidian",
-                    categoria: .productividad,
-                    segundos: 1500,
-                    cambiosDeApp: 14
-                ),
-                UsoDeAppScreenTime(
-                    bundleId: "com.apple.Safari",
-                    nombre: "Safari",
-                    categoria: .navegacion,
-                    segundos: 1080,
-                    cambiosDeApp: 12
-                ),
-            ]
-        }
-
-        usosPorApp = sembrados.sorted { $0.segundos > $1.segundos }
-        sesionMasLargaSegundos = 24 * 60
-        if let primero = usosPorApp.first {
-            appActualNombre = primero.nombre
-            appActualBundleID = primero.bundleId
-        }
-        guardarDatosDeHoy()
+        usosPorApp = reales.sorted { $0.segundos > $1.segundos }
     }
 
     private func guardarDatosDeHoy() {
