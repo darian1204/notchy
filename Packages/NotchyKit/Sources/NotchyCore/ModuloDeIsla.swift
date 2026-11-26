@@ -62,10 +62,18 @@ public protocol ModuloDeIsla: AnyObject {
     var tamanoExpandido: CGSize { get }
     /// Contenido que va debajo de la franja del notch.
     var vistaExpandida: AnyView { get }
-    /// Oreja izquierda cuando el módulo gana el estado compacto (`283 × 32`).
+    /// Oreja izquierda cuando el módulo gana el estado compacto.
     var orejaIzquierdaCompacta: AnyView? { get }
-    /// Oreja derecha cuando el módulo gana el estado compacto (`283 × 32`).
+    /// Oreja derecha cuando el módulo gana el estado compacto.
     var orejaDerechaCompacta: AnyView? { get }
+    /// Ancho de cada oreja en compacto. Las orejas crecen según lo que muestran.
+    var anchoDeOreja: CGFloat { get }
+    /// Orejas al pasar el cursor por encima (el asomo): más información antes de abrir.
+    var orejaIzquierdaAmpliada: AnyView? { get }
+    var orejaDerechaAmpliada: AnyView? { get }
+    var anchoDeOrejaAmpliada: CGFloat { get }
+    /// Lo que se ve en la burbuja cuando el módulo es la segunda actividad. `nil` usa la oreja izquierda.
+    var burbujaCompacta: AnyView? { get }
     /// Vista completa cuando el módulo muestra un aviso temporal (`440 × 82`).
     var vistaDeAviso: AnyView? { get }
     var salud: SaludDeModulo { get }
@@ -82,6 +90,11 @@ public protocol ModuloDeIsla: AnyObject {
 extension ModuloDeIsla {
     public var orejaIzquierdaCompacta: AnyView? { nil }
     public var orejaDerechaCompacta: AnyView? { nil }
+    public var anchoDeOreja: CGFloat { anchoDeOrejaPorDefecto }
+    public var orejaIzquierdaAmpliada: AnyView? { nil }
+    public var orejaDerechaAmpliada: AnyView? { nil }
+    public var anchoDeOrejaAmpliada: CGFloat { anchoDeOreja }
+    public var burbujaCompacta: AnyView? { nil }
     public var vistaDeAviso: AnyView? { nil }
     public var salud: SaludDeModulo { .listo }
     public var insignia: Int? { nil }
@@ -89,6 +102,9 @@ extension ModuloDeIsla {
     public func arrancar() {}
     public func detener() {}
 }
+
+/// Ancho de cada oreja compacta cuando el módulo no dice otro.
+public let anchoDeOrejaPorDefecto: CGFloat = 52
 
 /// Identificadores de módulos que la isla trata de forma especial.
 public enum ModulosBase {

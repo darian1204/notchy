@@ -1,5 +1,6 @@
 import CoreGraphics
 import NotchyCore
+import NotchyDesign
 import Observation
 
 /// Une la máquina de estados con el mundo: programa los temporizadores, publica los cambios
@@ -58,13 +59,76 @@ public final class CoordinadorDeIsla {
         return registro.modulo(id)
     }
 
+    /// El cursor está sobre una actividad compacta y las orejas se agrandan.
+    public private(set) var asomando = false
+
+    /// Qué ocupa las orejas con la isla cerrada.
+    public enum ContenidoDeOrejas {
+        case modulo(any ModuloDeIsla, ampliado: Bool)
+        case breve(EstadoDeHUDSistema)
+    }
+
+    /// Qué va en la burbuja de la segunda actividad.
+    public enum ContenidoDeBurbuja {
+        case modulo(any ModuloDeIsla)
+        case breve(EstadoDeHUDSistema)
+    }
+
+    /// La grabación nunca se oculta: con ella en las orejas, la actividad breve va a la burbuja.
+    private var grabacionEnOrejas: Bool {
+        guard case .compacto(let peticion) = estado else { return false }
+        return peticion.prioridad == .grabando
+    }
+
+    private var moduloSecundario: (any ModuloDeIsla)? {
+        maquina.secundaria.flatMap { registro.modulo($0.modulo) }
+    }
+
+    /// Las orejas con la isla en reposo o compacta. `nil` si no hay nada que mostrar.
+    public var orejas: ContenidoDeOrejas? {
+        switch estado {
+        case .reposo, .compacto: break
+        case .aviso, .expandido: return nil
+        }
+        if let hudActual, !grabacionEnOrejas { return .breve(hudActual) }
+        guard let modulo = moduloCompacto else { return nil }
+        return .modulo(modulo, ampliado: asomando && modulo.orejaIzquierdaAmpliada != nil)
+    }
+
+    /// La burbuja: la actividad que pierde las orejas o la segunda en prioridad.
+    public var burbuja: ContenidoDeBurbuja? {
+        switch estado {
+        case .reposo, .compacto: break
+        case .aviso, .expandido: return nil
+        }
+        if let hudActual {
+            if grabacionEnOrejas { return .breve(hudActual) }
+            if let modulo = moduloCompacto ?? moduloSecundario { return .modulo(modulo) }
+            return nil
+        }
+        return moduloSecundario.map { .modulo($0) }
+    }
+
+    /// Ancho de cada oreja para lo que ocupa las orejas ahora.
+    private var anchoDeOreja: CGFloat {
+        switch orejas {
+        case .breve: Medidas.orejaBreve
+        case .modulo(let modulo, let ampliado): ampliado ? modulo.anchoDeOrejaAmpliada : modulo.anchoDeOreja
+        case nil: Medidas.orejaCompacta
+        }
+    }
+
     /// Tamaño del cuerpo de la isla en el estado actual.
     public var tamano: CGSize {
         if estado == .reposo, hudActual != nil {
             return geometria.tamano(
                 de: .compacto(PeticionCompacta(modulo: "hud", prioridad: .musica)),
-                expandido: nil
+                expandido: nil,
+                anchoDeOreja: anchoDeOreja
             )
+        }
+        if case .compacto = estado {
+            return geometria.tamano(de: estado, expandido: nil, anchoDeOreja: anchoDeOreja)
         }
         if case .expandido = estado, registro.ajustes.estiloDeIsla == .tarjetas {
             return geometria.tamanoEnTarjetas(expandido: moduloAbierto?.tamanoExpandido)
@@ -80,7 +144,9 @@ public final class CoordinadorDeIsla {
         observadores.append(accion)
     }
 
-    public func mostrarHUD(_ hud: EstadoDeHUDSistema, duracion: Duration = .milliseconds(1600)) {
+    /// Muestra una actividad breve; dura lo que diga su tipo salvo que se pida otra cosa.
+    public func mostrarHUD(_ hud: EstadoDeHUDSistema, duracion: Duration? = nil) {
+        let duracion = duracion ?? hud.tipo.duracion
         hudActual = hud
         tareaHUD?.cancel()
         let dormir = self.dormir
@@ -103,6 +169,7 @@ public final class CoordinadorDeIsla {
                 }
             }
         }
+        if maquina.asomando != asomando { asomando = maquina.asomando }
         guard maquina.estado != estado else { return }
         estado = maquina.estado
         for accion in observadores {
@@ -153,6 +220,13 @@ public final class CoordinadorDeIsla {
                 self.grabacionActual = estado.activa ? estado : nil
             }
         }
-        tareasDeBus = [tareaCompacto, tareaAviso, tareaColorCaratula, tareaGrabacion]
+        let tareaBreve = Task { [weak self] in
+            let flujo = await bus.suscribir(a: ActividadBreveSolicitada.self)
+            for await solicitud in flujo {
+                guard let self else { break }
+                self.mostrarHUD(solicitud.actividad)
+            }
+        }
+        tareasDeBus = [tareaCompacto, tareaAviso, tareaColorCaratula, tareaGrabacion, tareaBreve]
     }
 }

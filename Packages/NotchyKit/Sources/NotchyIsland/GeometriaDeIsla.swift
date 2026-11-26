@@ -40,15 +40,21 @@ public struct GeometriaDeIsla: Equatable, Sendable {
     }
 
     /// Tamaño del cuerpo de la isla, sin contar los hombros.
-    public func tamano(de estado: EstadoDeIsla, expandido: CGSize?) -> CGSize {
+    /// `anchoDeOreja` es el de cada lado en compacto; cada actividad trae el suyo.
+    public func tamano(
+        de estado: EstadoDeIsla,
+        expandido: CGSize?,
+        anchoDeOreja: CGFloat = Medidas.orejaCompacta
+    ) -> CGSize {
         let reposo = tamanoDeReposo
         switch estado {
         case .reposo:
             return reposo
         case .compacto:
-            // Las orejas se suman al notch real. La píldora ya tiene sitio para ellas.
-            let orejas = Medidas.compacto.width - Medidas.notch.width
-            return tieneNotch ? CGSize(width: reposo.width + orejas, height: reposo.height) : reposo
+            // Las orejas se suman al notch real. La píldora crece igual para que quepan.
+            let base = tieneNotch ? reposo : CGSize(width: Medidas.notch.width, height: reposo.height)
+            let ancho = max(base.width + 2 * anchoDeOreja, tieneNotch ? 0 : reposo.width)
+            return CGSize(width: ancho, height: reposo.height)
         case .aviso:
             return CGSize(width: Medidas.aviso.width, height: max(Medidas.aviso.height, reposo.height))
         case .expandido:
@@ -75,6 +81,16 @@ public struct GeometriaDeIsla: Equatable, Sendable {
         CGRect(
             x: pantalla.marco.midX - tamano.width / 2, y: techo - tamano.height, width: tamano.width,
             height: tamano.height)
+    }
+
+    /// Burbuja de la segunda actividad: un círculo a la derecha del cuerpo de la isla, fuera de los
+    /// hombros, a la altura del notch.
+    public func zonaDeBurbuja(cuerpo tamano: CGSize) -> CGRect {
+        let cuerpo = zona(tamano)
+        let lado = tamanoDeReposo.height
+        let hombro = tieneNotch ? Medidas.hombro : 0
+        return CGRect(
+            x: cuerpo.maxX + hombro + Medidas.separacionDeBurbuja, y: techo - lado, width: lado, height: lado)
     }
 
     /// Zona que cuenta como "cursor dentro". En reposo se agranda un poco para que el notch sea fácil de tocar.

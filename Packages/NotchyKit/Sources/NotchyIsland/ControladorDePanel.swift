@@ -170,8 +170,12 @@ public final class ControladorDePanel {
         let geometria = coordinador.geometria
         let zona = geometria.zonaDeCursor(estado: coordinador.estado, tamano: coordinador.tamano)
         let dentro = GeometriaDeIsla.contiene(zona, NSEvent.mouseLocation)
+        // La burbuja recibe clics pero no cuenta como "dentro": no agranda ni abre la isla.
+        let enBurbuja =
+            coordinador.burbuja != nil
+            && GeometriaDeIsla.contiene(geometria.zonaDeBurbuja(cuerpo: coordinador.tamano), NSEvent.mouseLocation)
         // En reposo no hay nada que pulsar: los clics sobre el notch pasan a la barra de menús.
-        let interactivo = dentro && coordinador.estado != .reposo
+        let interactivo = (dentro && coordinador.estado != .reposo) || enBurbuja
         panel.ignoresMouseEvents = !interactivo
         if case .expandido = coordinador.estado, dentro, !panel.isKeyWindow {
             panel.makeKey()

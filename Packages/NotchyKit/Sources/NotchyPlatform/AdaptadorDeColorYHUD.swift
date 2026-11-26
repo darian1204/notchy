@@ -205,13 +205,20 @@ public final class VigilanteDeHUDSistema {
                 if cambioFuente || bajoAlLimite {
                     self.alDisparar(
                         EstadoDeHUDSistema(
-                            tipo: .bateria,
+                            tipo: Self.tipoDeAvisoDeBateria(
+                                cambioDeFuente: cambioFuente, fuente: actual.fuente),
                             nivel: Double(actual.porcentaje) / 100.0,
                             etiqueta: "\(actual.porcentaje)%"
                         ))
                 }
             }
         }
+    }
+
+    /// Conectar o desconectar gana sobre el aviso de batería baja.
+    static func tipoDeAvisoDeBateria(cambioDeFuente: Bool, fuente: String) -> TipoDeHUD {
+        guard cambioDeFuente else { return .bateriaBaja }
+        return fuente == (kIOPSACPowerValue as String) ? .cargando : .desconectado
     }
 
     public static func leerEstadoDeBateria() -> (porcentaje: Int, fuente: String)? {
