@@ -114,7 +114,8 @@ final class Ensamblado {
         )
         modeloDeBandeja = ModeloDeBandeja(
             repositorio: baseAbierta.map(RepositorioDeBandeja.init),
-            carpetaBandeja: rutasAbiertas?.bandeja
+            carpetaBandeja: rutasAbiertas?.bandeja,
+            bus: bus
         )
         modeloDeAirDrop = ModeloDeAirDrop(
             puerto: adaptadorDeAirDrop,

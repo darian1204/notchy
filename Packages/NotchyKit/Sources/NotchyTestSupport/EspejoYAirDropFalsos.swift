@@ -86,8 +86,9 @@ public final class AirDropFalso: PuertoDeAirDrop {
         oyente = nil
     }
 
-    public func enviar(archivos: [URL]) throws {
+    public func enviar(archivos: [URL], alTerminar: @escaping @MainActor (Bool) -> Void) throws {
         lotesEnviados.append(archivos)
+        alTerminar(true)
     }
 
     public func simularLlegada(_ archivo: ArchivoRecibidoAirDrop) {

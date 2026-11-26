@@ -37,7 +37,8 @@ public final class AdaptadorMuestreadorDeColor: PuertoMuestreadorDeColor {
 public final class VigilanteDeHUDSistema {
     private var monitorGlobal: Any?
     private var monitorLocal: Any?
-    private var tareaBateria: Task<Void, Never>?
+    /// Aviso del sistema cuando cambia la fuente de energía o la carga. Sustituye el sondeo cada 15 s.
+    private var fuenteDeAvisosDeEnergia: CFRunLoopSource?
     private var ultimoNivelBateria: Int?
     private var ultimaFuenteEnergia: String?
     private let alDisparar: @MainActor (EstadoDeHUDSistema) -> Void
@@ -64,8 +65,10 @@ public final class VigilanteDeHUDSistema {
         if let monitorLocal { NSEvent.removeMonitor(monitorLocal) }
         monitorGlobal = nil
         monitorLocal = nil
-        tareaBateria?.cancel()
-        tareaBateria = nil
+        if let fuenteDeAvisosDeEnergia {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), fuenteDeAvisosDeEnergia, .defaultMode)
+        }
+        fuenteDeAvisosDeEnergia = nil
     }
 
     private func procesarEventoDeSistema(_ evento: NSEvent) {
@@ -191,28 +194,36 @@ public final class VigilanteDeHUDSistema {
             ultimoNivelBateria = inicial.porcentaje
             ultimaFuenteEnergia = inicial.fuente
         }
-        tareaBateria = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                guard let self, !Task.isCancelled else { break }
-                guard let actual = Self.leerEstadoDeBateria() else { continue }
-                let cambioFuente = actual.fuente != self.ultimaFuenteEnergia
-                let bajoAlLimite =
-                    (actual.porcentaje == 20 || actual.porcentaje == 10)
-                    && actual.porcentaje != self.ultimoNivelBateria
-                self.ultimoNivelBateria = actual.porcentaje
-                self.ultimaFuenteEnergia = actual.fuente
-                if cambioFuente || bajoAlLimite {
-                    self.alDisparar(
-                        EstadoDeHUDSistema(
-                            tipo: Self.tipoDeAvisoDeBateria(
-                                cambioDeFuente: cambioFuente, fuente: actual.fuente),
-                            nivel: Double(actual.porcentaje) / 100.0,
-                            etiqueta: "\(actual.porcentaje)%"
-                        ))
-                }
-            }
+        // La función de C no captura nada: recibe `self` como contexto. El aviso llega en el run loop
+        // principal, así que ya está en el hilo principal.
+        let contexto = Unmanaged.passUnretained(self).toOpaque()
+        let aviso: IOPowerSourceCallbackType = { contexto in
+            guard let contexto else { return }
+            let vigilante = Unmanaged<VigilanteDeHUDSistema>.fromOpaque(contexto).takeUnretainedValue()
+            MainActor.assumeIsolated { vigilante.revisarBateria() }
         }
+        guard let fuente = IOPSNotificationCreateRunLoopSource(aviso, contexto)?.takeRetainedValue() else { return }
+        CFRunLoopAddSource(CFRunLoopGetMain(), fuente, .defaultMode)
+        fuenteDeAvisosDeEnergia = fuente
+    }
+
+    private func revisarBateria() {
+        guard let actual = Self.leerEstadoDeBateria() else { return }
+        let cambioFuente = ultimaFuenteEnergia != nil && actual.fuente != ultimaFuenteEnergia
+        let enBateria = actual.fuente != (kIOPSACPowerValue as String)
+        // Solo al bajar: cargando de 9 % a 10 % no es un aviso.
+        let bajoAlLimite =
+            enBateria && (actual.porcentaje == 20 || actual.porcentaje == 10)
+            && (ultimoNivelBateria.map { $0 > actual.porcentaje } ?? false)
+        ultimoNivelBateria = actual.porcentaje
+        ultimaFuenteEnergia = actual.fuente
+        guard cambioFuente || bajoAlLimite else { return }
+        alDisparar(
+            EstadoDeHUDSistema(
+                tipo: Self.tipoDeAvisoDeBateria(cambioDeFuente: cambioFuente, fuente: actual.fuente),
+                nivel: Double(actual.porcentaje) / 100.0,
+                etiqueta: "\(actual.porcentaje)%"
+            ))
     }
 
     /// Conectar o desconectar gana sobre el aviso de batería baja.

@@ -208,6 +208,13 @@ public enum TipoDeHUD: String, Sendable, Equatable, CaseIterable {
     }
 }
 
+extension EstadoDeHUDSistema {
+    /// Aviso de archivos ("1 archivo", "3 archivos") para la Bandeja y AirDrop.
+    public static func archivos(_ cantidad: Int, tipo: TipoDeHUD = .archivos) -> EstadoDeHUDSistema {
+        EstadoDeHUDSistema(tipo: tipo, nivel: 1, etiqueta: cantidad == 1 ? "1 archivo" : "\(cantidad) archivos")
+    }
+}
+
 /// Un módulo pide mostrar una actividad breve en las orejas.
 public struct ActividadBreveSolicitada: Evento, Equatable {
     public let actividad: EstadoDeHUDSistema
