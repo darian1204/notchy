@@ -112,11 +112,7 @@ public final class CoordinadorDeIsla {
     /// Ancho de cada oreja para lo que ocupa las orejas ahora.
     private var anchoDeOreja: CGFloat {
         switch orejas {
-        case .breve(let hud):
-            switch hud.tipo {
-            case .archivos, .airdropEnviado, .airdropRecibido: Medidas.orejaBreveConTexto
-            default: Medidas.orejaBreve
-            }
+        case .breve: Medidas.orejaBreve
         case .modulo(let modulo, let ampliado): ampliado ? modulo.anchoDeOrejaAmpliada : modulo.anchoDeOreja
         case nil: Medidas.orejaCompacta
         }

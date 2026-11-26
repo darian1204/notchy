@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// Color muestreado para el Color Picker con conversiones a HEX, RGB, HSL, literal Swift y contraste WCAG.
 public struct ColorMuestreado: Sendable, Equatable, Codable, Identifiable {
@@ -209,9 +210,17 @@ public enum TipoDeHUD: String, Sendable, Equatable, CaseIterable {
 }
 
 extension EstadoDeHUDSistema {
-    /// Aviso de archivos ("1 archivo", "3 archivos") para la Bandeja y AirDrop.
-    public static func archivos(_ cantidad: Int, tipo: TipoDeHUD = .archivos) -> EstadoDeHUDSistema {
-        EstadoDeHUDSistema(tipo: tipo, nivel: 1, etiqueta: cantidad == 1 ? "1 archivo" : "\(cantidad) archivos")
+    /// Aviso de archivos para la Bandeja y AirDrop: en la oreja se ve el ícono de su clase (imagen,
+    /// video, PDF…) y el número si son varios. `nombres` son los nombres o rutas de los archivos.
+    public static func archivos(_ nombres: [String], tipo: TipoDeHUD = .archivos) -> EstadoDeHUDSistema {
+        let cantidad = nombres.count
+        return EstadoDeHUDSistema(
+            tipo: tipo,
+            nivel: 1,
+            etiqueta: cantidad == 1 ? "1 archivo" : "\(cantidad) archivos",
+            simbolo: ClaseDeArchivo.comun(de: nombres).simbolo,
+            cantidad: cantidad
+        )
     }
 }
 
@@ -228,12 +237,65 @@ public struct EstadoDeHUDSistema: Sendable, Equatable {
     public let tipo: TipoDeHUD
     /// Fracción entre 0.0 y 1.0.
     public let nivel: Double
+    /// Texto para VoiceOver y, si no hay `simbolo`, lo que se ve en la oreja derecha.
     public let etiqueta: String
+    /// Ícono que va en la oreja derecha en lugar del texto (el tipo de archivo).
+    public let simbolo: String?
+    /// Cuántos elementos son. El número solo se muestra si es más de uno.
+    public let cantidad: Int
 
-    public init(tipo: TipoDeHUD, nivel: Double, etiqueta: String? = nil) {
+    public init(tipo: TipoDeHUD, nivel: Double, etiqueta: String? = nil, simbolo: String? = nil, cantidad: Int = 1) {
         self.tipo = tipo
         self.nivel = min(max(nivel, 0), 1)
         self.etiqueta = etiqueta ?? "\(Int((self.nivel * 100).rounded()))%"
+        self.simbolo = simbolo
+        self.cantidad = cantidad
+    }
+}
+
+/// Clase de archivo, para elegir su ícono en las orejas.
+public enum ClaseDeArchivo: String, Sendable, Equatable, CaseIterable {
+    case imagen, video, audio, pdf, texto, presentacion, hojaDeCalculo, comprimido, codigo, carpeta, otro
+
+    public var simbolo: String {
+        switch self {
+        case .imagen: "photo.fill"
+        case .video: "film.fill"
+        case .audio: "music.note"
+        case .pdf: "doc.richtext.fill"
+        case .texto: "doc.text.fill"
+        case .presentacion: "rectangle.on.rectangle.angled.fill"
+        case .hojaDeCalculo: "tablecells.fill"
+        case .comprimido: "doc.zipper"
+        case .codigo: "chevron.left.forwardslash.chevron.right"
+        case .carpeta: "folder.fill"
+        case .otro: "doc.fill"
+        }
+    }
+
+    /// Por la extensión del nombre, con los tipos uniformes del sistema.
+    public static func de(nombre: String) -> ClaseDeArchivo {
+        let sufijo = (nombre as NSString).pathExtension.lowercased()
+        guard !sufijo.isEmpty, let tipo = UTType(filenameExtension: sufijo) else { return .otro }
+        if tipo.conforms(to: .folder) { return .carpeta }
+        if tipo.conforms(to: .image) { return .imagen }
+        if tipo.conforms(to: .movie) || tipo.conforms(to: .video) { return .video }
+        if tipo.conforms(to: .audio) { return .audio }
+        if tipo.conforms(to: .pdf) { return .pdf }
+        if tipo.conforms(to: .presentation) { return .presentacion }
+        if tipo.conforms(to: .spreadsheet) { return .hojaDeCalculo }
+        if tipo.conforms(to: .archive) { return .comprimido }
+        if tipo.conforms(to: .sourceCode) || tipo.conforms(to: .script) { return .codigo }
+        if tipo.conforms(to: .text) || tipo.conforms(to: .rtf) || sufijo == "docx" || sufijo == "pages" {
+            return .texto
+        }
+        return .otro
+    }
+
+    /// Si todos son de la misma clase, esa; si se mezclan, archivo genérico.
+    public static func comun(de nombres: [String]) -> ClaseDeArchivo {
+        let clases = Set(nombres.map(de(nombre:)))
+        return clases.count == 1 ? clases.first! : .otro
     }
 }
 

@@ -84,9 +84,9 @@ public final class ModeloDeBandeja {
     // MARK: - Agregar y quitar
 
     /// Aviso breve en las orejas de la isla cerrada: "3 archivos".
-    private func avisarEnLasOrejas(_ cantidad: Int) {
+    private func avisarEnLasOrejas(_ nombres: [String]) {
         guard let bus else { return }
-        Task { await bus.publicar(ActividadBreveSolicitada(.archivos(cantidad))) }
+        Task { await bus.publicar(ActividadBreveSolicitada(.archivos(nombres))) }
     }
 
     /// Agrega archivos copiándolos a la carpeta de la bandeja (BND-1). Síncrono; la vista usa `agregarEnSegundoPlano`.
@@ -94,11 +94,12 @@ public final class ModeloDeBandeja {
     public func agregarArchivos(_ urls: [URL]) -> Int {
         guard let repositorio, let carpetaBandeja else { return 0 }
         let copias = Self.copiar(urls, a: carpetaBandeja)
-        let agregados = copias.filter { (try? repositorio.agregar($0)) != nil }.count
+        let guardadas = copias.filter { (try? repositorio.agregar($0)) != nil }
+        let agregados = guardadas.count
         recargar()
         if agregados > 0 {
             mostrarAvisoTemporal("Guardado en Shelf (\(agregados))")
-            avisarEnLasOrejas(agregados)
+            avisarEnLasOrejas(guardadas.map(\.nombre))
         }
         return agregados
     }
@@ -112,12 +113,13 @@ public final class ModeloDeBandeja {
                 Self.copiar(urls, a: carpetaBandeja)
             }.value
             guard let self else { return }
-            let agregados = copias.filter { (try? repositorio.agregar($0)) != nil }.count
+            let guardadas = copias.filter { (try? repositorio.agregar($0)) != nil }
+            let agregados = guardadas.count
             self.trabajando = false
             self.recargar()
             if agregados > 0 {
                 self.mostrarAvisoTemporal("Guardado en Shelf (\(agregados))")
-                self.avisarEnLasOrejas(agregados)
+                self.avisarEnLasOrejas(guardadas.map(\.nombre))
             }
         }
     }
