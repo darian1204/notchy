@@ -118,25 +118,31 @@ public struct VistaDeIsla: View {
         }
     }
 
-    /// Liquid glass con la forma de la isla, teñido con el tema del panel, y un velo negro arriba
-    /// para que el notch no se note.
+    /// Liquid glass con la forma de la isla. Encima lleva el color del tema según el tintado y un velo
+    /// negro solo a la altura del notch, para que no se note.
     @ViewBuilder private var siluetaVidrio: some View {
-        let alto = coordinador.geometria.tamanoDeReposo.height
+        let alto = max(coordinador.tamano.height, 1)
+        let notch = coordinador.geometria.tieneNotch ? coordinador.geometria.tamanoDeReposo.height / alto : 0
         let velo = LinearGradient(
             stops: [
                 .init(color: Paleta.fondo, location: 0),
-                .init(color: Paleta.fondo, location: min(0.9, alto / max(coordinador.tamano.height, 1))),
-                .init(color: Paleta.fondo.opacity(0), location: 1),
+                .init(color: Paleta.fondo, location: min(0.9, notch)),
+                .init(color: Paleta.fondo.opacity(0), location: min(1, notch + 28 / alto)),
             ],
             startPoint: .top,
             endPoint: .bottom
         )
+        let tema = vidrio.capa(colorDePanel, minimo: 0.12)
         if coordinador.geometria.tieneNotch {
             let forma = FormaDeIsla(radioInferior: radio, hombro: hombro)
-            forma.fill(velo).glassEffect(vidrio.materialDeFondo(color: colorDePanel), in: forma)
+            ZStack {
+                forma.fill(tema)
+                forma.fill(velo)
+            }
+            .glassEffect(vidrio.material(), in: forma)
         } else {
             let forma = RoundedRectangle(cornerRadius: min(radio, coordinador.tamano.height / 2))
-            forma.fill(Color.clear).glassEffect(vidrio.materialDeFondo(color: colorDePanel), in: forma)
+            forma.fill(tema).glassEffect(vidrio.material(), in: forma)
         }
     }
 

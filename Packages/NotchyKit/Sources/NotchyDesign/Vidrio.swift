@@ -24,20 +24,17 @@ public struct VidrioDeIsla: Equatable, Sendable {
     /// más el fondo; por encima, el regular, que se va cubriendo de color.
     static let umbralTransparente = 0.25
 
-    /// Material de una píldora o tarjeta. `tinte` es un estado propio (por ejemplo, activo) y
-    /// manda sobre el tintado general.
+    /// Vidrio base: el transparente de Apple abajo del umbral, el regular arriba. `tinte` es un estado
+    /// propio (por ejemplo, activo).
     public func material(tinte: Color? = nil) -> Glass {
         let base: Glass = tintado < Self.umbralTransparente ? .clear : .regular
-        if let tinte { return base.tint(tinte) }
-        let opacidad = max(0, tintado - Self.umbralTransparente) / (1 - Self.umbralTransparente) * 0.55
-        return opacidad > 0.01 ? base.tint(Color.black.opacity(opacidad)) : base
+        return tinte.map { base.tint($0) } ?? base
     }
 
-    /// Material de la isla completa con el color del tema del panel. En transparente el tema apenas
-    /// tiñe; en tintado cubre casi todo.
-    public func materialDeFondo(color: Color) -> Glass {
-        let base: Glass = tintado < Self.umbralTransparente ? .clear : .regular
-        return base.tint(color.opacity(0.2 + 0.7 * tintado))
+    /// Capa de color que va encima del vidrio y debajo del contenido. `Glass.tint` casi no se nota con
+    /// colores oscuros, así que el tintado se pinta aparte: de nada (transparente) a casi opaco.
+    public func capa(_ color: Color, minimo: Double = 0) -> Color {
+        color.opacity(minimo + (0.82 - minimo) * tintado)
     }
 
     func aplica(a tipo: TipoDeSuperficie) -> Bool {
@@ -71,7 +68,9 @@ struct SuperficieDeIsla<Forma: Shape>: ViewModifier {
         if reducirTransparencia {
             content.background(tinte ?? (alta ? Paleta.superficieAltaSolida : Paleta.superficieSolida), in: forma)
         } else if vidrio.aplica(a: tipo) {
-            content.glassEffect(vidrio.material(tinte: tinte), in: forma)
+            content
+                .background(tinte == nil ? vidrio.capa(.black) : .clear, in: forma)
+                .glassEffect(vidrio.material(tinte: tinte), in: forma)
         } else {
             content.background(tinte ?? (alta ? Paleta.superficieAlta : Paleta.superficie), in: forma)
         }
