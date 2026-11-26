@@ -9,6 +9,8 @@ import NotchyCore
 public final class AdaptadorDeAirDrop: PuertoDeAirDrop {
     private let carpeta: URL
     private var fuente: DispatchSourceFileSystemObject?
+    /// `NSSharingService.delegate` es débil: el adaptador lo retiene mientras dura el envío.
+    private var delegadoDeEnvio: DelegadoDeEnvioAirDrop?
 
     public init(
         carpetaDescargas: URL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -83,13 +85,19 @@ public final class AdaptadorDeAirDrop: PuertoDeAirDrop {
         fuente = nil
     }
 
-    public func enviar(archivos: [URL]) throws {
+    public func enviar(archivos: [URL], alTerminar: @escaping @MainActor (Bool) -> Void) throws {
         guard !archivos.isEmpty else { return }
         guard let servicio = NSSharingService(named: .sendViaAirDrop),
             servicio.canPerform(withItems: archivos)
         else {
             throw NotchyError.noDisponible("El servicio de AirDrop no está disponible")
         }
+        let delegado = DelegadoDeEnvioAirDrop { [weak self] completado in
+            self?.delegadoDeEnvio = nil
+            alTerminar(completado)
+        }
+        delegadoDeEnvio = delegado
+        servicio.delegate = delegado
         NSApp.activate()
         servicio.perform(withItems: archivos)
     }
@@ -115,5 +123,22 @@ public final class AdaptadorDeAirDrop: PuertoDeAirDrop {
         return bytes.withUnsafeBytes { puntero in
             setxattr(ruta, nombre, puntero.baseAddress, bytes.count, 0, 0) == 0
         }
+    }
+}
+
+/// Recibe de AppKit si el envío por AirDrop terminó o falló.
+final class DelegadoDeEnvioAirDrop: NSObject, NSSharingServiceDelegate {
+    private let alTerminar: @MainActor (Bool) -> Void
+
+    init(alTerminar: @escaping @MainActor (Bool) -> Void) {
+        self.alTerminar = alTerminar
+    }
+
+    func sharingService(_ sharingService: NSSharingService, didShareItems items: [Any]) {
+        MainActor.assumeIsolated { alTerminar(true) }
+    }
+
+    func sharingService(_ sharingService: NSSharingService, didFailToShareItems items: [Any], error: any Error) {
+        MainActor.assumeIsolated { alTerminar(false) }
     }
 }

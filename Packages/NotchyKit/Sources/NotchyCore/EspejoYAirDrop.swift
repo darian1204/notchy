@@ -35,7 +35,8 @@ public protocol PuertoDeAirDrop: AnyObject {
     func listarRecibidos() throws -> [ArchivoRecibidoAirDrop]
     func vigilarRecibidos(alCambiar: @escaping @MainActor () -> Void)
     func detenerVigilancia()
-    func enviar(archivos: [URL]) throws
+    /// Abre el selector de AirDrop. `alTerminar` avisa si el envío se completó (`true`) o falló.
+    func enviar(archivos: [URL], alTerminar: @escaping @MainActor (Bool) -> Void) throws
 }
 
 /// Evento publicado cuando llega un archivo nuevo por AirDrop (AIR-1).

@@ -24,9 +24,12 @@ public final class ModeloDeBandeja {
     @ObservationIgnored private var tareaLimpieza: Task<Void, Never>?
     @ObservationIgnored private var miniaturasPedidas: Set<String> = []
 
-    public init(repositorio: RepositorioDeBandeja?, carpetaBandeja: URL?) {
+    @ObservationIgnored private let bus: BusDeEventos?
+
+    public init(repositorio: RepositorioDeBandeja?, carpetaBandeja: URL?, bus: BusDeEventos? = nil) {
         self.repositorio = repositorio
         self.carpetaBandeja = carpetaBandeja
+        self.bus = bus
         recargar()
     }
 
@@ -80,6 +83,12 @@ public final class ModeloDeBandeja {
 
     // MARK: - Agregar y quitar
 
+    /// Aviso breve en las orejas de la isla cerrada: "3 archivos".
+    private func avisarEnLasOrejas(_ cantidad: Int) {
+        guard let bus else { return }
+        Task { await bus.publicar(ActividadBreveSolicitada(.archivos(cantidad))) }
+    }
+
     /// Agrega archivos copiándolos a la carpeta de la bandeja (BND-1). Síncrono; la vista usa `agregarEnSegundoPlano`.
     @discardableResult
     public func agregarArchivos(_ urls: [URL]) -> Int {
@@ -89,6 +98,7 @@ public final class ModeloDeBandeja {
         recargar()
         if agregados > 0 {
             mostrarAvisoTemporal("Guardado en Shelf (\(agregados))")
+            avisarEnLasOrejas(agregados)
         }
         return agregados
     }
@@ -107,6 +117,7 @@ public final class ModeloDeBandeja {
             self.recargar()
             if agregados > 0 {
                 self.mostrarAvisoTemporal("Guardado en Shelf (\(agregados))")
+                self.avisarEnLasOrejas(agregados)
             }
         }
     }

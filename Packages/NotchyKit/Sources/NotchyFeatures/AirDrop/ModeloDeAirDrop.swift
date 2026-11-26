@@ -57,11 +57,15 @@ public final class ModeloDeAirDrop {
         do {
             let lista = try puerto.listarRecibidos()
             let nuevasRutas = Set(lista.map(\.ruta))
-            if inicializado {
-                for archivo in lista where !rutasConocidas.contains(archivo.ruta) {
-                    if let bus {
-                        Task { await bus.publicar(ArchivoAirDropDetectado(archivo: archivo)) }
-                    }
+            if inicializado, let bus {
+                let nuevos = lista.filter { !rutasConocidas.contains($0.ruta) }
+                for archivo in nuevos {
+                    Task { await bus.publicar(ArchivoAirDropDetectado(archivo: archivo)) }
+                }
+                // Un solo aviso en las orejas por tanda, aunque lleguen varios archivos.
+                if !nuevos.isEmpty {
+                    let aviso = EstadoDeHUDSistema.archivos(nuevos.count, tipo: .airdropRecibido)
+                    Task { await bus.publicar(ActividadBreveSolicitada(aviso)) }
                 }
             }
             rutasConocidas = nuevasRutas
@@ -79,7 +83,12 @@ public final class ModeloDeAirDrop {
         let urls = archivos.filter(\.isFileURL)
         guard !urls.isEmpty else { return }
         do {
-            try puerto.enviar(archivos: urls)
+            let cantidad = urls.count
+            try puerto.enviar(archivos: urls) { [weak self] completado in
+                guard completado, let bus = self?.bus else { return }
+                let aviso = EstadoDeHUDSistema.archivos(cantidad, tipo: .airdropEnviado)
+                Task { await bus.publicar(ActividadBreveSolicitada(aviso)) }
+            }
             mensajeDeError = nil
         } catch {
             mensajeDeError = error.localizedDescription

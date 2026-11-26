@@ -10,6 +10,8 @@ public enum Medidas {
     /// Ancho de cada oreja compacta por defecto y el de las actividades breves.
     public static let orejaCompacta: CGFloat = 52
     public static let orejaBreve: CGFloat = 64
+    /// Los avisos con texto ("3 archivos") necesitan más sitio.
+    public static let orejaBreveConTexto: CGFloat = 96
     /// Separación entre el cuerpo de la isla y la burbuja de la segunda actividad.
     public static let separacionDeBurbuja: CGFloat = 8
     public static let aviso = CGSize(width: 440, height: 82)
