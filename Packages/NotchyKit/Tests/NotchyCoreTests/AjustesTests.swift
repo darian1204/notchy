@@ -167,7 +167,7 @@ import Testing
         ajustes.atajo = .ninguno
         ajustes.iconoEnBarraDeMenus = true
         ajustes.iniciarAlAbrirSesion = false
-        ajustes.temaPanel = .bosque
+        ajustes.temaPanel = "bosque"
         ajustes.estiloDeIsla = .tarjetas
         ajustes.vidrio = .completo
         ajustes.rutaVaultObsidian = "/Users/secreto/MiVault"
@@ -179,7 +179,7 @@ import Testing
         #expect(ajustes.atajo == .controlOpcionEspacio)
         #expect(ajustes.iconoEnBarraDeMenus == false)
         #expect(ajustes.iniciarAlAbrirSesion == true)
-        #expect(ajustes.temaPanel == .obsidiana)
+        #expect(ajustes.temaPanel == "obsidiana")
         #expect(ajustes.estiloDeIsla == .clasico)
         #expect(ajustes.vidrio == .apagado)
         #expect(ajustes.rutaVaultObsidian == Ajustes.rutaVaultPorDefecto)

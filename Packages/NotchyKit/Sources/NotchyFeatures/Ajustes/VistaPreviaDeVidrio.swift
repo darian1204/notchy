@@ -7,7 +7,8 @@ import SwiftUI
 struct VistaPreviaDeVidrio: View {
     let estilo: EstiloDeVidrio
     let tintado: Double
-    let tema: TemaDePanel
+    /// Color del tema del panel ya resuelto.
+    let colorDePanel: Color
 
     private var vidrio: VidrioDeIsla {
         VidrioDeIsla(
@@ -71,7 +72,7 @@ struct VistaPreviaDeVidrio: View {
     }
 
     @ViewBuilder private func fondoDeIsla(_ forma: UnevenRoundedRectangle) -> some View {
-        let color = Color(hex: tema.hexBase)
+        let color = colorDePanel
         if vidrio.fondo {
             ZStack {
                 forma.fill(vidrio.capa(color, minimo: 0.12))

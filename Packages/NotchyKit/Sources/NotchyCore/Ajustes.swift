@@ -65,13 +65,22 @@ public final class Ajustes {
     public var rutaVaultObsidian: String {
         didSet { alCambiar(rutaVaultObsidian, oldValue, .rutaVaultObsidian) }
     }
-    /// Tema visual del panel de la isla (7 opciones).
-    public var temaPanel: TemaDePanel {
+    /// Id del tema elegido para el panel. Se guarda como el texto de antes (`"obsidiana"`), así que
+    /// lo que ya estaba elegido se conserva.
+    public var temaPanel: String {
         didSet { alCambiar(temaPanel, oldValue, .temaPanel) }
     }
-    /// Tema de acento de la barra superior (9 opciones).
-    public var temaBarra: TemaDeBarra {
+    /// Id del tema elegido para la barra de módulos.
+    public var temaBarra: String {
         didSet { alCambiar(temaBarra, oldValue, .temaBarra) }
+    }
+    /// Temas del panel: los originales que no se han borrado y los del usuario. Nunca vacía.
+    public var temasDePanel: [TemaDeColor] {
+        didSet { alCambiar(temasDePanel, oldValue, .temasDePanel) }
+    }
+    /// Temas de la barra de módulos. Nunca vacía.
+    public var temasDeBarra: [TemaDeColor] {
+        didSet { alCambiar(temasDeBarra, oldValue, .temasDeBarra) }
     }
     /// Estilo de la isla abierta: clásico o tarjetas.
     public var estiloDeIsla: EstiloDeIsla {
@@ -174,8 +183,10 @@ public final class Ajustes {
         appsExcluidasPortapapeles = Self.leer(.appsExcluidasPortapapeles, de: almacen) ?? []
         carpetaFotosEspejo = Self.leer(.carpetaFotosEspejo, de: almacen) ?? Self.rutaDescargasPorDefecto
         rutaVaultObsidian = Self.leer(.rutaVaultObsidian, de: almacen) ?? Self.rutaVaultPorDefecto
-        temaPanel = Self.leer(.temaPanel, de: almacen) ?? .obsidiana
-        temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
+        temaPanel = Self.leer(.temaPanel, de: almacen) ?? ListaDeTemas.panel.porDefecto
+        temaBarra = Self.leer(.temaBarra, de: almacen) ?? ListaDeTemas.barra.porDefecto
+        temasDePanel = Self.normalizarTemas(Self.leer(.temasDePanel, de: almacen), lista: .panel)
+        temasDeBarra = Self.normalizarTemas(Self.leer(.temasDeBarra, de: almacen), lista: .barra)
         estiloDeIsla = Self.leer(.estiloDeIsla, de: almacen) ?? .clasico
         vidrio = Self.leer(.vidrio, de: almacen) ?? .apagado
         tintadoDelVidrio = Self.limitarTintado(Self.leer(.tintadoDelVidrio, de: almacen) ?? Self.tintadoPorDefecto)
@@ -236,7 +247,7 @@ public final class Ajustes {
         case esquema, ordenDeModulos, modulosApagados, pantalla, atajo, iconoEnBarraDeMenus, iniciarAlAbrirSesion
         case diasRetencionPortapapeles, horasRetencionPortapapeles, limiteElementosPortapapeles,
             appsExcluidasPortapapeles
-        case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
+        case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, temasDePanel, temasDeBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox, separarVocesEnReuniones
         case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas, vidrio
@@ -259,8 +270,10 @@ public final class Ajustes {
         appsExcluidasPortapapeles = []
         carpetaFotosEspejo = Self.rutaDescargasPorDefecto
         rutaVaultObsidian = Self.rutaVaultPorDefecto
-        temaPanel = .obsidiana
-        temaBarra = .clasico
+        temaPanel = ListaDeTemas.panel.porDefecto
+        temaBarra = ListaDeTemas.barra.porDefecto
+        temasDePanel = ListaDeTemas.panel.originales
+        temasDeBarra = ListaDeTemas.barra.originales
         estiloDeIsla = .clasico
         vidrio = .apagado
         tintadoDelVidrio = Self.tintadoPorDefecto
@@ -353,6 +366,102 @@ public final class Ajustes {
             nuevos[indice] = id
         }
         accesosRapidos = nuevos
+    }
+
+    // MARK: - Temas de color
+
+    public func temas(_ lista: ListaDeTemas) -> [TemaDeColor] {
+        switch lista {
+        case .panel: temasDePanel
+        case .barra: temasDeBarra
+        }
+    }
+
+    public func idElegido(_ lista: ListaDeTemas) -> String {
+        switch lista {
+        case .panel: temaPanel
+        case .barra: temaBarra
+        }
+    }
+
+    public func elegirTema(_ id: String, en lista: ListaDeTemas) {
+        guard temas(lista).contains(where: { $0.id == id }) else { return }
+        switch lista {
+        case .panel: temaPanel = id
+        case .barra: temaBarra = id
+        }
+    }
+
+    /// El tema elegido; si se borró, el primero de la lista.
+    public func temaActual(_ lista: ListaDeTemas) -> TemaDeColor {
+        let elegido = idElegido(lista)
+        let disponibles = temas(lista)
+        return disponibles.first { $0.id == elegido } ?? disponibles.first ?? lista.originales[0]
+    }
+
+    public var temaDePanelActual: TemaDeColor { temaActual(.panel) }
+    public var temaDeBarraActual: TemaDeColor { temaActual(.barra) }
+
+    /// Agrega un tema de color fijo al final, lo elige y devuelve su id.
+    @discardableResult
+    public func agregarTema(en lista: ListaDeTemas, nombre: String, hex: UInt32) -> String {
+        let tema = TemaDeColor(id: "propio-" + UUID().uuidString, nombre: Self.limpiarNombre(nombre), hex: hex)
+        asignar(temas(lista) + [tema], a: lista)
+        elegirTema(tema.id, en: lista)
+        return tema.id
+    }
+
+    /// Cambia nombre y color de un tema existente. La fuente no cambia.
+    public func actualizarTema(_ tema: TemaDeColor, en lista: ListaDeTemas) {
+        var nuevos = temas(lista)
+        guard let indice = nuevos.firstIndex(where: { $0.id == tema.id }) else { return }
+        nuevos[indice].nombre = Self.limpiarNombre(tema.nombre)
+        if nuevos[indice].colorEditable { nuevos[indice].hex = tema.hex & 0xFFFFFF }
+        asignar(nuevos, a: lista)
+    }
+
+    /// Siempre queda al menos un tema por lista.
+    public func puedeEliminarTema(de lista: ListaDeTemas) -> Bool { temas(lista).count > 1 }
+
+    public func eliminarTema(_ id: String, de lista: ListaDeTemas) {
+        guard puedeEliminarTema(de: lista) else { return }
+        let nuevos = temas(lista).filter { $0.id != id }
+        guard nuevos.count < temas(lista).count else { return }
+        asignar(nuevos, a: lista)
+        if idElegido(lista) == id { elegirTema(nuevos[0].id, en: lista) }
+    }
+
+    /// `true` si falta un original o alguno cambió de nombre o color.
+    public func originalesModificados(_ lista: ListaDeTemas) -> Bool {
+        let actuales = temas(lista)
+        return lista.originales.contains { original in actuales.first { $0.id == original.id } != original }
+    }
+
+    /// Regresa los originales a su lugar y valores; los temas propios se quedan después de ellos.
+    public func restaurarTemasOriginales(_ lista: ListaDeTemas) {
+        let originales = lista.originales
+        let propios = temas(lista).filter { tema in !originales.contains { $0.id == tema.id } }
+        asignar(originales + propios, a: lista)
+    }
+
+    private func asignar(_ nuevos: [TemaDeColor], a lista: ListaDeTemas) {
+        switch lista {
+        case .panel: temasDePanel = nuevos
+        case .barra: temasDeBarra = nuevos
+        }
+    }
+
+    static func limpiarNombre(_ nombre: String) -> String {
+        let limpio = nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        return limpio.isEmpty ? "Tema sin nombre" : String(limpio.prefix(40))
+    }
+
+    /// Sin guardar o vacía: los originales. Sin ids repetidos y con colores de 24 bits.
+    static func normalizarTemas(_ guardados: [TemaDeColor]?, lista: ListaDeTemas) -> [TemaDeColor] {
+        var vistos = Set<String>()
+        let limpios = (guardados ?? []).filter { vistos.insert($0.id).inserted }
+            .map { TemaDeColor(id: $0.id, nombre: limpiarNombre($0.nombre), hex: $0.hex, fuente: $0.fuente) }
+        return limpios.isEmpty ? lista.originales : limpios
     }
 
     /// Entre 0 y 1; lo que no es número vuelve al valor por defecto.
