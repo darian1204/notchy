@@ -156,20 +156,64 @@ public struct ColorDeCaratulaActualizado: Evento, Equatable {
     }
 }
 
-/// Tipo de HUD del sistema mostrado en las orejas compactas del notch.
+/// Actividad breve en las orejas: el HUD del sistema y los avisos de unos segundos.
 public enum TipoDeHUD: String, Sendable, Equatable, CaseIterable {
     case volumen
     case silencio
     case brillo
-    case bateria
+    /// Se conectó el cargador.
+    case cargando
+    /// Se desconectó el cargador.
+    case desconectado
+    /// La batería cruzó el 20 % o el 10 %.
+    case bateriaBaja
+    /// Llegaron archivos a la Bandeja.
+    case archivos
+    /// Se enviaron archivos por AirDrop desde Notchy.
+    case airdropEnviado
+    /// Llegaron archivos por AirDrop.
+    case airdropRecibido
 
     public var icono: String {
         switch self {
         case .volumen: "speaker.wave.2.fill"
         case .silencio: "speaker.slash.fill"
         case .brillo: "sun.max.fill"
-        case .bateria: "battery.100percent"
+        case .cargando: "battery.100percent.bolt"
+        case .desconectado: "battery.75percent"
+        case .bateriaBaja: "battery.25percent"
+        case .archivos: "tray.and.arrow.down.fill"
+        case .airdropEnviado, .airdropRecibido: "airplayaudio"
         }
+    }
+
+    /// Volumen y brillo se van rápido; los avisos se quedan lo suficiente para leerlos.
+    public var duracion: Duration {
+        switch self {
+        case .volumen, .silencio, .brillo: .milliseconds(1600)
+        case .cargando, .desconectado, .bateriaBaja, .archivos, .airdropEnviado, .airdropRecibido: .seconds(3)
+        }
+    }
+
+    /// Si la oreja derecha muestra una barra de nivel; si no, muestra la etiqueta.
+    public var conBarra: Bool { self == .volumen || self == .silencio || self == .brillo }
+
+    /// Módulo que abre un clic sobre la actividad.
+    public var modulo: String? {
+        switch self {
+        case .archivos, .airdropRecibido: "bandeja"
+        case .airdropEnviado: "airdrop"
+        default: nil
+        }
+    }
+}
+
+/// Un módulo pide mostrar una actividad breve en las orejas.
+public struct ActividadBreveSolicitada: Evento, Equatable {
+    public let actividad: EstadoDeHUDSistema
+
+    public init(_ actividad: EstadoDeHUDSistema) {
+        self.actividad = actividad
     }
 }
 

@@ -7,6 +7,11 @@ public enum Medidas {
     /// Píldora flotante para pantallas sin notch.
     public static let pildora = CGSize(width: 300, height: 34)
     public static let compacto = CGSize(width: 283, height: 32)
+    /// Ancho de cada oreja compacta por defecto y el de las actividades breves.
+    public static let orejaCompacta: CGFloat = 52
+    public static let orejaBreve: CGFloat = 64
+    /// Separación entre el cuerpo de la isla y la burbuja de la segunda actividad.
+    public static let separacionDeBurbuja: CGFloat = 8
     public static let aviso = CGSize(width: 440, height: 82)
     public static let inicio = CGSize(width: 620, height: 224)
     public static let portapapeles = CGSize(width: 620, height: 240)

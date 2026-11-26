@@ -44,6 +44,8 @@ public struct MaquinaDeIsla: Sendable {
     }
 
     public static let retardoAlAbrir: Duration = .milliseconds(120)
+    /// Con una actividad en las orejas, el cursor primero la agranda (asomo) y abre después.
+    public static let retardoAlAbrirDesdeCompacto: Duration = .milliseconds(600)
     public static let retardoAlCerrar: Duration = .milliseconds(350)
     /// Retardo especial para el espejo: permanece 2 segundos abierto al perder el cursor.
     public static let retardoAlCerrarEspejo: Duration = .seconds(2)
@@ -67,6 +69,18 @@ public struct MaquinaDeIsla: Sendable {
 
     public init() {}
 
+    /// Segunda actividad en prioridad, para la burbuja. Solo existe cuando la isla está en compacto.
+    public var secundaria: PeticionCompacta? {
+        guard case .compacto(let primera) = estado else { return nil }
+        return peticiones.filter { $0.modulo != primera.modulo }.max { $0.prioridad < $1.prioridad }
+    }
+
+    /// El cursor está sobre una actividad compacta: las orejas se agrandan antes de abrir.
+    public var asomando: Bool {
+        guard cursorDentro, case .compacto = estado else { return false }
+        return true
+    }
+
     public var estado: EstadoDeIsla {
         if let expandido {
             return .expandido(modulo: expandido)
@@ -88,7 +102,14 @@ public struct MaquinaDeIsla: Sendable {
                 abiertaSinCursor = false
                 return [.cancelar(.cerrar)]
             }
-            return modulos.isEmpty ? [] : [.cancelar(.cerrar), .programar(.abrir, Self.retardoAlAbrir)]
+            guard !modulos.isEmpty else { return [] }
+            let espera: Duration
+            if case .compacto = estado {
+                espera = Self.retardoAlAbrirDesdeCompacto
+            } else {
+                espera = Self.retardoAlAbrir
+            }
+            return [.cancelar(.cerrar), .programar(.abrir, espera)]
 
         case .cursorSalio:
             cursorDentro = false
