@@ -25,6 +25,10 @@ public final class ModeloDeScreenTime {
     /// Día al que pertenecen `usosPorApp`. Al cambiar de día se empieza de cero.
     @ObservationIgnored private var diaCargado = ""
     @ObservationIgnored private var ultimoTic: Date?
+    /// Hay cambios sin escribir en disco. Se guardan una vez por minuto, no en cada tic.
+    @ObservationIgnored private var cambiosSinGuardar = false
+    @ObservationIgnored private var ultimoGuardado: Date = .distantPast
+    static let intervaloDeGuardado: TimeInterval = 60
 
     /// Cada cuánto se suma tiempo a la app del frente.
     static let intervaloDeTic: TimeInterval = 10
@@ -72,6 +76,7 @@ public final class ModeloDeScreenTime {
     }
 
     public func detener() {
+        guardarSiHayCambios(forzar: true)
         tareaReloj?.cancel()
         tareaReloj = nil
         if let observadorActivacion {
@@ -114,12 +119,18 @@ public final class ModeloDeScreenTime {
         usosPorApp.sorted { $0.segundos > $1.segundos }
     }
 
+    /// Suma tiempo a mano y lo guarda al momento.
     public func registrarTiempoManual(
         bundleID: String,
         nombre: String,
         segundos: TimeInterval,
         cambios: Int = 1
     ) {
+        sumar(bundleID: bundleID, nombre: nombre, segundos: segundos, cambios: cambios)
+        guardarSiHayCambios(forzar: true)
+    }
+
+    private func sumar(bundleID: String, nombre: String, segundos: TimeInterval, cambios: Int) {
         let categoria = Self.categorizar(bundleID: bundleID, nombre: nombre)
         if let indice = usosPorApp.firstIndex(where: { $0.bundleId == bundleID }) {
             usosPorApp[indice].segundos += segundos
@@ -136,7 +147,7 @@ public final class ModeloDeScreenTime {
             )
         }
         usosPorApp.sort { $0.segundos > $1.segundos }
-        guardarDatosDeHoy()
+        cambiosSinGuardar = true
     }
 
     public static func categorizar(bundleID: String, nombre: String) -> CategoriaDeScreenTime {
@@ -200,7 +211,8 @@ public final class ModeloDeScreenTime {
         // Un cambio de app no es tiempo de uso: antes sumaba 5 s por cambio.
         if contarCambio, !Self.appsQueNoCuentan.contains(bundleID) {
             asegurarDiaActual()
-            registrarTiempoManual(bundleID: bundleID, nombre: nombre, segundos: 0, cambios: 1)
+            sumar(bundleID: bundleID, nombre: nombre, segundos: 0, cambios: 1)
+            guardarSiHayCambios()
         }
     }
 
@@ -223,12 +235,8 @@ public final class ModeloDeScreenTime {
         if segundosSesionActual > sesionMasLargaSegundos {
             sesionMasLargaSegundos = segundosSesionActual
         }
-        registrarTiempoManual(
-            bundleID: appActualBundleID,
-            nombre: appActualNombre,
-            segundos: segundos,
-            cambios: 0
-        )
+        sumar(bundleID: appActualBundleID, nombre: appActualNombre, segundos: segundos, cambios: 0)
+        guardarSiHayCambios()
     }
 
     private var claveDeHoy: String { "notchy.screentime." + Self.dia(de: ahora()) }
@@ -238,9 +246,10 @@ public final class ModeloDeScreenTime {
         return String(format: "%04d-%02d-%02d", partes.year ?? 0, partes.month ?? 0, partes.day ?? 0)
     }
 
-    /// Si ya es otro día, empieza de cero en vez de arrastrar los totales del anterior.
+    /// Si ya es otro día, cierra el anterior en su propia fecha y empieza de cero.
     private func asegurarDiaActual() {
         guard Self.dia(de: ahora()) != diaCargado else { return }
+        guardarSiHayCambios(forzar: true)
         cargarDatosDeHoy()
     }
 
@@ -248,6 +257,7 @@ public final class ModeloDeScreenTime {
     /// dejó la versión que arrastraba los totales de un día a otro. No inventa datos.
     private func cargarDatosDeHoy() {
         diaCargado = Self.dia(de: ahora())
+        cambiosSinGuardar = false
         segundosSesionActual = 0
         sesionMasLargaSegundos = 0
         usosPorApp = []
@@ -268,10 +278,17 @@ public final class ModeloDeScreenTime {
         usosPorApp = reales.sorted { $0.segundos > $1.segundos }
     }
 
-    private func guardarDatosDeHoy() {
+    /// Escribe en disco como mucho una vez por minuto; `forzar` escribe ya (al cerrar o cambiar de día).
+    /// Siempre en la fecha de los datos cargados, no en la de ahora.
+    private func guardarSiHayCambios(forzar: Bool = false) {
+        guard cambiosSinGuardar, !diaCargado.isEmpty else { return }
+        let momento = ahora()
+        guard forzar || momento.timeIntervalSince(ultimoGuardado) >= Self.intervaloDeGuardado else { return }
         if let datos = try? JSONEncoder().encode(usosPorApp) {
-            defaults.set(datos, forKey: claveDeHoy)
+            defaults.set(datos, forKey: "notchy.screentime." + diaCargado)
         }
+        cambiosSinGuardar = false
+        ultimoGuardado = momento
     }
 }
 

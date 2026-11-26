@@ -183,7 +183,7 @@ final class Ensamblado {
         )
         modeloDeTraductor = ModeloDeTraductor(agente: adaptadorDeAgente)
         modeloDeWindowSnap = ModeloDeWindowSnap(puerto: adaptadorDeWindowSnap)
-        modeloDeMonitorSistema = ModeloDeMonitorSistema(puerto: adaptadorDeMonitor)
+        modeloDeMonitorSistema = ModeloDeMonitorSistema(puerto: adaptadorDeMonitor, bus: bus)
         resumidorDeReuniones = ResumidorDeReuniones(
             bus: bus,
             modelo: adaptadorDeResumen,
