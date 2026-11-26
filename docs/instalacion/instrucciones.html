@@ -1,0 +1,180 @@
+<!doctype html>
+<!-- Instrucciones para instalar Notchy en otra Mac. Se convierte a PDF con scripts/instrucciones. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Notchy · Instalación en otra Mac</title>
+<style>
+  :root { --tinta: #1d1b22; --suave: #5d5868; --acento: #c2457a; --fondo-caja: #f6f2f7; --borde: #e4dde8; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; }
+  body { font: 10.5px/1.55 -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; color: var(--tinta);
+         padding: 0 44px; -webkit-print-color-adjust: exact; }
+  h1 { font-size: 26px; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.3px; }
+  h2 { font-size: 15px; margin: 22px 0 8px; display: flex; align-items: center; gap: 9px; }
+  h3 { font-size: 11.5px; margin: 14px 0 4px; }
+  p { margin: 0 0 7px; }
+  ol, ul { margin: 0 0 8px; padding-left: 18px; }
+  li { margin: 0 0 3px; }
+  code, .tecla { font: 10px "SF Mono", Menlo, monospace; background: var(--fondo-caja); border: 1px solid var(--borde);
+                 border-radius: 4px; padding: 1px 4px; }
+  .num { flex: none; width: 22px; height: 22px; border-radius: 11px; background: var(--acento); color: #fff;
+         font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+  .paso { break-inside: avoid; page-break-inside: avoid; }
+  .captura { display: block; margin: 8px auto 4px; border-radius: 10px; border: 1px solid var(--borde);
+             box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+  .pie { text-align: center; color: var(--suave); font-size: 9px; margin-bottom: 6px; }
+  .nota { background: var(--fondo-caja); border-left: 3px solid var(--acento); border-radius: 6px;
+          padding: 8px 11px; margin: 8px 0; break-inside: avoid; }
+  .nota strong:first-child { color: var(--acento); }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; break-inside: avoid; }
+  th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  th { font-size: 9.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--suave); }
+  .salto { page-break-before: always; break-before: page; }
+  .portada { height: 760px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+  .portada img { width: 132px; height: 132px; margin-bottom: 22px; }
+  .portada .sub { font-size: 14px; color: var(--suave); margin-bottom: 26px; }
+  .portada .datos { font-size: 10.5px; color: var(--suave); line-height: 1.8; }
+  .requisitos li { margin-bottom: 5px; }
+  .boton { display: inline-block; font-weight: 600; background: #ececf1; border: 1px solid #d5d4dc; border-radius: 5px;
+           padding: 0 5px; font-size: 10px; }
+</style>
+</head>
+<body>
+
+<section class="portada">
+  <img src="capturas/icono.png" alt="Ícono de Notchy">
+  <h1>Instalar Notchy en otra Mac</h1>
+  <div class="sub">Guía paso a paso, de copiar el archivo al primer uso.</div>
+  <div class="datos">
+    Versión 0.1.0 · Para Mac con Apple Silicon y macOS 27 o posterior<br>
+    Tiempo aproximado: 5 minutos<br>
+    Contenido del paquete: <code>Notchy.dmg</code> (la app) y este PDF
+  </div>
+</section>
+
+<section class="salto">
+  <h2>Antes de empezar</h2>
+  <ul class="requisitos">
+    <li><strong>Una Mac con chip de Apple</strong> (M1 o posterior). En Macs con Intel no abre. Para saberlo: menú Apple → <em>Acerca de esta Mac</em>, renglón <em>Chip</em>.</li>
+    <li><strong>macOS 27 o posterior.</strong> En la misma ventana de <em>Acerca de esta Mac</em> aparece la versión.</li>
+    <li><strong>Una cuenta de administrador</strong> (la contraseña de la Mac o Touch ID), solo para autorizarla la primera vez.</li>
+    <li>Mejor si la Mac tiene notch. Si no lo tiene, Notchy aparece como una píldora debajo de la barra de menús.</li>
+  </ul>
+  <div class="nota"><strong>Por qué hay un paso de seguridad.</strong> Notchy está firmada por su desarrollador, pero no pasó por la
+    revisión automática de Apple (notarización), que solo existe para apps que se distribuyen públicamente. Por eso macOS la
+    bloquea la primera vez y hay que autorizarla a mano una sola vez (pasos 3 y 4). Es normal y no hay que desactivar ninguna
+    protección del sistema.</div>
+
+  <div class="paso">
+    <h2><span class="num">1</span>Pasar el archivo a la otra Mac</h2>
+    <p>Copia <code>Notchy.dmg</code> a la otra Mac por AirDrop, una memoria USB o iCloud Drive. Cualquiera sirve. Déjalo en
+      <em>Descargas</em> o en el <em>Escritorio</em>.</p>
+  </div>
+
+  <div class="paso">
+    <h2><span class="num">2</span>Abrir el disco y arrastrar Notchy a Aplicaciones</h2>
+    <ol>
+      <li>Haz doble clic en <code>Notchy.dmg</code>. Se abre una ventana como esta.</li>
+      <li>Arrastra el ícono de <strong>Notchy</strong> sobre la carpeta <strong>Aplicaciones</strong> y suéltalo.</li>
+      <li>Cuando termine de copiar, cierra la ventana y expulsa el disco: en el Finder, botón ⏏ junto a <em>Notchy</em> en la barra lateral.</li>
+    </ol>
+    <img class="captura" src="capturas/1-disco.png" style="width: 78%">
+    <div class="pie">La ventana del disco: arrastra Notchy (izquierda) a Aplicaciones (derecha).</div>
+  </div>
+</section>
+
+<section class="salto">
+  <div class="paso">
+    <h2><span class="num">3</span>Abrirla por primera vez</h2>
+    <ol>
+      <li>Abre la carpeta <em>Aplicaciones</em> y haz doble clic en <strong>Notchy</strong>.</li>
+      <li>macOS muestra el aviso <em>“No se abrió Notchy.app”</em> (en inglés: <em>“Notchy.app” Not Opened</em>).</li>
+      <li>Pulsa <span class="boton">Listo</span> (<span class="boton">Done</span>). <strong>No pulses “Trasladar a la Papelera”</strong>.</li>
+    </ol>
+    <img class="captura" src="capturas/2-aviso.png" style="width: 42%">
+    <div class="pie">El aviso de la primera vez. Pulsa Listo / Done.</div>
+  </div>
+
+  <div class="paso">
+    <h2><span class="num">4</span>Autorizarla en Privacidad y seguridad</h2>
+    <ol>
+      <li>Abre <strong>Ajustes del Sistema</strong> (menú Apple → <em>Ajustes del Sistema…</em>).</li>
+      <li>En la barra lateral entra a <strong>Privacidad y seguridad</strong> (<em>Privacy &amp; Security</em>).</li>
+      <li>Baja hasta la sección <strong>Seguridad</strong>. Verás el mensaje <em>“Se bloqueó Notchy.app para proteger tu Mac”</em>.</li>
+      <li>Pulsa <span class="boton">Abrir de todos modos</span> (<span class="boton">Open Anyway</span>) y confirma con tu contraseña o Touch ID.</li>
+      <li>Vuelve a salir el aviso, ahora con el botón <span class="boton">Abrir de todos modos</span>. Púlsalo y Notchy arranca.</li>
+    </ol>
+    <img class="captura" src="capturas/3-abrir-de-todos-modos.png" style="width: 76%">
+    <div class="pie">Privacidad y seguridad → Seguridad. El botón aparece durante una hora después del intento del paso 3;
+      si no lo ves, repite el paso 3.</div>
+    <div class="nota"><strong>Solo se hace una vez.</strong> Desde aquí Notchy abre normal, también al iniciar sesión.</div>
+  </div>
+</section>
+
+<section class="salto">
+  <div class="paso">
+    <h2><span class="num">5</span>Primer uso</h2>
+    <img class="captura" src="capturas/4-isla.png" style="width: 100%">
+    <div class="pie">La isla abierta en el notch.</div>
+    <ul>
+      <li><strong>Abrir la isla:</strong> pasa el cursor sobre el notch, o usa el atajo <span class="tecla">⌃ Control</span> + <span class="tecla">⌥ Opción</span> + <span class="tecla">Espacio</span>.</li>
+      <li><strong>Cerrarla:</strong> aleja el cursor, haz clic fuera o pulsa <span class="tecla">Esc</span>.</li>
+      <li><strong>Ajustes:</strong> clic derecho sobre la isla → <em>Ajustes…</em>, o el engrane en la paleta <span class="tecla">⌘K</span>. Ahí se eligen módulos, temas, liquid glass y el Inicio.</li>
+      <li><strong>No aparece en el Dock.</strong> Es normal: vive en el notch. Para salir, clic derecho sobre la isla → <em>Salir de Notchy</em>.</li>
+      <li><strong>Arranca sola al iniciar sesión.</strong> macOS puede avisar <em>“Se agregó un ítem en segundo plano”</em>; se puede desactivar en Ajustes de Notchy → General.</li>
+    </ul>
+  </div>
+
+  <div class="paso">
+    <h2>Permisos que puede pedir</h2>
+    <p>macOS pregunta la primera vez que usas cada función. Acepta solo las que vayas a usar; las demás siguen funcionando sin ellas.</p>
+    <table>
+      <tr><th>Permiso</th><th>Para qué lo usa Notchy</th></tr>
+      <tr><td>Calendarios</td><td>Agenda del día en la isla.</td></tr>
+      <tr><td>Recordatorios</td><td>Pendientes de la lista “Obsidian”.</td></tr>
+      <tr><td>Micrófono, grabación de audio del sistema y reconocimiento de voz</td><td>Grabar y transcribir reuniones y notas de voz, todo en la Mac.</td></tr>
+      <tr><td>Cámara</td><td>El espejo del notch.</td></tr>
+      <tr><td>Carpeta Descargas</td><td>Avisar cuando llega algo por AirDrop.</td></tr>
+      <tr><td>Automatización (Música y Spotify)</td><td>Saber qué canción suena si falla el método principal.</td></tr>
+      <tr><td>Accesibilidad</td><td>Acomodar ventanas (módulo Window Snap).</td></tr>
+    </table>
+    <p>Si negaste uno y luego lo quieres: <strong>Ajustes del Sistema → Privacidad y seguridad</strong> → la categoría → activa <em>Notchy</em>.</p>
+  </div>
+</section>
+
+<section class="salto">
+  <div class="paso">
+    <h2>Problemas comunes</h2>
+    <h3>“Notchy está dañado y no se puede abrir”</h3>
+    <p>Pasa a veces cuando el archivo llega por algunos navegadores o servicios de nube. Abre la app <em>Terminal</em>, pega esta línea,
+      pulsa Intro y vuelve a abrir Notchy:</p>
+    <p><code>xattr -dr com.apple.quarantine /Applications/Notchy.app</code></p>
+    <h3>“No se puede abrir en esta Mac” o no hace nada</h3>
+    <p>Revisa los requisitos: chip de Apple y macOS 27 o posterior.</p>
+    <h3>No veo la isla</h3>
+    <p>Pasa el cursor justo sobre el notch o usa <span class="tecla">⌃⌥ Espacio</span>. Si sigue sin aparecer, abre <em>Monitor de Actividad</em>
+      y busca “Notchy”: si no está, ábrela otra vez desde Aplicaciones. En pantallas sin notch aparece como píldora bajo la barra de menús.</p>
+    <h3>No aparece el botón “Abrir de todos modos”</h3>
+    <p>Solo se muestra durante una hora después de intentar abrirla. Repite el paso 3 y entra de inmediato a Privacidad y seguridad.</p>
+  </div>
+
+  <div class="paso">
+    <h2>Actualizar a una versión nueva</h2>
+    <p>Sal de Notchy (clic derecho sobre la isla → <em>Salir de Notchy</em>) y repite los pasos 1 a 4. Al arrastrar a Aplicaciones elige
+      <em>Reemplazar</em>. Tus ajustes y datos se conservan.</p>
+  </div>
+
+  <div class="paso">
+    <h2>Desinstalar</h2>
+    <ol>
+      <li>Sal de Notchy.</li>
+      <li>Arrastra <em>Notchy</em> de la carpeta Aplicaciones a la Papelera.</li>
+      <li>Para borrar también sus datos: en el Finder, menú <em>Ir → Ir a la carpeta…</em>, escribe
+        <code>~/Library/Application Support/Notchy</code> y manda esa carpeta a la Papelera.</li>
+    </ol>
+  </div>
+</section>
+
+</body>
+</html>

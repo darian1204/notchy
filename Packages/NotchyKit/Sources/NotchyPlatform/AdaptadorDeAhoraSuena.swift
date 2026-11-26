@@ -119,19 +119,25 @@ public struct RutasDeMediaRemote: Sendable, Equatable {
     }
 
     public static func detectar() -> RutasDeMediaRemote? {
-        let raizDelPaquete = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let home = URL(fileURLWithPath: NSHomeDirectory())
-        let carpetasCandidatas: [URL] = [
-            raizDelPaquete.appending(path: "Resources/mediaremote-adapter"),
-            Bundle.main.resourceURL?.appending(path: "mediaremote-adapter"),
-            home.appending(path: "Developer/notchy/Resources/mediaremote-adapter"),
-            home.appending(path: "Developer/isla-spikes/vendor/mediaremote-adapter"),
-        ].compactMap { $0 }
+        // En la app publicada el adaptador va dentro del paquete (lo copia scripts/empaquetar). Las rutas
+        // del repo solo existen en depuración, para no dejar rutas de la Mac del desarrollador en el binario.
+        var carpetasCandidatas: [URL] = [Bundle.main.resourceURL?.appending(path: "mediaremote-adapter")]
+            .compactMap { $0 }
+        #if DEBUG
+            let raizDelPaquete = URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+            let home = URL(fileURLWithPath: NSHomeDirectory())
+            carpetasCandidatas =
+                [
+                    raizDelPaquete.appending(path: "Resources/mediaremote-adapter"),
+                    home.appending(path: "Developer/notchy/Resources/mediaremote-adapter"),
+                    home.appending(path: "Developer/isla-spikes/vendor/mediaremote-adapter"),
+                ] + carpetasCandidatas
+        #endif
 
         let fm = FileManager.default
         for carpeta in carpetasCandidatas {

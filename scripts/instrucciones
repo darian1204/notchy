@@ -1,0 +1,8 @@
+#!/bin/zsh
+# Convierte docs/instalacion/instrucciones.html en dist/Instrucciones de instalación.pdf.
+set -eu
+source ${0:A:h}/comun.zsh
+mkdir -p $RAIZ/build/icono $RAIZ/dist
+swiftc -O $RAIZ/scripts/renderizar-html.swift -o $RAIZ/build/icono/renderizar 2> /dev/null
+$RAIZ/build/icono/renderizar pdf $RAIZ/docs/instalacion/instrucciones.html "$RAIZ/dist/Instrucciones de instalación.pdf"
+print -- "Listo: dist/Instrucciones de instalación.pdf"

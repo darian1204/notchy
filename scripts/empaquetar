@@ -1,0 +1,78 @@
+#!/bin/zsh
+# Compila Notchy en Release, la firma y arma dist/Notchy.dmg con la app, un acceso a Aplicaciones y
+# las instrucciones (dist/Instrucciones de instalación.pdf, si existe). Para instalar en otra Mac.
+set -u
+source ${0:A:h}/comun.zsh
+DIST=$RAIZ/dist
+DERIVADOS_RELEASE=$RAIZ/build/DerivedDataRelease
+APP_RELEASE=$DERIVADOS_RELEASE/Build/Products/Release/Notchy.app
+PDF="$DIST/Instrucciones de instalación.pdf"
+
+print -- "== Compilando Release"
+if [[ ${1:-} == "--sin-compilar" && -d $APP_RELEASE ]]; then
+    print -- "   (se reutiliza la compilación anterior)"
+elif ! xcodebuild -project $RAIZ/Notchy.xcodeproj -scheme Notchy -configuration Release \
+    -derivedDataPath $DERIVADOS_RELEASE -allowProvisioningUpdates build > $REGISTROS/release.log 2>&1; then
+    /usr/bin/grep -E "error:" $REGISTROS/release.log | sort -u | head -20
+    print -- "No compiló. Registro: build/logs/release.log"
+    exit 1
+fi
+# El adaptador de MediaRemote (qué música suena) no entra en el target de Xcode: se copia aquí dentro de
+# la app y se vuelve a firmar todo con la misma identidad y los mismos permisos.
+if [[ ! -d $APP_RELEASE/Contents/Resources/mediaremote-adapter ]]; then
+    ditto $RAIZ/Resources/mediaremote-adapter $APP_RELEASE/Contents/Resources/mediaremote-adapter
+    IDENTIDAD=$(codesign -dvv $APP_RELEASE 2>&1 | sed -n 's/^Authority=\(Apple Development.*\)$/\1/p' | head -1)
+    PERMISOS=$RAIZ/build/permisos-release.plist
+    codesign -d --entitlements :- $APP_RELEASE > $PERMISOS 2> /dev/null
+    ADAPTADOR=$APP_RELEASE/Contents/Resources/mediaremote-adapter
+    codesign --force --options runtime --timestamp=none --sign "$IDENTIDAD" \
+        $ADAPTADOR/MediaRemoteAdapter.framework $ADAPTADOR/MediaRemoteAdapterTestClient > /dev/null 2>&1
+    codesign --force --options runtime --timestamp=none --sign "$IDENTIDAD" --entitlements $PERMISOS \
+        $APP_RELEASE > /dev/null 2>&1
+fi
+codesign --verify --deep --strict $APP_RELEASE || { print -- "La firma no es válida"; exit 1; }
+if strings -a $APP_RELEASE/Contents/MacOS/Notchy | grep -q "$HOME"; then
+    print -- "Aviso: el binario contiene rutas de esta Mac ($HOME)"
+fi
+
+print -- "== Armando el disco"
+mkdir -p $DIST
+CARPETA=$RAIZ/build/dmg
+rm -rf $CARPETA && mkdir -p $CARPETA
+ditto $APP_RELEASE $CARPETA/Notchy.app
+ln -s /Applications $CARPETA/Aplicaciones
+[[ -f $PDF ]] && cp $PDF $CARPETA/
+rm -f $DIST/Notchy.dmg $RAIZ/build/notchy-rw.dmg
+# Primero un disco editable para dejar la ventana ordenada (íconos grandes, sin barra lateral) y luego
+# se comprime en solo lectura.
+hdiutil create -volname "Notchy" -srcfolder $CARPETA -fs APFS -format UDRW $RAIZ/build/notchy-rw.dmg > /dev/null 2>&1
+MONTAJE=$(hdiutil attach $RAIZ/build/notchy-rw.dmg -nobrowse -noautoopen 2> /dev/null | awk -F'\t' '/\/Volumes\// {print $NF}')
+osascript > /dev/null << APPLESCRIPT
+tell application "Finder"
+    set disco to disk "Notchy"
+    open disco
+    set ventana to container window of disco
+    set current view of ventana to icon view
+    set toolbar visible of ventana to false
+    set statusbar visible of ventana to false
+    set bounds of ventana to {200, 120, 860, 520}
+    set opciones to icon view options of ventana
+    set arrangement of opciones to not arranged
+    set icon size of opciones to 112
+    set text size of opciones to 13
+    set position of item "Notchy.app" of ventana to {150, 150}
+    set position of item "Aplicaciones" of ventana to {500, 150}
+    try
+        set position of item "Instrucciones de instalación.pdf" of ventana to {325, 300}
+    end try
+    update disco without registering applications
+    delay 1
+    close ventana
+end tell
+APPLESCRIPT
+sync
+hdiutil detach "$MONTAJE" -quiet
+hdiutil convert $RAIZ/build/notchy-rw.dmg -format UDZO -o $DIST/Notchy.dmg > /dev/null 2>&1
+rm -f $RAIZ/build/notchy-rw.dmg
+VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" $APP_RELEASE/Contents/Info.plist)
+print -- "Listo: dist/Notchy.dmg (Notchy $VERSION, $(du -h $DIST/Notchy.dmg | cut -f1))"
