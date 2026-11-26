@@ -65,7 +65,10 @@ import Testing
             var maquina = maquina()
             _ = maquina.recibir(.cursorEntro)
             _ = maquina.recibir(.vencio(.abrir))
-            #expect(maquina.recibir(entrada) == [.cancelar(.abrir), .cancelar(.cerrar)])
+            #expect(
+                maquina.recibir(entrada) == [
+                    .cancelar(.abrir), .cancelar(.cerrar), .programar(.olvidar, .seconds(10)),
+                ])
             #expect(maquina.estado == .reposo)
         }
     }
@@ -138,6 +141,49 @@ import Testing
         #expect(maquina.estado == .expandido(modulo: "inicio"))
         _ = maquina.recibir(.modulosDisponibles([]))
         #expect(maquina.estado == .reposo)
+    }
+
+    // MARK: Último módulo
+
+    @Test func reabrirAntesDeDiezSegundosVuelveAlUltimoModulo() {
+        var maquina = maquina()
+        _ = maquina.recibir(.atajo)
+        _ = maquina.recibir(.elegirModulo("agenda"))
+        #expect(maquina.recibir(.escape).contains(.programar(.olvidar, .seconds(10))))
+        _ = maquina.recibir(.cursorEntro)
+        #expect(maquina.recibir(.vencio(.abrir)).contains(.cancelar(.olvidar)))
+        #expect(maquina.estado == .expandido(modulo: "agenda"))
+    }
+
+    @Test func despuesDeDiezSegundosVuelveAlInicio() {
+        var maquina = maquina()
+        _ = maquina.recibir(.atajo)
+        _ = maquina.recibir(.elegirModulo("agenda"))
+        _ = maquina.recibir(.escape)
+        _ = maquina.recibir(.vencio(.olvidar))
+        _ = maquina.recibir(.atajo)
+        #expect(maquina.estado == .expandido(modulo: "inicio"))
+    }
+
+    @Test func elUltimoModuloApagadoSeOlvida() {
+        var maquina = maquina()
+        _ = maquina.recibir(.atajo)
+        _ = maquina.recibir(.elegirModulo("agenda"))
+        _ = maquina.recibir(.escape)
+        _ = maquina.recibir(.modulosDisponibles(["inicio"]))
+        _ = maquina.recibir(.atajo)
+        #expect(maquina.estado == .expandido(modulo: "inicio"))
+    }
+
+    @Test func abrirOtroModuloDirectoReemplazaElRecordado() {
+        var maquina = maquina(["inicio", "agenda", "musica"])
+        _ = maquina.recibir(.atajo)
+        _ = maquina.recibir(.elegirModulo("agenda"))
+        _ = maquina.recibir(.escape)
+        _ = maquina.recibir(.elegirModulo("musica"))
+        _ = maquina.recibir(.escape)
+        _ = maquina.recibir(.atajo)
+        #expect(maquina.estado == .expandido(modulo: "musica"))
     }
 
     // MARK: Compacto (ISL-6)

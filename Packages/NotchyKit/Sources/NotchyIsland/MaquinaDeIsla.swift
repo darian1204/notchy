@@ -16,6 +16,8 @@ public enum EstadoDeIsla: Equatable, Sendable {
 public struct MaquinaDeIsla: Sendable {
     public enum Temporizador: Hashable, Sendable, CaseIterable {
         case abrir, cerrar, aviso
+        /// Olvida el último módulo abierto y vuelve al de por defecto.
+        case olvidar
     }
 
     public enum Efecto: Equatable, Sendable {
@@ -44,6 +46,8 @@ public struct MaquinaDeIsla: Sendable {
     /// Retardo especial para el espejo: permanece 2 segundos abierto al perder el cursor.
     public static let retardoAlCerrarEspejo: Duration = .seconds(2)
     public static let duracionDelAviso: Duration = .seconds(6)
+    /// Tiempo que la isla recuerda el último módulo al cerrarse. Si se reabre antes, vuelve a él.
+    public static let memoriaDelUltimoModulo: Duration = .seconds(10)
     /// El módulo que abre el hover cuando está activo.
     public static let moduloDeInicio = ModulosBase.inicio
 
@@ -52,6 +56,8 @@ public struct MaquinaDeIsla: Sendable {
     /// Abierta con el atajo o desde un menú: no depende del cursor, así que Esc debe poder cerrarla.
     public private(set) var abiertaSinCursor = false
     private var expandido: String?
+    /// Último módulo abierto, recordado durante `memoriaDelUltimoModulo` tras cerrar.
+    private var recordado: String?
     private var peticiones: [PeticionCompacta] = []
     private var aviso: String?
 
@@ -90,14 +96,18 @@ public struct MaquinaDeIsla: Sendable {
 
         case .vencio(.abrir):
             guard cursorDentro, expandido == nil else { return [] }
-            abrir(moduloPorDefecto, sinCursor: false)
-            return []
+            abrir(moduloAlAbrir, sinCursor: false)
+            return [.cancelar(.olvidar)]
 
         case .vencio(.cerrar):
             return cursorDentro ? [] : cerrar()
 
         case .vencio(.aviso):
             aviso = nil
+            return []
+
+        case .vencio(.olvidar):
+            recordado = nil
             return []
 
         case .clicFuera, .escape:
@@ -107,13 +117,15 @@ public struct MaquinaDeIsla: Sendable {
             if expandido != nil {
                 return cerrar()
             }
-            abrir(moduloPorDefecto, sinCursor: !cursorDentro)
-            return [.cancelar(.abrir)]
+            abrir(moduloAlAbrir, sinCursor: !cursorDentro)
+            return [.cancelar(.abrir), .cancelar(.olvidar)]
 
         case .elegirModulo(let id):
             guard modulos.contains(id) else { return [] }
             if expandido == nil {
                 abrir(id, sinCursor: !cursorDentro)
+                recordado = nil
+                return [.cancelar(.olvidar)]
             } else {
                 expandido = id
             }
@@ -135,6 +147,9 @@ public struct MaquinaDeIsla: Sendable {
         case .modulosDisponibles(let nuevos):
             modulos = nuevos
             peticiones.removeAll { !nuevos.contains($0.modulo) }
+            if let recordado, !nuevos.contains(recordado) {
+                self.recordado = nil
+            }
             if let aviso, !nuevos.contains(aviso) {
                 self.aviso = nil
             }
@@ -149,6 +164,12 @@ public struct MaquinaDeIsla: Sendable {
         modulos.contains(Self.moduloDeInicio) ? Self.moduloDeInicio : modulos.first
     }
 
+    /// Al reabrir antes de que venza la memoria, el último módulo; si no, el de por defecto.
+    private var moduloAlAbrir: String? {
+        if let recordado, modulos.contains(recordado) { return recordado }
+        return moduloPorDefecto
+    }
+
     private mutating func abrir(_ modulo: String?, sinCursor: Bool) {
         guard let modulo else { return }
         expandido = modulo
@@ -156,8 +177,13 @@ public struct MaquinaDeIsla: Sendable {
     }
 
     private mutating func cerrar() -> [Efecto] {
+        guard let abierto = expandido else {
+            abiertaSinCursor = false
+            return [.cancelar(.abrir), .cancelar(.cerrar)]
+        }
         expandido = nil
         abiertaSinCursor = false
-        return [.cancelar(.abrir), .cancelar(.cerrar)]
+        recordado = abierto == moduloPorDefecto ? nil : abierto
+        return [.cancelar(.abrir), .cancelar(.cerrar), .programar(.olvidar, Self.memoriaDelUltimoModulo)]
     }
 }
