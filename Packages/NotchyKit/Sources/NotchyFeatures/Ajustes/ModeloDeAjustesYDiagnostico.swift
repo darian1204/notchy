@@ -289,8 +289,8 @@ public final class ModeloDeAjustesYDiagnostico {
                 vidrio: ajustes.vidrio.rawValue,
                 tintadoDelVidrio: Ajustes.limitarTintado(ajustes.tintadoDelVidrio),
                 destinoDeInbox: ajustes.destinoDeInbox.rawValue,
-                temaPanel: ajustes.temaPanel.rawValue,
-                temaBarra: ajustes.temaBarra.rawValue,
+                temaPanel: Self.idParaDiagnostico(ajustes.temaPanel),
+                temaBarra: Self.idParaDiagnostico(ajustes.temaBarra),
                 pantalla: ajustes.pantalla.rawValue,
                 atajo: ajustes.atajo.rawValue,
                 iconoEnBarraDeMenus: ajustes.iconoEnBarraDeMenus,
@@ -316,6 +316,11 @@ public final class ModeloDeAjustesYDiagnostico {
             return "{}"
         }
         return texto
+    }
+
+    /// Los temas propios salen como "propio", sin su id.
+    static func idParaDiagnostico(_ id: String) -> String {
+        id.hasPrefix("propio-") ? "propio" : id
     }
 
     private static func etiquetaSaludSinRutas(_ salud: SaludDeModulo) -> String {

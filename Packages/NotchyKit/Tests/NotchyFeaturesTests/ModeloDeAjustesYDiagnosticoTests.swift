@@ -108,7 +108,7 @@ import Testing
         let ajustes = Ajustes(almacen: AlmacenEnMemoria())
         ajustes.rutaVaultObsidian = "/Users/darian/Documents/SecretVaultPersonal"
         ajustes.carpetaFotosEspejo = "/Users/darian/Pictures/FotosPrivadas"
-        ajustes.temaPanel = .medianoche
+        ajustes.temaPanel = "medianoche"
 
         let base = try BaseDeDatos.enMemoria()
         let repoPortapapeles = RepositorioDePortapapeles(base)

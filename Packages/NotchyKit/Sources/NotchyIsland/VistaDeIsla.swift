@@ -67,14 +67,14 @@ public struct VistaDeIsla: View {
     }
 
     private var colorDePanel: Color {
-        let tema = coordinador.registro.ajustes.temaPanel
+        let tema = coordinador.registro.ajustes.temaDePanelActual
         if coordinador.estado == .reposo && coordinador.hudActual == nil {
             return Paleta.fondo
         }
-        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
+        if tema.fuente == .caratula, let hex = coordinador.hexCaratulaActual {
             return Color(hex: Self.oscurecerHex(hex, factor: 0.22))
         }
-        return Color(hex: tema.hexBase)
+        return Color(hex: tema.hex)
     }
 
     private static func oscurecerHex(_ hex: UInt32, factor: Double) -> UInt32 {
@@ -238,19 +238,16 @@ public struct VistaDeIsla: View {
 
     /// Acento del tema de la barra, o `nil` con el tema Clásico (por módulo).
     private var acentoDeTema: Color? {
-        let tema = coordinador.registro.ajustes.temaBarra
-        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
-            return Color(hex: hex)
+        let tema = coordinador.registro.ajustes.temaDeBarraActual
+        switch tema.fuente {
+        case .porModulo: return nil
+        case .caratula: return Color(hex: coordinador.hexCaratulaActual ?? tema.hex)
+        case .fijo: return Color(hex: tema.hex)
         }
-        return tema.hexAcento.map { Color(hex: $0) }
     }
 
     private func colorAcentoBarra(porDefecto: UInt32) -> Color {
-        let tema = coordinador.registro.ajustes.temaBarra
-        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
-            return Color(hex: hex)
-        }
-        return Color(hex: tema.hexAcento ?? porDefecto)
+        acentoDeTema ?? Color(hex: porDefecto)
     }
 
     private func contenidoCompacto(de modulo: any ModuloDeIsla) -> some View {
@@ -313,6 +310,7 @@ private struct Materializar: ViewModifier {
 /// Íconos de los módulos en las orejas, a los lados del notch, y el engrane a la derecha.
 /// Nunca hay contenido en el hueco de la cámara.
 struct BarraDeModulos: View {
+    @Environment(\.acentoDeIsla) private var acento
     let coordinador: CoordinadorDeIsla
 
     var body: some View {
@@ -345,14 +343,7 @@ struct BarraDeModulos: View {
     }
 
     private func colorParaIcono(_ modulo: IdentidadDeModulo) -> Color {
-        let tema = coordinador.registro.ajustes.temaBarra
-        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
-            return Color(hex: hex)
-        }
-        if let hexTema = tema.hexAcento {
-            return Color(hex: hexTema)
-        }
-        return Color(hex: modulo.color)
+        acento ?? Color(hex: modulo.color)
     }
 
     private func boton(_ modulo: IdentidadDeModulo) -> some View {

@@ -107,10 +107,7 @@ public struct VistaDeAjustesYDiagnostico: View {
     }
 
     private func pestanaTemas(ajustes: Bindable<Ajustes>) -> some View {
-        let columnasPanel = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
-        let columnasBarra = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-
-        return Form {
+        Form {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Estilo de la isla")
@@ -180,7 +177,7 @@ public struct VistaDeAjustesYDiagnostico: View {
                     VistaPreviaDeVidrio(
                         estilo: modelo.ajustes.vidrio,
                         tintado: modelo.ajustes.tintadoDelVidrio,
-                        tema: modelo.ajustes.temaPanel
+                        colorDePanel: Color(hex: modelo.ajustes.temaDePanelActual.hex)
                     )
                     HStack(spacing: 10) {
                         Image(systemName: "square.on.square")
@@ -223,105 +220,16 @@ public struct VistaDeAjustesYDiagnostico: View {
             }
 
             Section {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Siete temas para el panel y nueve para la barra")
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Temas del panel y de la barra")
                         .font(.headline)
                     Text(
-                        "La barra puede usar un tema distinto al del panel, incluido uno que toma su color de la carátula que está sonando."
+                        "Elige el color exacto, agrega los tuyos y borra los que no uses. Pasa el cursor sobre un tema para editarlo o borrarlo."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                    Text("TEMA DEL PANEL (7)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
-
-                    LazyVGrid(columns: columnasPanel, spacing: 10) {
-                        ForEach(TemaDePanel.allCases) { tema in
-                            let seleccionado = modelo.ajustes.temaPanel == tema
-                            Button {
-                                modelo.ajustes.temaPanel = tema
-                            } label: {
-                                VStack(spacing: 6) {
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color.black,
-                                                    Color(hex: tema.hexBase),
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(height: 36)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .strokeBorder(
-                                                    seleccionado
-                                                        ? Color.accentColor
-                                                        : Color.white.opacity(0.22),
-                                                    lineWidth: seleccionado ? 2 : 1
-                                                )
-                                        )
-                                    Text(tema.nombre)
-                                        .font(.caption.weight(seleccionado ? .bold : .medium))
-                                        .lineLimit(1)
-                                }
-                                .padding(6)
-                                .background(
-                                    seleccionado
-                                        ? Color.accentColor.opacity(0.12)
-                                        : Color.primary.opacity(0.04),
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Text("TEMA DE LA BARRA DE MÓDULOS (9)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
-
-                    LazyVGrid(columns: columnasBarra, spacing: 10) {
-                        ForEach(TemaDeBarra.allCases) { tema in
-                            let seleccionado = modelo.ajustes.temaBarra == tema
-                            Button {
-                                modelo.ajustes.temaBarra = tema
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(colorMuestraBarra(tema))
-                                        .frame(width: 16, height: 16)
-                                        .overlay(
-                                            Circle()
-                                                .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
-                                        )
-                                    Text(tema.nombre)
-                                        .font(.caption.weight(seleccionado ? .bold : .medium))
-                                        .lineLimit(1)
-                                    Spacer(minLength: 0)
-                                    if seleccionado {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.caption)
-                                            .foregroundStyle(Color.accentColor)
-                                    }
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(
-                                    seleccionado
-                                        ? Color.accentColor.opacity(0.14)
-                                        : Color.primary.opacity(0.04),
-                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    SeccionDeTemas(ajustes: modelo.ajustes, lista: .panel)
+                    SeccionDeTemas(ajustes: modelo.ajustes, lista: .barra)
                 }
                 .padding(.vertical, 4)
             }
@@ -334,10 +242,6 @@ public struct VistaDeAjustesYDiagnostico: View {
             }
         }
         .formStyle(.grouped)
-    }
-
-    private func colorMuestraBarra(_ tema: TemaDeBarra) -> Color {
-        Color(hex: tema.hexAcento ?? 0x5AA9FF)
     }
 
     private func pestanaGeneral(ajustes: Bindable<Ajustes>) -> some View {

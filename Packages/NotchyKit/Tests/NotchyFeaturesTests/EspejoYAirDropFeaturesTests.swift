@@ -196,13 +196,13 @@ extension EspejoYAirDropFeaturesTests {
         #expect(TemaDeBarra.allCases.count == 9)
 
         let ajustes = Ajustes(almacen: AlmacenEnMemoria())
-        #expect(ajustes.temaPanel == .obsidiana)
-        #expect(ajustes.temaBarra == .clasico)
+        #expect(ajustes.temaPanel == "obsidiana")
+        #expect(ajustes.temaBarra == "clasico")
 
-        ajustes.temaPanel = .ciruela
-        ajustes.temaBarra = .caratula
-        #expect(ajustes.temaPanel == .ciruela)
-        #expect(ajustes.temaBarra == .caratula)
+        ajustes.temaPanel = "ciruela"
+        ajustes.temaBarra = "caratula"
+        #expect(ajustes.temaPanel == "ciruela")
+        #expect(ajustes.temaBarra == "caratula")
     }
 }
 
