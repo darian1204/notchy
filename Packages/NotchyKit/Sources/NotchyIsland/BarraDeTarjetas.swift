@@ -44,6 +44,7 @@ struct BarraDeTarjetas: View {
     let alBuscar: @MainActor () -> Void
     @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
     @Environment(\.vidrioDeIsla) private var vidrio
+    @Environment(\.acentoDeIsla) private var acento
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
     /// Un solo indicador de selección que viaja entre pestañas.
     @Namespace private var indicador
@@ -93,6 +94,7 @@ struct BarraDeTarjetas: View {
             HStack(spacing: 5) {
                 Image(systemName: pestana.simbolo)
                     .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(activa ? colorDePestana(modulo) : Paleta.textoDeApoyo)
                 Text(pestana.nombre)
                     .font(.system(size: 11, weight: .medium))
                 TimelineView(.periodic(from: .now, by: 30)) { _ in
@@ -115,6 +117,7 @@ struct BarraDeTarjetas: View {
                 if activa {
                     Capsule()
                         .fill(reducirTransparencia ? Paleta.superficieAltaSolida : Paleta.superficieAlta)
+                        .overlay(Capsule().fill(acento?.opacity(0.22) ?? .clear))
                         .matchedGeometryEffect(id: "seleccion", in: indicador)
                 }
             }
@@ -126,6 +129,11 @@ struct BarraDeTarjetas: View {
         .help(modulo == nil ? "\(pestana.nombre) está apagado en Ajustes" : pestana.nombre)
         .accessibilityLabel(pestana.nombre)
         .accessibilityAddTraits(activa ? .isSelected : [])
+    }
+
+    /// Ícono de la pestaña activa: el acento del tema, o el color del módulo con el tema Clásico.
+    private func colorDePestana(_ modulo: (any ModuloDeIsla)?) -> Color {
+        acento ?? modulo.map { Color(hex: $0.identidad.color) } ?? Paleta.texto
     }
 
     private var buscar: some View {
@@ -181,6 +189,7 @@ struct PuntosDePagina: View {
 struct PaletaDeModulos: View {
     let coordinador: CoordinadorDeIsla
     let alCerrar: @MainActor () -> Void
+    @Environment(\.acentoDeIsla) private var acento
 
     @State private var consulta = ""
     @FocusState private var enfocado: Bool
@@ -247,7 +256,7 @@ struct PaletaDeModulos: View {
         Button {
             abrir(modulo.id)
         } label: {
-            contenidoDeCelda(simbolo: modulo.icono, color: Color(hex: modulo.color), nombre: modulo.nombre)
+            contenidoDeCelda(simbolo: modulo.icono, color: acento ?? Color(hex: modulo.color), nombre: modulo.nombre)
                 .background(
                     seleccionada ? Paleta.superficie : Color.clear, in: RoundedRectangle(cornerRadius: 9))
         }

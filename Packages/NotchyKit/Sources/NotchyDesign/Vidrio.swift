@@ -52,6 +52,8 @@ public enum TipoDeSuperficie: Sendable {
 
 extension EnvironmentValues {
     @Entry public var vidrioDeIsla: VidrioDeIsla = .apagado
+    /// Color del tema de la barra. `nil` es el tema Clásico: cada módulo con su color.
+    @Entry public var acentoDeIsla: Color? = nil
 }
 
 /// Superficie tenue de siempre, o liquid glass si el ajuste lo pide. Con "Reducir transparencia"
