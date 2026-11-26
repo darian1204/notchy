@@ -14,6 +14,8 @@ public final class ModeloDeAhoraSuena {
     public private(set) var cargandoLetra = false
     public var mostrarLetra = true
     public private(set) var nivelesEspectro: [Double] = Array(repeating: 0.25, count: 12)
+    /// Color dominante de la carátula, para teñir el espectro de las orejas.
+    public private(set) var hexDeCaratula: UInt32?
 
     @ObservationIgnored private let puerto: any PuertoDeAhoraSuena
     @ObservationIgnored private let bus: BusDeEventos?
@@ -99,10 +101,17 @@ public final class ModeloDeAhoraSuena {
     private func aplicar(_ nuevo: EstadoDeAhoraSuena?) {
         let anterior = estadoActual
         estadoActual = nuevo
+        // El color solo se recalcula cuando cambia la carátula, no en cada actualización.
+        let caratulaCambio = nuevo?.caratulaPNG != anterior?.caratulaPNG
+        if caratulaCambio {
+            hexDeCaratula = Self.colorDominante(de: nuevo?.caratulaPNG)
+        }
         if let bus {
             Task { await bus.publicar(CambioDeAhoraSuena(estado: nuevo)) }
-            let hex = Self.colorDominante(de: nuevo?.caratulaPNG)
-            Task { await bus.publicar(ColorDeCaratulaActualizado(hex: hex)) }
+            if caratulaCambio {
+                let hex = hexDeCaratula
+                Task { await bus.publicar(ColorDeCaratulaActualizado(hex: hex)) }
+            }
         }
         let debeMostrarCompacto = (nuevo?.reproduciendo == true)
         if debeMostrarCompacto != pidioCompacto {

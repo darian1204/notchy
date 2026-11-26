@@ -29,22 +29,37 @@ public final class ModuloDeAhoraSuena: ModuloDeIsla {
     }
 
     public var orejaIzquierdaCompacta: AnyView? {
-        AnyView(
-            CaratulaDeCancion(
-                datos: modelo.estadoActual?.caratulaPNG,
-                tamano: 22,
-                radio: 5
-            ))
+        AnyView(CaratulaDeCancion(datos: modelo.estadoActual?.caratulaPNG, tamano: 20, radio: 6))
     }
 
     public var orejaDerechaCompacta: AnyView? {
+        AnyView(EspectroDeOreja(modelo: modelo))
+    }
+
+    public var anchoDeOrejaAmpliada: CGFloat { 150 }
+
+    public var orejaIzquierdaAmpliada: AnyView? {
         AnyView(
-            EspectroDeAudio(
-                niveles: Array(modelo.nivelesEspectro.prefix(4)),
-                alto: 14,
-                reproduciendo: modelo.estadoActual?.reproduciendo == true
-            )
-            .frame(width: 18, height: 14))
+            HStack(spacing: 7) {
+                CaratulaDeCancion(datos: modelo.estadoActual?.caratulaPNG, tamano: 22, radio: 6)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(modelo.estadoActual?.titulo ?? "")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Paleta.texto)
+                    Text(modelo.estadoActual?.artista ?? "")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Paleta.textoDeApoyo)
+                }
+                .lineLimit(1)
+            })
+    }
+
+    public var orejaDerechaAmpliada: AnyView? {
+        AnyView(
+            HStack(spacing: 8) {
+                TiempoRestante(estado: modelo.estadoActual)
+                EspectroDeOreja(modelo: modelo)
+            })
     }
 
     public func arrancar() {
@@ -423,6 +438,53 @@ struct BarraDeProgresoMusical: View {
 }
 
 /// Carátula del álbum o degradado de respaldo del mockup.
+/// Espectro de 4 barras teñido con el color de la carátula.
+struct EspectroDeOreja: View {
+    let modelo: ModeloDeAhoraSuena
+
+    var body: some View {
+        EspectroDeAudio(
+            niveles: Array(modelo.nivelesEspectro.prefix(4)),
+            alto: 14,
+            reproduciendo: modelo.estadoActual?.reproduciendo == true,
+            color: modelo.hexDeCaratula.map { Color(hex: Self.aclarar($0)) } ?? Paleta.musica
+        )
+        .frame(width: 20, height: 14)
+        .accessibilityHidden(true)
+    }
+
+    /// Las carátulas oscuras darían barras invisibles sobre el negro: se suben a un mínimo de brillo.
+    static func aclarar(_ hex: UInt32) -> UInt32 {
+        let (r, g, b) = (Double((hex >> 16) & 0xFF), Double((hex >> 8) & 0xFF), Double(hex & 0xFF))
+        let maximo = max(r, g, b, 1)
+        let factor = maximo < 210 ? 210 / maximo : 1
+        func canal(_ valor: Double) -> UInt32 { UInt32(min(255, valor * factor)) }
+        return (canal(r) << 16) | (canal(g) << 8) | canal(b)
+    }
+}
+
+/// "-1:23" hasta el final de la canción. Solo se actualiza mientras se ve (el asomo dura poco).
+struct TiempoRestante: View {
+    let estado: EstadoDeAhoraSuena?
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { contexto in
+            Text(texto(en: contexto.date))
+                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .foregroundStyle(Paleta.textoDeApoyo)
+                .contentTransition(.numericText(countsDown: true))
+        }
+    }
+
+    private func texto(en fecha: Date) -> String {
+        guard let estado, let duracion = estado.duracionSegundos,
+            let transcurrido = estado.transcurridoActual(en: fecha)
+        else { return "" }
+        let restante = max(0, Int((duracion - transcurrido).rounded()))
+        return String(format: "-%d:%02d", restante / 60, restante % 60)
+    }
+}
+
 struct CaratulaDeCancion: View {
     let datos: Data?
     let tamano: CGFloat

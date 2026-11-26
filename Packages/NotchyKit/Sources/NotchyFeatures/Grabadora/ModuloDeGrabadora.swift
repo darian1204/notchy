@@ -38,6 +38,22 @@ public final class ModuloDeGrabadora: ModuloDeIsla {
         AnyView(OrejaDerechaGrabando(modelo: modelo))
     }
 
+    /// El tiempo necesita más sitio que un ícono.
+    public var anchoDeOreja: CGFloat { 66 }
+    public var anchoDeOrejaAmpliada: CGFloat { 120 }
+
+    public var orejaIzquierdaAmpliada: AnyView? {
+        AnyView(OrejaIzquierdaGrabando(modelo: modelo, conEstado: true))
+    }
+
+    public var orejaDerechaAmpliada: AnyView? {
+        AnyView(OrejaDerechaGrabando(modelo: modelo))
+    }
+
+    public var burbujaCompacta: AnyView? {
+        AnyView(PuntoDeGrabacion(pausada: modelo.pausada))
+    }
+
     public func arrancar() {
         modelo.iniciar()
     }
@@ -47,17 +63,35 @@ public final class ModuloDeGrabadora: ModuloDeIsla {
     }
 }
 
-struct OrejaIzquierdaGrabando: View {
-    let modelo: ModeloDeGrabadora
+/// Punto rojo que late mientras graba (efecto de símbolo del sistema, sin redibujar la vista).
+struct PuntoDeGrabacion: View {
+    let pausada: Bool
 
     var body: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(modelo.pausada ? Paleta.portapapeles : Paleta.grabadora)
-                .frame(width: 7, height: 7)
+        Image(systemName: pausada ? "pause.circle.fill" : "circle.fill")
+            .font(.system(size: pausada ? 11 : 8, weight: .bold))
+            .foregroundStyle(pausada ? Paleta.portapapeles : Paleta.grabadora)
+            .symbolEffect(.pulse, options: .repeating, isActive: !pausada)
+            .contentTransition(.symbolEffect(.replace))
+    }
+}
+
+struct OrejaIzquierdaGrabando: View {
+    let modelo: ModeloDeGrabadora
+    var conEstado = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            PuntoDeGrabacion(pausada: modelo.pausada)
+            if conEstado {
+                Text(modelo.pausada ? "En pausa" : "Grabando")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(modelo.pausada ? Paleta.portapapeles : Paleta.grabadora)
+            }
             Text(modelo.cronometroFormateado)
-                .font(.system(size: 11, weight: .bold).monospacedDigit())
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
                 .foregroundStyle(Paleta.texto)
+                .contentTransition(.numericText())
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
@@ -74,11 +108,11 @@ struct OrejaDerechaGrabando: View {
     var body: some View {
         EspectroDeAudio(
             niveles: modelo.nivelesOnda,
-            alto: 13,
+            alto: 14,
             reproduciendo: !modelo.pausada,
             color: Paleta.grabadora
         )
-        .frame(width: 18, height: 13)
+        .frame(width: 20, height: 14)
         .accessibilityHidden(true)
     }
 }

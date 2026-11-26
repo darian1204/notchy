@@ -29,17 +29,25 @@ public struct VistaDeIsla: View {
                     vistaAviso
                         .frame(width: tamano.width, height: tamano.height)
                         .transition(entrada)
-                } else if let hud = coordinador.hudActual, coordinador.grabacionActual == nil {
-                    contenidoHUD(hud)
-                        .frame(width: tamano.width, height: tamano.height)
-                        .transition(.opacity)
-                } else if let modulo = coordinador.moduloCompacto {
-                    contenidoCompacto(de: modulo)
+                } else if let orejas = coordinador.orejas {
+                    VistaDeOrejas(coordinador: coordinador, contenido: orejas, acento: acentoDeTema)
                         .frame(width: tamano.width, height: tamano.height)
                         .transition(.opacity)
                 }
             }
             .frame(width: tamano.width + 2 * hombro, height: tamano.height)
+            // La burbuja va fuera del cuerpo, a la derecha de los hombros.
+            .overlay(alignment: .topTrailing) {
+                if let burbuja = coordinador.burbuja {
+                    let lado = coordinador.geometria.tamanoDeReposo.height
+                    BurbujaDeActividad(coordinador: coordinador, contenido: burbuja, acento: acentoDeTema, lado: lado)
+                        .offset(x: Medidas.separacionDeBurbuja + lado)
+                        .transition(
+                            reducirMovimiento
+                                ? .opacity
+                                : .scale(scale: 0.4, anchor: .leading).combined(with: .opacity))
+                }
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -50,6 +58,8 @@ public struct VistaDeIsla: View {
         .environment(\.appearsActive, true)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.estado)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.hudActual)
+        .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.asomando)
+        .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: claveDeBurbuja)
         .onChange(of: coordinador.estado) { paletaAbierta = false }
     }
 
@@ -217,40 +227,6 @@ public struct VistaDeIsla: View {
         }
     }
 
-    private func contenidoHUD(_ hud: EstadoDeHUDSistema) -> some View {
-        let colorBarra = colorAcentoBarra(porDefecto: 0xE09DB4)
-        return HStack(spacing: 0) {
-            HStack(spacing: 5) {
-                Image(systemName: hud.tipo.icono)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Paleta.texto)
-                Text(hud.etiqueta)
-                    .font(.system(size: 11, weight: .bold).monospacedDigit())
-                    .foregroundStyle(Paleta.texto)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-
-            Color.clear.frame(width: coordinador.geometria.pantalla.notch?.width ?? 0)
-
-            HStack(spacing: 0) {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Paleta.superficieAlta)
-                            .frame(height: 5)
-                        Capsule()
-                            .fill(colorBarra)
-                            .frame(width: max(4, geo.size.width * hud.nivel), height: 5)
-                    }
-                    .frame(maxHeight: .infinity, alignment: .center)
-                }
-                .frame(width: 48, height: 12)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-        }
-        .padding(.horizontal, 10)
-    }
-
     /// Acento del tema de la barra, o `nil` con el tema Clásico (por módulo).
     private var acentoDeTema: Color? {
         let tema = coordinador.registro.ajustes.temaDeBarraActual
@@ -261,36 +237,13 @@ public struct VistaDeIsla: View {
         }
     }
 
-    private func colorAcentoBarra(porDefecto: UInt32) -> Color {
-        acentoDeTema ?? Color(hex: porDefecto)
-    }
-
-    private func contenidoCompacto(de modulo: any ModuloDeIsla) -> some View {
-        Button {
-            coordinador.recibir(.elegirModulo(modulo.identidad.id))
-        } label: {
-            HStack(spacing: 0) {
-                HStack(spacing: 4) {
-                    if let orejaIzquierda = modulo.orejaIzquierdaCompacta {
-                        orejaIzquierda
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-
-                Color.clear.frame(width: coordinador.geometria.pantalla.notch?.width ?? 0)
-
-                HStack(spacing: 4) {
-                    if let orejaDerecha = modulo.orejaDerechaCompacta {
-                        orejaDerecha
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-            }
-            .padding(.horizontal, 10)
-            .contentShape(Rectangle())
+    /// Cambia cuando aparece, se va o cambia la burbuja, para animarla aunque el estado no cambie.
+    private var claveDeBurbuja: String? {
+        switch coordinador.burbuja {
+        case .modulo(let modulo): modulo.identidad.id
+        case .breve(let hud): hud.tipo.rawValue
+        case nil: nil
         }
-        .buttonStyle(.presion)
-        .accessibilityLabel(modulo.identidad.nombre)
     }
 
     /// Primero crece la forma; el contenido entra después: baja un poco desde el notch y aparece.
