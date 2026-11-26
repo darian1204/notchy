@@ -177,6 +177,32 @@ public struct VistaDeAjustesYDiagnostico: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Liquid glass")
                         .font(.headline)
+                    VistaPreviaDeVidrio(
+                        estilo: modelo.ajustes.vidrio,
+                        tintado: modelo.ajustes.tintadoDelVidrio,
+                        tema: modelo.ajustes.temaPanel
+                    )
+                    HStack(spacing: 10) {
+                        Image(systemName: "square.on.square")
+                            .foregroundStyle(.secondary)
+                            .help("Transparente")
+                        Slider(value: ajustes.tintadoDelVidrio, in: 0...1)
+                            .labelsHidden()
+                            .accessibilityLabel("Tintado del liquid glass")
+                            .accessibilityValue(
+                                Text("\(Int((modelo.ajustes.tintadoDelVidrio * 100).rounded())) por ciento tintado"))
+                        Image(systemName: "square.fill.on.square.fill")
+                            .foregroundStyle(.secondary)
+                            .help("Tintado")
+                    }
+                    .disabled(modelo.ajustes.vidrio == .apagado)
+                    HStack {
+                        Text("Transparente")
+                        Spacer()
+                        Text("Tintado")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     Picker("Liquid glass", selection: ajustes.vidrio) {
                         ForEach(EstiloDeVidrio.allCases) { estilo in
                             Text(estilo.nombre).tag(estilo)
@@ -187,9 +213,11 @@ public struct VistaDeAjustesYDiagnostico: View {
                     Text(modelo.ajustes.vidrio.descripcion)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("Con \"Reducir transparencia\" en Accesibilidad se usan superficies sólidas.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "En Completo, la isla toma el color del tema del panel. Con \"Reducir transparencia\" en Accesibilidad se usan superficies sólidas."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
             }

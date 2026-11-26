@@ -82,7 +82,12 @@ public struct VistaDeIsla: View {
 
     private var vidrio: VidrioDeIsla {
         let estilo = coordinador.registro.ajustes.vidrio
-        return VidrioDeIsla(pildoras: estilo.pildoras, tarjetas: estilo.tarjetas, fondo: estilo.fondo)
+        return VidrioDeIsla(
+            pildoras: estilo.pildoras,
+            tarjetas: estilo.tarjetas,
+            fondo: estilo.fondo,
+            tintado: Ajustes.limitarTintado(coordinador.registro.ajustes.tintadoDelVidrio)
+        )
     }
 
     /// Vidrio en toda la isla: solo abierta o con aviso, nunca en reposo ni compacta, para que el
@@ -113,24 +118,25 @@ public struct VistaDeIsla: View {
         }
     }
 
-    /// Liquid glass con la forma de la isla y un velo negro arriba para que el notch no se note.
+    /// Liquid glass con la forma de la isla, teñido con el tema del panel, y un velo negro arriba
+    /// para que el notch no se note.
     @ViewBuilder private var siluetaVidrio: some View {
         let alto = coordinador.geometria.tamanoDeReposo.height
         let velo = LinearGradient(
             stops: [
                 .init(color: Paleta.fondo, location: 0),
                 .init(color: Paleta.fondo, location: min(0.9, alto / max(coordinador.tamano.height, 1))),
-                .init(color: Paleta.fondo.opacity(0.25), location: 1),
+                .init(color: Paleta.fondo.opacity(0), location: 1),
             ],
             startPoint: .top,
             endPoint: .bottom
         )
         if coordinador.geometria.tieneNotch {
             let forma = FormaDeIsla(radioInferior: radio, hombro: hombro)
-            forma.fill(velo).glassEffect(.regular, in: forma)
+            forma.fill(velo).glassEffect(vidrio.materialDeFondo(color: colorDePanel), in: forma)
         } else {
             let forma = RoundedRectangle(cornerRadius: min(radio, coordinador.tamano.height / 2))
-            forma.fill(Paleta.fondo.opacity(0.25)).glassEffect(.regular, in: forma)
+            forma.fill(Color.clear).glassEffect(vidrio.materialDeFondo(color: colorDePanel), in: forma)
         }
     }
 

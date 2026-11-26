@@ -97,6 +97,12 @@ public final class Ajustes {
     public var vidrio: EstiloDeVidrio {
         didSet { alCambiar(vidrio, oldValue, .vidrio) }
     }
+    /// Qué tan tintado se ve el vidrio: 0 es transparente y 1 es tintado, como en macOS.
+    /// Quien lo pinta lo pasa por `limitarTintado`.
+    public var tintadoDelVidrio: Double {
+        didSet { alCambiar(tintadoDelVidrio, oldValue, .tintadoDelVidrio) }
+    }
+    public static let tintadoPorDefecto = 0.5
     /// Los 3 accesos rápidos del Inicio en estilo tarjetas, por id de módulo.
     public var accesosRapidos: [String] {
         didSet {
@@ -172,6 +178,7 @@ public final class Ajustes {
         temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
         estiloDeIsla = Self.leer(.estiloDeIsla, de: almacen) ?? .clasico
         vidrio = Self.leer(.vidrio, de: almacen) ?? .apagado
+        tintadoDelVidrio = Self.limitarTintado(Self.leer(.tintadoDelVidrio, de: almacen) ?? Self.tintadoPorDefecto)
         destinoDeInbox = Self.leer(.destinoDeInbox, de: almacen) ?? .obsidian
         paginaNotion = Self.leer(.paginaNotion, de: almacen) ?? ""
         tarjetasDeInicio = Self.normalizarTarjetas(
@@ -233,7 +240,7 @@ public final class Ajustes {
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox, separarVocesEnReuniones
         case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas, vidrio
-        case tarjetasDeInicio, destinoDeInbox, paginaNotion
+        case tarjetasDeInicio, destinoDeInbox, paginaNotion, tintadoDelVidrio
     }
 
     /// Restaura todas las preferencias a sus valores por defecto y limpia el almacén.
@@ -256,6 +263,7 @@ public final class Ajustes {
         temaBarra = .clasico
         estiloDeIsla = .clasico
         vidrio = .apagado
+        tintadoDelVidrio = Self.tintadoPorDefecto
         destinoDeInbox = .obsidian
         paginaNotion = ""
         tarjetasDeInicio = Self.tarjetasPorDefecto
@@ -345,6 +353,12 @@ public final class Ajustes {
             nuevos[indice] = id
         }
         accesosRapidos = nuevos
+    }
+
+    /// Entre 0 y 1; lo que no es número vuelve al valor por defecto.
+    public static func limitarTintado(_ valor: Double) -> Double {
+        guard valor.isFinite else { return tintadoPorDefecto }
+        return min(max(valor, 0), 1)
     }
 
     private func alCambiar<Valor: Codable & Equatable>(_ nuevo: Valor, _ anterior: Valor, _ clave: Clave) {
