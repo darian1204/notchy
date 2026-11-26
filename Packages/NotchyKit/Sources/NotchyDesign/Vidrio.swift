@@ -20,15 +20,11 @@ public struct VidrioDeIsla: Equatable, Sendable {
 
     public static let apagado = VidrioDeIsla()
 
-    /// Por debajo de este punto el vidrio es el transparente de Apple (`Glass.clear`), que deja ver
-    /// más el fondo; por encima, el regular, que se va cubriendo de color.
-    static let umbralTransparente = 0.25
-
-    /// Vidrio base: el transparente de Apple abajo del umbral, el regular arriba. `tinte` es un estado
-    /// propio (por ejemplo, activo).
+    /// Vidrio base: siempre el transparente de Apple (`Glass.clear`). Cambiar a `.regular` a mitad del
+    /// control daba un salto de desenfoque; el tintado lo hace solo la capa de color, que es continua.
+    /// `tinte` es un estado propio (por ejemplo, activo).
     public func material(tinte: Color? = nil) -> Glass {
-        let base: Glass = tintado < Self.umbralTransparente ? .clear : .regular
-        return tinte.map { base.tint($0) } ?? base
+        tinte.map { Glass.clear.tint($0) } ?? .clear
     }
 
     /// Capa de color que va encima del vidrio y debajo del contenido. `Glass.tint` casi no se nota con
