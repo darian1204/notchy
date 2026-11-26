@@ -114,6 +114,20 @@ struct DatoDeActividadBreve: View {
             }
             .frame(width: 40, height: 5)
             .animation(.spring(response: 0.25, dampingFraction: 0.9), value: hud.nivel)
+        } else if let simbolo = hud.simbolo {
+            // Archivos: el ícono de su clase (imagen, video, PDF…) y el número si son varios.
+            HStack(spacing: 4) {
+                Image(systemName: simbolo)
+                    .font(.system(size: 13, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                if hud.cantidad > 1 {
+                    Text("\(hud.cantidad)")
+                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .contentTransition(.numericText())
+                }
+            }
+            .foregroundStyle(Paleta.texto)
+            .accessibilityLabel(hud.etiqueta)
         } else {
             Text(hud.etiqueta)
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())

@@ -16,6 +16,11 @@ public final class ModeloDeAirDrop {
     @ObservationIgnored private let alRevelarArchivo: (@MainActor (URL) -> Void)?
     @ObservationIgnored private var rutasConocidas: Set<String> = []
     @ObservationIgnored private var inicializado = false
+    /// Archivos recibidos que aún no se avisaron: AirDrop escribe cada archivo por separado, así que se
+    /// espera un momento para dar un solo aviso con todos.
+    @ObservationIgnored private var recibidosSinAvisar: [String] = []
+    @ObservationIgnored private var tareaDeAviso: Task<Void, Never>?
+    static let esperaParaAgrupar: Duration = .milliseconds(900)
     @ObservationIgnored private let log = Registro.de(.airdrop)
 
     public init(
@@ -50,6 +55,9 @@ public final class ModeloDeAirDrop {
     }
 
     public func detener() {
+        tareaDeAviso?.cancel()
+        tareaDeAviso = nil
+        recibidosSinAvisar = []
         puerto.detenerVigilancia()
     }
 
@@ -62,10 +70,9 @@ public final class ModeloDeAirDrop {
                 for archivo in nuevos {
                     Task { await bus.publicar(ArchivoAirDropDetectado(archivo: archivo)) }
                 }
-                // Un solo aviso en las orejas por tanda, aunque lleguen varios archivos.
                 if !nuevos.isEmpty {
-                    let aviso = EstadoDeHUDSistema.archivos(nuevos.count, tipo: .airdropRecibido)
-                    Task { await bus.publicar(ActividadBreveSolicitada(aviso)) }
+                    recibidosSinAvisar += nuevos.map(\.nombre)
+                    programarAvisoDeRecibidos(bus: bus)
                 }
             }
             rutasConocidas = nuevasRutas
@@ -79,14 +86,26 @@ public final class ModeloDeAirDrop {
         }
     }
 
+    /// Un solo aviso en las orejas por tanda: se reinicia la espera con cada archivo que llega.
+    private func programarAvisoDeRecibidos(bus: BusDeEventos) {
+        tareaDeAviso?.cancel()
+        tareaDeAviso = Task { [weak self] in
+            try? await Task.sleep(for: Self.esperaParaAgrupar)
+            guard !Task.isCancelled, let self, !self.recibidosSinAvisar.isEmpty else { return }
+            let aviso = EstadoDeHUDSistema.archivos(self.recibidosSinAvisar, tipo: .airdropRecibido)
+            self.recibidosSinAvisar = []
+            await bus.publicar(ActividadBreveSolicitada(aviso))
+        }
+    }
+
     public func enviar(archivos: [URL]) {
         let urls = archivos.filter(\.isFileURL)
         guard !urls.isEmpty else { return }
         do {
-            let cantidad = urls.count
+            let nombres = urls.map(\.lastPathComponent)
             try puerto.enviar(archivos: urls) { [weak self] completado in
                 guard completado, let bus = self?.bus else { return }
-                let aviso = EstadoDeHUDSistema.archivos(cantidad, tipo: .airdropEnviado)
+                let aviso = EstadoDeHUDSistema.archivos(nombres, tipo: .airdropEnviado)
                 Task { await bus.publicar(ActividadBreveSolicitada(aviso)) }
             }
             mensajeDeError = nil
