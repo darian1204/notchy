@@ -26,7 +26,7 @@ private struct EncabezadoDeTarjeta: View {
             .foregroundStyle(Paleta.texto)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
     }
 }
 
@@ -101,7 +101,7 @@ struct TarjetaPortapapelesInicio: View {
                             .background(Paleta.superficie, in: RoundedRectangle(cornerRadius: 7))
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.presion)
                     .help("Copiar otra vez")
                 }
                 Spacer(minLength: 0)
@@ -180,6 +180,7 @@ struct TarjetaMonitorInicio: View {
 struct EditorDeInicio: View {
     @Bindable var ajustes: Ajustes
     let alTerminar: @MainActor () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -196,8 +197,10 @@ struct EditorDeInicio: View {
             HStack(spacing: 6) {
                 ForEach(Array(ajustes.tarjetasDeInicio.enumerated()), id: \.element.id) { indice, elegida in
                     ficha(elegida, indice: indice)
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
                 }
             }
+            .animation(Movimiento.seleccion(reducir: reducirMovimiento), value: ajustes.tarjetasDeInicio)
             if !ajustes.tarjetasDisponibles.isEmpty {
                 Text("AGREGAR")
                     .font(.system(size: 9, weight: .bold))
@@ -215,7 +218,7 @@ struct EditorDeInicio: View {
                                 .frame(height: 22)
                                 .background(Paleta.superficie, in: Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.presion)
                         .disabled(!ajustes.puedeAgregarTarjeta)
                         .help(ajustes.puedeAgregarTarjeta ? "Agregar \(tarjeta.nombre)" : "Quita una tarjeta primero")
                     }
@@ -257,7 +260,7 @@ struct EditorDeInicio: View {
                         .frame(height: 20)
                         .background(Paleta.superficieAlta, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .help("Cambiar el ancho")
                 .accessibilityLabel("Ancho de \(tarjeta.nombre): \(elegida.ancho.nombre)")
                 boton("chevron.right", "Mover a la derecha") { ajustes.moverTarjeta(tarjeta, 1) }
@@ -279,7 +282,7 @@ struct EditorDeInicio: View {
                 .background(Paleta.superficieAlta, in: Circle())
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .help(etiqueta)
         .accessibilityLabel(etiqueta)
     }

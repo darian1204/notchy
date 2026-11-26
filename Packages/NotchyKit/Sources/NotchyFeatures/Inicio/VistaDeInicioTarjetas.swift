@@ -68,8 +68,10 @@ struct VistaDeInicioTarjetas: View {
                 ForEach(elegidas) { elegida in
                     tarjeta(elegida.tarjeta)
                         .frame(width: max(0, libre * elegida.ancho.peso / max(total, 1)))
+                        .transition(.scale(scale: 0.96).combined(with: .opacity))
                 }
             }
+            .animation(Movimiento.seleccion(reducir: reducirMovimiento), value: elegidas)
         }
         .contextMenu {
             if fuentes.ajustes != nil {
@@ -88,7 +90,7 @@ struct VistaDeInicioTarjetas: View {
                         .frame(width: 14, height: 14)
                         .background(Paleta.texto, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .offset(x: 4, y: -4)
                 .help("Editar las tarjetas del Inicio")
                 .accessibilityLabel("Editar Inicio")
@@ -203,7 +205,7 @@ private struct FranjaDeEstado: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .help(etiqueta)
         .accessibilityLabel("\(etiqueta): \(texto)")
     }
@@ -213,6 +215,9 @@ private struct FranjaDeEstado: View {
 private struct TarjetaInbox: View {
     let fuentes: FuentesDeInicioTarjetas
     @FocusState private var campoEnfocado: Bool
+    /// Palomita breve en el botón de enviar tras guardar.
+    @State private var recienGuardado = false
+    @State private var tareaPalomita: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -229,7 +234,7 @@ private struct TarjetaInbox: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Paleta.textoDeApoyo)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .help("Abrir el inbox en \(fuentes.inbox?.nombreDelDestino ?? "Obsidian")")
                 .accessibilityLabel("Abrir inbox en \(fuentes.inbox?.nombreDelDestino ?? "Obsidian")")
             }
@@ -265,17 +270,19 @@ private struct TarjetaInbox: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Paleta.texto)
                     .focused($campoEnfocado)
-                    .onSubmit { _ = inbox.guardarBorrador() }
+                    .onSubmit { guardar(inbox) }
                 Button {
-                    _ = inbox.guardarBorrador()
+                    guardar(inbox)
                 } label: {
-                    Image(systemName: "arrow.up")
+                    Image(systemName: recienGuardado ? "checkmark" : "arrow.up")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Paleta.texto)
+                        .foregroundStyle(recienGuardado ? Paleta.fondo : Paleta.texto)
+                        .contentTransition(.symbolEffect(.replace))
                         .frame(width: 18, height: 18)
-                        .background(Paleta.superficieAlta, in: Circle())
+                        .background(recienGuardado ? Paleta.musica : Paleta.superficieAlta, in: Circle())
+                        .animation(.easeOut(duration: 0.18), value: recienGuardado)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .accessibilityLabel("Enviar al inbox")
             }
             .padding(.leading, 9)
@@ -283,6 +290,17 @@ private struct TarjetaInbox: View {
             .frame(height: 28)
             .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Paleta.bordeSuave))
+        }
+    }
+
+    private func guardar(_ inbox: GestorDeInboxObsidian) {
+        guard inbox.guardarBorrador() else { return }
+        recienGuardado = true
+        tareaPalomita?.cancel()
+        tareaPalomita = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            recienGuardado = false
         }
     }
 
@@ -309,7 +327,7 @@ private struct TarjetaInbox: View {
                 .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
     }
 }
 
@@ -324,6 +342,8 @@ private struct ColumnaDeAccesosRapidos: View {
     let fuentes: FuentesDeInicioTarjetas
     @Binding var ranuraEditando: Int?
     @State private var cursorEncima = false
+    /// Toques por acceso, para que el símbolo rebote una vez al abrirlo.
+    @State private var toques: [Int: Int] = [:]
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
 
     var body: some View {
@@ -346,6 +366,7 @@ private struct ColumnaDeAccesosRapidos: View {
             if ranuraEditando != nil {
                 ranuraEditando = indice
             } else if let modulo {
+                toques[indice, default: 0] += 1
                 fuentes.alAbrirModulo?(modulo.id)
             } else {
                 ranuraEditando = indice
@@ -354,6 +375,9 @@ private struct ColumnaDeAccesosRapidos: View {
             Image(systemName: modulo?.icono ?? "plus")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(color)
+                .symbolEffect(
+                    .bounce, options: .nonRepeating, value: reducirMovimiento ? 0 : toques[indice, default: 0]
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .superficieDeIsla(
                     .pildora,
@@ -366,7 +390,7 @@ private struct ColumnaDeAccesosRapidos: View {
                 )
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .overlay(alignment: .topTrailing) {
             if cursorEncima && ranuraEditando == nil {
                 Button {
@@ -378,7 +402,7 @@ private struct ColumnaDeAccesosRapidos: View {
                         .frame(width: 14, height: 14)
                         .background(Paleta.texto, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .offset(x: 4, y: -4)
                 .help("Cambiar este acceso")
                 .accessibilityLabel("Cambiar acceso \(indice + 1)")
@@ -447,7 +471,7 @@ private struct SelectorDeAcceso: View {
             .background(elegido ? Paleta.superficieAlta : Color.clear, in: RoundedRectangle(cornerRadius: 9))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .accessibilityLabel(modulo.nombre)
         .accessibilityAddTraits(elegido ? .isSelected : [])
     }
@@ -479,7 +503,7 @@ private struct FichaDePendiente: View {
                     .frame(width: 18, height: 18)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.presion)
             .help(armado ? "Toca otra vez para marcarlo como hecho" : "Marcar como hecho (dos toques)")
             .accessibilityLabel(armado ? "Confirmar: marcar como hecho" : "Marcar como hecho")
 
@@ -495,7 +519,7 @@ private struct FichaDePendiente: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.presion)
             .help("\(pendiente.titulo) · abrir en la Agenda")
         }
         .font(.system(size: 12))
@@ -561,7 +585,7 @@ private struct TarjetaBandejaReciente: View {
                 .foregroundStyle(Paleta.texto)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.presion)
             .help("Abrir la Bandeja")
 
             if urls.isEmpty {
