@@ -21,13 +21,15 @@ public final class ModeloDeScreenTime {
     @ObservationIgnored private var inicioSesionActual: Date = .now
     @ObservationIgnored private let ahora: @MainActor () -> Date
     @ObservationIgnored private let segundosSinUsar: @MainActor () -> TimeInterval
+    @ObservationIgnored private let hayVideo: @MainActor () -> Bool
     /// Día al que pertenecen `usosPorApp`. Al cambiar de día se empieza de cero.
     @ObservationIgnored private var diaCargado = ""
     @ObservationIgnored private var ultimoTic: Date?
 
     /// Cada cuánto se suma tiempo a la app del frente.
     static let intervaloDeTic: TimeInterval = 10
-    /// Sin teclado ni ratón por más de esto, no se cuenta (te fuiste o la pantalla se apagó).
+    /// Sin teclado ni ratón por más de esto, no se cuenta (te fuiste), salvo que haya un video
+    /// reproduciéndose.
     static let limiteDeInactividad: TimeInterval = 5 * 60
     /// Apps que no son uso real: la pantalla de bloqueo y el protector de pantalla.
     static let appsQueNoCuentan: Set<String> = ["com.apple.loginwindow", "com.apple.ScreenSaver.Engine"]
@@ -37,11 +39,13 @@ public final class ModeloDeScreenTime {
         ahora: @escaping @MainActor () -> Date = { .now },
         segundosSinUsar: @escaping @MainActor () -> TimeInterval = {
             CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
-        }
+        },
+        hayVideo: @escaping @MainActor () -> Bool = { false }
     ) {
         self.defaults = defaults
         self.ahora = ahora
         self.segundosSinUsar = segundosSinUsar
+        self.hayVideo = hayVideo
         cargarDatosDeHoy()
     }
 
@@ -209,7 +213,7 @@ public final class ModeloDeScreenTime {
         let transcurrido = momento.timeIntervalSince(ultimoTic)
         // Un hueco largo es que la Mac durmió: ese tiempo no se usó.
         guard transcurrido > 0, transcurrido <= Self.intervaloDeTic * 3 else { return }
-        guard segundosSinUsar() < Self.limiteDeInactividad else { return }
+        guard segundosSinUsar() < Self.limiteDeInactividad || hayVideo() else { return }
         guard !Self.appsQueNoCuentan.contains(appActualBundleID) else { return }
         acumularTiempo(segundos: min(transcurrido, Self.intervaloDeTic))
     }

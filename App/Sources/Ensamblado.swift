@@ -134,7 +134,7 @@ final class Ensamblado {
         modeloDeColorPicker = ModeloDeColorPicker(
             muestreador: adaptadorDeColor
         )
-        modeloDeScreenTime = ModeloDeScreenTime()
+        modeloDeScreenTime = ModeloDeScreenTime(hayVideo: { AsercionesDeEnergia.pantallaRetenidaPorUnaApp() })
         modeloDeClima = ModeloDeClima()
         modeloDeNotificaciones = ModeloDeNotificaciones(
             bus: bus, sistema: AdaptadorDeNotificacionesDelSistema())
