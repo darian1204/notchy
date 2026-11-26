@@ -128,3 +128,39 @@ public enum EstiloDeIsla: String, Codable, Sendable, CaseIterable, Identifiable 
         }
     }
 }
+
+/// Liquid glass en la isla. Cada nivel incluye al anterior.
+public enum EstiloDeVidrio: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Superficies tenues sobre el fondo del tema, como siempre.
+    case apagado
+    /// Vidrio en las píldoras de pestañas, botones y accesos rápidos.
+    case pildoras
+    /// Vidrio en las píldoras y en las tarjetas.
+    case pildorasYTarjetas
+    /// Toda la isla abierta es vidrio, con píldoras y tarjetas encima.
+    case completo
+
+    public var id: String { rawValue }
+
+    public var nombre: String {
+        switch self {
+        case .apagado: "Apagado"
+        case .pildoras: "Píldoras"
+        case .pildorasYTarjetas: "Píldoras y tarjetas"
+        case .completo: "Completo"
+        }
+    }
+
+    public var descripcion: String {
+        switch self {
+        case .apagado: "Superficies tenues sobre el color del tema."
+        case .pildoras: "Liquid glass en las pestañas, botones y accesos rápidos."
+        case .pildorasYTarjetas: "Liquid glass en las píldoras y en las tarjetas; el fondo sigue con el tema."
+        case .completo: "Toda la isla abierta es liquid glass. El notch queda negro arriba."
+        }
+    }
+
+    public var pildoras: Bool { self != .apagado }
+    public var tarjetas: Bool { self == .pildorasYTarjetas || self == .completo }
+    public var fondo: Bool { self == .completo }
+}

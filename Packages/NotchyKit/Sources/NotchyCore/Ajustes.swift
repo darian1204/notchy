@@ -77,6 +77,10 @@ public final class Ajustes {
     public var estiloDeIsla: EstiloDeIsla {
         didSet { alCambiar(estiloDeIsla, oldValue, .estiloDeIsla) }
     }
+    /// Liquid glass en la isla: apagado, píldoras, píldoras y tarjetas, o completo.
+    public var vidrio: EstiloDeVidrio {
+        didSet { alCambiar(vidrio, oldValue, .vidrio) }
+    }
     /// Los 3 accesos rápidos del Inicio en estilo tarjetas, por id de módulo.
     public var accesosRapidos: [String] {
         didSet {
@@ -151,6 +155,7 @@ public final class Ajustes {
         temaPanel = Self.leer(.temaPanel, de: almacen) ?? .obsidiana
         temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
         estiloDeIsla = Self.leer(.estiloDeIsla, de: almacen) ?? .clasico
+        vidrio = Self.leer(.vidrio, de: almacen) ?? .apagado
         accesosRapidos = Self.normalizarAccesos(Self.leer(.accesosRapidos, de: almacen) ?? Self.accesosPorDefecto)
         hudSistemaActivo = Self.leer(.hudSistemaActivo, de: almacen) ?? true
         diasRetencionAudioReuniones = Self.leer(.diasRetencionAudioReuniones, de: almacen) ?? 30
@@ -207,7 +212,7 @@ public final class Ajustes {
         case carpetaFotosEspejo, rutaVaultObsidian, temaPanel, temaBarra, hudSistemaActivo
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox, separarVocesEnReuniones
-        case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas
+        case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas, vidrio
     }
 
     /// Restaura todas las preferencias a sus valores por defecto y limpia el almacén.
@@ -229,6 +234,7 @@ public final class Ajustes {
         temaPanel = .obsidiana
         temaBarra = .clasico
         estiloDeIsla = .clasico
+        vidrio = .apagado
         accesosRapidos = Self.accesosPorDefecto
         hudSistemaActivo = true
         diasRetencionAudioReuniones = 30

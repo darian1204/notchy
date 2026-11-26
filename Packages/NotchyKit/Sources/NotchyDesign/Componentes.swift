@@ -3,7 +3,6 @@ import SwiftUI
 /// Tarjeta del inicio y de los módulos: superficie tenue sobre el negro de la isla.
 public struct Tarjeta<Contenido: View>: View {
     private let contenido: Contenido
-    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     public init(@ViewBuilder _ contenido: () -> Contenido) {
         self.contenido = contenido()
@@ -14,10 +13,7 @@ public struct Tarjeta<Contenido: View>: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 11)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(
-                reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
-                in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjeta)
-            )
+            .superficieDeIsla(.tarjeta, en: RoundedRectangle(cornerRadius: Medidas.radioDeTarjeta))
     }
 }
 
@@ -25,7 +21,7 @@ public struct Tarjeta<Contenido: View>: View {
 public struct TarjetaConBorde<Contenido: View>: View {
     private let relleno: CGFloat
     private let contenido: Contenido
-    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
+    @Environment(\.vidrioDeIsla) private var vidrio
 
     public init(relleno: CGFloat = 10, @ViewBuilder _ contenido: () -> Contenido) {
         self.relleno = relleno
@@ -36,13 +32,10 @@ public struct TarjetaConBorde<Contenido: View>: View {
         contenido
             .padding(relleno)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(
-                reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
-                in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
-            )
+            .superficieDeIsla(.tarjeta, en: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna))
             .overlay(
                 RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
-                    .strokeBorder(Paleta.bordeSuave, lineWidth: 1)
+                    .strokeBorder(vidrio.tarjetas ? Color.clear : Paleta.bordeSuave, lineWidth: 1)
             )
     }
 }
@@ -61,7 +54,7 @@ public struct EstiloDePildora: ButtonStyle {
             .foregroundStyle(destacado ? Paleta.fondo : Paleta.texto)
             .padding(.horizontal, 12)
             .frame(height: Medidas.altoDeBoton)
-            .background(destacado ? Paleta.texto : Paleta.superficieAlta, in: Capsule())
+            .superficieDeIsla(.pildora, en: Capsule(), alta: true, tinte: destacado ? Paleta.texto : nil)
             .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

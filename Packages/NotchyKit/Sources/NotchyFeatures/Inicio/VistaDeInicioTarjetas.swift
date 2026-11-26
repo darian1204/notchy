@@ -263,7 +263,6 @@ private struct ColumnaDeAccesosRapidos: View {
     @Binding var ranuraEditando: Int?
     @State private var cursorEncima = false
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
-    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         let ids = fuentes.ajustes?.accesosRapidos ?? Ajustes.accesosPorDefecto
@@ -294,11 +293,10 @@ private struct ColumnaDeAccesosRapidos: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(color)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    grabando
-                        ? Paleta.grabadora.opacity(0.18)
-                        : (reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie),
-                    in: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)
+                .superficieDeIsla(
+                    .pildora,
+                    en: RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna),
+                    tinte: grabando ? Paleta.grabadora.opacity(0.18) : nil
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Medidas.radioDeTarjetaInterna)

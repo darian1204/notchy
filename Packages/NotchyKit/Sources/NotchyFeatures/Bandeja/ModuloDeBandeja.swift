@@ -30,7 +30,6 @@ struct VistaDeBandeja: View {
     @Bindable var modelo: ModeloDeBandeja
     @State private var accionConHover: String?
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
-    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -95,10 +94,7 @@ struct VistaDeBandeja: View {
             }
         }
         .padding(.vertical, 6)
-        .background(
-            reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
+        .superficieDeIsla(.tarjeta, en: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Paleta.borde.opacity(0.75), lineWidth: 1)
@@ -298,10 +294,7 @@ struct VistaDeBandeja: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(
-            reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
-            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-        )
+        .superficieDeIsla(.tarjeta, en: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture {
             NSWorkspace.shared.open(url)
         }

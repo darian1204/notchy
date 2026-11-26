@@ -106,6 +106,27 @@ public struct VistaDeAjustesYDiagnostico: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 10) {
+                    Text("Liquid glass")
+                        .font(.headline)
+                    Picker("Liquid glass", selection: ajustes.vidrio) {
+                        ForEach(EstiloDeVidrio.allCases) { estilo in
+                            Text(estilo.nombre).tag(estilo)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(modelo.ajustes.vidrio.descripcion)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Con \"Reducir transparencia\" en Accesibilidad se usan superficies sólidas.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Siete temas para el panel y nueve para la barra")
                         .font(.headline)
                     Text(
