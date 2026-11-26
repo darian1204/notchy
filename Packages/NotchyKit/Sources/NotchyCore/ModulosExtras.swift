@@ -183,7 +183,7 @@ public enum TipoDeHUD: String, Sendable, Equatable, CaseIterable {
         case .desconectado: "battery.75percent"
         case .bateriaBaja: "battery.25percent"
         case .archivos: "tray.and.arrow.down.fill"
-        case .airdropEnviado, .airdropRecibido: "airplayaudio"
+        case .airdropEnviado, .airdropRecibido: "dot.radiowaves.left.and.right"
         }
     }
 
