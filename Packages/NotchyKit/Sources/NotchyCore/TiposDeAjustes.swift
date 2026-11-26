@@ -164,3 +164,78 @@ public enum EstiloDeVidrio: String, Codable, Sendable, CaseIterable, Identifiabl
     public var tarjetas: Bool { self == .pildorasYTarjetas || self == .completo }
     public var fondo: Bool { self == .completo }
 }
+
+/// Tarjetas que se pueden poner en el Inicio del estilo tarjetas.
+public enum TarjetaDeInicio: String, Codable, Sendable, CaseIterable, Identifiable {
+    case musica, inbox, bandeja, agenda, portapapeles, monitor
+
+    public var id: String { rawValue }
+
+    public var nombre: String {
+        switch self {
+        case .musica: "Música y estado"
+        case .inbox: "Inbox"
+        case .bandeja: "Bandeja"
+        case .agenda: "Agenda de hoy"
+        case .portapapeles: "Portapapeles"
+        case .monitor: "Monitor"
+        }
+    }
+
+    public var icono: String {
+        switch self {
+        case .musica: "music.note"
+        case .inbox: "tray.and.arrow.down"
+        case .bandeja: "square.and.arrow.down.on.square"
+        case .agenda: "calendar"
+        case .portapapeles: "doc.on.clipboard"
+        case .monitor: "gauge.with.dots.needle.33percent"
+        }
+    }
+}
+
+/// Ancho relativo de una tarjeta del Inicio. Los anchos reales se reparten el espacio en proporción.
+public enum AnchoDeTarjeta: String, Codable, Sendable, CaseIterable, Identifiable {
+    case angosta, media, ancha
+
+    public var id: String { rawValue }
+
+    public var nombre: String {
+        switch self {
+        case .angosta: "Angosta"
+        case .media: "Media"
+        case .ancha: "Ancha"
+        }
+    }
+
+    /// Peso en puntos: con las tres por defecto suman exactamente el ancho de la fila.
+    public var peso: Double {
+        switch self {
+        case .angosta: 124
+        case .media: 208
+        case .ancha: 262
+        }
+    }
+
+    /// El siguiente ancho, para un botón que cicla.
+    public var siguiente: AnchoDeTarjeta {
+        switch self {
+        case .angosta: .media
+        case .media: .ancha
+        case .ancha: .angosta
+        }
+    }
+}
+
+/// Una tarjeta puesta en el Inicio, con su ancho.
+public struct TarjetaDeInicioElegida: Codable, Sendable, Equatable, Identifiable {
+    public var tarjeta: TarjetaDeInicio
+    public var ancho: AnchoDeTarjeta
+
+    public var id: String { tarjeta.rawValue }
+
+    public init(_ tarjeta: TarjetaDeInicio, _ ancho: AnchoDeTarjeta) {
+        self.tarjeta = tarjeta
+        self.ancho = ancho
+    }
+}

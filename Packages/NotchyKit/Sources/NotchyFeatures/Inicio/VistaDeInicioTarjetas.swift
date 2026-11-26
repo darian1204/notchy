@@ -28,27 +28,79 @@ struct VistaDeInicioTarjetas: View {
     let fuentes: FuentesDeInicioTarjetas
     /// Acceso rápido que se está cambiando. Mientras no es `nil`, el selector tapa las tarjetas.
     @State private var ranuraEditando: Int?
+    /// Editor de tarjetas del Inicio abierto.
+    @State private var editandoTarjetas = false
+    @State private var cursorEnTarjetas = false
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
 
     var body: some View {
         HStack(spacing: Medidas.separacion) {
             ZStack {
                 tarjetas
-                    .opacity(ranuraEditando == nil ? 1 : 0)
+                    .opacity(ranuraEditando == nil && !editandoTarjetas ? 1 : 0)
                 if ranuraEditando != nil {
                     SelectorDeAcceso(fuentes: fuentes, ranura: $ranuraEditando)
+                        .transition(.opacity)
+                } else if editandoTarjetas, let ajustes = fuentes.ajustes {
+                    EditorDeInicio(ajustes: ajustes) { editandoTarjetas = false }
                         .transition(.opacity)
                 }
             }
             .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: ranuraEditando)
+            .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: editandoTarjetas)
 
             ColumnaDeAccesosRapidos(fuentes: fuentes, ranuraEditando: $ranuraEditando)
                 .frame(width: 38)
         }
     }
 
+    private var elegidas: [TarjetaDeInicioElegida] {
+        fuentes.ajustes?.tarjetasDeInicio ?? Ajustes.tarjetasPorDefecto
+    }
+
+    /// Las tarjetas elegidas, repartiendo el ancho en proporción a su peso.
     private var tarjetas: some View {
-        HStack(spacing: Medidas.separacion) {
+        GeometryReader { geometria in
+            let elegidas = elegidas
+            let libre = geometria.size.width - Medidas.separacion * CGFloat(max(elegidas.count - 1, 0))
+            let total = elegidas.map(\.ancho.peso).reduce(0, +)
+            HStack(spacing: Medidas.separacion) {
+                ForEach(elegidas) { elegida in
+                    tarjeta(elegida.tarjeta)
+                        .frame(width: max(0, libre * elegida.ancho.peso / max(total, 1)))
+                }
+            }
+        }
+        .contextMenu {
+            if fuentes.ajustes != nil {
+                Button("Editar Inicio…") { editandoTarjetas = true }
+            }
+        }
+        .onHover { cursorEnTarjetas = $0 }
+        .overlay(alignment: .topTrailing) {
+            if cursorEnTarjetas, fuentes.ajustes != nil {
+                Button {
+                    editandoTarjetas = true
+                } label: {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Paleta.fondo)
+                        .frame(width: 14, height: 14)
+                        .background(Paleta.texto, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .offset(x: 4, y: -4)
+                .help("Editar las tarjetas del Inicio")
+                .accessibilityLabel("Editar Inicio")
+                .transition(.opacity)
+            }
+        }
+        .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: cursorEnTarjetas)
+    }
+
+    @ViewBuilder private func tarjeta(_ tarjeta: TarjetaDeInicio) -> some View {
+        switch tarjeta {
+        case .musica:
             TarjetaConBorde {
                 VStack(spacing: 0) {
                     ColumnaMusicaInicio(
@@ -60,16 +112,26 @@ struct VistaDeInicioTarjetas: View {
                     FranjaDeEstado(fuentes: fuentes)
                 }
             }
-            .frame(width: 262)
-
+        case .inbox:
             TarjetaConBorde {
                 TarjetaInbox(fuentes: fuentes)
             }
-
+        case .bandeja:
             TarjetaConBorde(relleno: 8) {
                 TarjetaBandejaReciente(fuentes: fuentes)
             }
-            .frame(width: 124)
+        case .agenda:
+            TarjetaConBorde {
+                TarjetaAgendaInicio(fuentes: fuentes)
+            }
+        case .portapapeles:
+            TarjetaConBorde {
+                TarjetaPortapapelesInicio(fuentes: fuentes)
+            }
+        case .monitor:
+            TarjetaConBorde {
+                TarjetaMonitorInicio(fuentes: fuentes)
+            }
         }
     }
 }

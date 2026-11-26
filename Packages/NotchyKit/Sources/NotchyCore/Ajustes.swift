@@ -77,6 +77,14 @@ public final class Ajustes {
     public var estiloDeIsla: EstiloDeIsla {
         didSet { alCambiar(estiloDeIsla, oldValue, .estiloDeIsla) }
     }
+    /// Tarjetas del Inicio en estilo tarjetas, en orden. Entre 1 y 4, sin repetir.
+    public var tarjetasDeInicio: [TarjetaDeInicioElegida] {
+        didSet {
+            let limpias = Self.normalizarTarjetas(tarjetasDeInicio)
+            if limpias != tarjetasDeInicio { tarjetasDeInicio = limpias }
+            alCambiar(tarjetasDeInicio, oldValue, .tarjetasDeInicio)
+        }
+    }
     /// Liquid glass en la isla: apagado, píldoras, píldoras y tarjetas, o completo.
     public var vidrio: EstiloDeVidrio {
         didSet { alCambiar(vidrio, oldValue, .vidrio) }
@@ -156,6 +164,8 @@ public final class Ajustes {
         temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
         estiloDeIsla = Self.leer(.estiloDeIsla, de: almacen) ?? .clasico
         vidrio = Self.leer(.vidrio, de: almacen) ?? .apagado
+        tarjetasDeInicio = Self.normalizarTarjetas(
+            Self.leer(.tarjetasDeInicio, de: almacen) ?? Self.tarjetasPorDefecto)
         accesosRapidos = Self.normalizarAccesos(Self.leer(.accesosRapidos, de: almacen) ?? Self.accesosPorDefecto)
         hudSistemaActivo = Self.leer(.hudSistemaActivo, de: almacen) ?? true
         diasRetencionAudioReuniones = Self.leer(.diasRetencionAudioReuniones, de: almacen) ?? 30
@@ -213,6 +223,7 @@ public final class Ajustes {
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox, separarVocesEnReuniones
         case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas, vidrio
+        case tarjetasDeInicio
     }
 
     /// Restaura todas las preferencias a sus valores por defecto y limpia el almacén.
@@ -235,6 +246,7 @@ public final class Ajustes {
         temaBarra = .clasico
         estiloDeIsla = .clasico
         vidrio = .apagado
+        tarjetasDeInicio = Self.tarjetasPorDefecto
         accesosRapidos = Self.accesosPorDefecto
         hudSistemaActivo = true
         diasRetencionAudioReuniones = 30
@@ -244,6 +256,56 @@ public final class Ajustes {
         idiomaTranscripcionPorDefecto = .espanolMexico
         preferirMicrofonoInternoConBluetooth = true
         herramientasAgenteSiemprePermitidas = []
+    }
+
+    // MARK: Tarjetas del Inicio
+
+    public static let maximoDeTarjetas = 4
+    public static let tarjetasPorDefecto = [
+        TarjetaDeInicioElegida(.musica, .ancha),
+        TarjetaDeInicioElegida(.inbox, .media),
+        TarjetaDeInicioElegida(.bandeja, .angosta),
+    ]
+
+    /// Sin repetidas y entre 1 y 4. Vacía vuelve a las de por defecto.
+    static func normalizarTarjetas(_ tarjetas: [TarjetaDeInicioElegida]) -> [TarjetaDeInicioElegida] {
+        var resultado: [TarjetaDeInicioElegida] = []
+        for tarjeta in tarjetas where !resultado.contains(where: { $0.tarjeta == tarjeta.tarjeta }) {
+            resultado.append(tarjeta)
+        }
+        resultado = Array(resultado.prefix(maximoDeTarjetas))
+        return resultado.isEmpty ? tarjetasPorDefecto : resultado
+    }
+
+    public var puedeAgregarTarjeta: Bool { tarjetasDeInicio.count < Self.maximoDeTarjetas }
+    public var puedeQuitarTarjeta: Bool { tarjetasDeInicio.count > 1 }
+
+    /// Tarjetas que no están en el Inicio.
+    public var tarjetasDisponibles: [TarjetaDeInicio] {
+        TarjetaDeInicio.allCases.filter { tarjeta in !tarjetasDeInicio.contains { $0.tarjeta == tarjeta } }
+    }
+
+    public func agregarTarjeta(_ tarjeta: TarjetaDeInicio, ancho: AnchoDeTarjeta = .media) {
+        guard puedeAgregarTarjeta, !tarjetasDeInicio.contains(where: { $0.tarjeta == tarjeta }) else { return }
+        tarjetasDeInicio.append(TarjetaDeInicioElegida(tarjeta, ancho))
+    }
+
+    public func quitarTarjeta(_ tarjeta: TarjetaDeInicio) {
+        guard puedeQuitarTarjeta else { return }
+        tarjetasDeInicio.removeAll { $0.tarjeta == tarjeta }
+    }
+
+    /// Mueve una tarjeta un lugar a la izquierda (`-1`) o a la derecha (`1`).
+    public func moverTarjeta(_ tarjeta: TarjetaDeInicio, _ delta: Int) {
+        guard let indice = tarjetasDeInicio.firstIndex(where: { $0.tarjeta == tarjeta }) else { return }
+        let destino = indice + delta
+        guard tarjetasDeInicio.indices.contains(destino) else { return }
+        tarjetasDeInicio.swapAt(indice, destino)
+    }
+
+    public func cambiarAncho(de tarjeta: TarjetaDeInicio, a ancho: AnchoDeTarjeta) {
+        guard let indice = tarjetasDeInicio.firstIndex(where: { $0.tarjeta == tarjeta }) else { return }
+        tarjetasDeInicio[indice].ancho = ancho
     }
 
     // MARK: Accesos rápidos
