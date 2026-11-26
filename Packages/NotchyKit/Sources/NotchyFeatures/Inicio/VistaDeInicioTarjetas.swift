@@ -345,6 +345,7 @@ private struct ColumnaDeAccesosRapidos: View {
     /// Toques por acceso, para que el símbolo rebote una vez al abrirlo.
     @State private var toques: [Int: Int] = [:]
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    @Environment(\.acentoDeIsla) private var acento
 
     var body: some View {
         let ids = fuentes.ajustes?.accesosRapidos ?? Ajustes.accesosPorDefecto
@@ -360,7 +361,7 @@ private struct ColumnaDeAccesosRapidos: View {
     private func boton(indice: Int, modulo: IdentidadDeModulo?) -> some View {
         let grabando = modulo?.id == "grabadora" && fuentes.grabadora?.grabando == true
         let editando = ranuraEditando == indice
-        let color = modulo.map { Color(hex: $0.color) } ?? Paleta.textoDeApoyo
+        let color = modulo.map { acento ?? Color(hex: $0.color) } ?? Paleta.textoDeApoyo
         let borde: Color = editando ? Paleta.texto : (grabando ? Paleta.grabadora.opacity(0.5) : Paleta.bordeSuave)
         return Button {
             if ranuraEditando != nil {

@@ -44,6 +44,7 @@ public struct VistaDeIsla: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.vidrioDeIsla, vidrio)
+        .environment(\.acentoDeIsla, acentoDeTema)
         // La isla nunca está "en segundo plano": sin esto el vidrio y los acentos se apagan cuando
         // el panel no tiene el foco del teclado.
         .environment(\.appearsActive, true)
@@ -233,6 +234,15 @@ public struct VistaDeIsla: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 10)
+    }
+
+    /// Acento del tema de la barra, o `nil` con el tema Clásico (por módulo).
+    private var acentoDeTema: Color? {
+        let tema = coordinador.registro.ajustes.temaBarra
+        if tema == .caratula, let hex = coordinador.hexCaratulaActual {
+            return Color(hex: hex)
+        }
+        return tema.hexAcento.map { Color(hex: $0) }
     }
 
     private func colorAcentoBarra(porDefecto: UInt32) -> Color {
