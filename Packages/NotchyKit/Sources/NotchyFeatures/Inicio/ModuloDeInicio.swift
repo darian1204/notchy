@@ -367,7 +367,7 @@ struct ColumnaMusicaInicio: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.presion)
             .accessibilityLabel("Abrir Ahora suena")
 
             if let estado {
@@ -395,7 +395,7 @@ struct ColumnaMusicaInicio: View {
                         .foregroundStyle(Paleta.texto)
                         .frame(width: 24, height: 24)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .accessibilityLabel("Canción anterior")
 
                 Button {
@@ -407,7 +407,7 @@ struct ColumnaMusicaInicio: View {
                         .frame(width: 32, height: 32)
                         .background(Paleta.texto, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .accessibilityLabel(estado?.reproduciendo == true ? "Pausar" : "Reproducir")
 
                 Button {
@@ -418,7 +418,7 @@ struct ColumnaMusicaInicio: View {
                         .foregroundStyle(Paleta.texto)
                         .frame(width: 24, height: 24)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .accessibilityLabel("Siguiente canción")
             }
             .frame(maxWidth: .infinity, alignment: .center)
@@ -488,7 +488,7 @@ struct ColumnaArchivosInicio: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
             } else if urls.count == 1, let unica = urls.first {
                 // Solo la imagen/miniatura grande sin descripción
                 Button {
@@ -497,7 +497,7 @@ struct ColumnaArchivosInicio: View {
                     MiniaturaDeArchivo(url: unica, tamano: min(96, miniatura * 1.65))
                         .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .onDrag {
                     NSItemProvider(object: unica as NSURL)
                 }
@@ -514,7 +514,7 @@ struct ColumnaArchivosInicio: View {
                             MiniaturaDeArchivo(url: url, tamano: miniatura)
                                 .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.presion)
                         .onDrag {
                             NSItemProvider(object: url as NSURL)
                         }
@@ -572,7 +572,7 @@ private struct ColumnaNotasInboxInicio: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Paleta.portapapeles)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .help("Abrir 00-inbox/inbox.md en Obsidian")
                 .accessibilityLabel("Abrir inbox en Obsidian")
 
@@ -583,7 +583,7 @@ private struct ColumnaNotasInboxInicio: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Paleta.textoDeApoyo)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.presion)
                 .help("Abrir carpeta 00-inbox en Finder")
                 .accessibilityLabel("Abrir carpeta inbox en Finder")
             }
@@ -610,7 +610,7 @@ private struct ColumnaNotasInboxInicio: View {
                                     ? Paleta.textoDeApoyo : Paleta.portapapeles
                             )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.presion)
                     .disabled(gestor.borrador.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .help("Guardar en el inbox de \(gestor.nombreDelDestino)")
                     .accessibilityLabel("Guardar en el inbox")

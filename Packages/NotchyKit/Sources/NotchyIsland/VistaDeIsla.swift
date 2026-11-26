@@ -252,28 +252,36 @@ public struct VistaDeIsla: View {
             .padding(.horizontal, 10)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .accessibilityLabel(modulo.identidad.nombre)
     }
 
-    /// Primero crece la forma; el contenido entra después con fundido y desenfoque.
+    /// Primero crece la forma; el contenido entra después: baja un poco desde el notch y aparece.
+    /// Sin desenfoque animado, que obliga a redibujar todo el contenido en cada cuadro.
     private var entrada: AnyTransition {
         let aparicion: AnyTransition =
             (reducirMovimiento || reducirTransparencia)
             ? .opacity
-            : .modifier(active: Desenfoque(radio: 6, opacidad: 0), identity: Desenfoque(radio: 0, opacidad: 1))
+            : .modifier(
+                active: Materializar(escala: 0.97, desplazamiento: -6, opacidad: 0),
+                identity: Materializar(escala: 1, desplazamiento: 0, opacidad: 1))
         return .asymmetric(
             insertion: aparicion.animation(Movimiento.entradaDeContenido(reducir: reducirMovimiento)),
             removal: .opacity.animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento)))
     }
 }
 
-private struct Desenfoque: ViewModifier {
-    let radio: CGFloat
+/// Entrada del contenido anclada arriba, en el notch, de donde sale la isla.
+private struct Materializar: ViewModifier {
+    let escala: CGFloat
+    let desplazamiento: CGFloat
     let opacidad: Double
 
     func body(content: Content) -> some View {
-        content.blur(radius: radio).opacity(opacidad)
+        content
+            .scaleEffect(escala, anchor: .top)
+            .offset(y: desplazamiento)
+            .opacity(opacidad)
     }
 }
 
@@ -351,7 +359,7 @@ struct BarraDeModulos: View {
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .help(modulo.nombre)
         .accessibilityLabel(modulo.nombre)
         .accessibilityAddTraits(abierto ? .isSelected : [])
@@ -372,7 +380,7 @@ struct BarraDeModulos: View {
                 .contentShape(Rectangle())
         }
         .menuStyle(.button)
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Ajustes y salir")

@@ -44,6 +44,9 @@ struct BarraDeTarjetas: View {
     let alBuscar: @MainActor () -> Void
     @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
     @Environment(\.vidrioDeIsla) private var vidrio
+    @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
+    /// Un solo indicador de selección que viaja entre pestañas.
+    @Namespace private var indicador
 
     var body: some View {
         HStack(spacing: 0) {
@@ -62,6 +65,8 @@ struct BarraDeTarjetas: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, Medidas.margenLateral)
+        .animation(Movimiento.seleccion(reducir: reducirMovimiento), value: coordinador.moduloAbierto?.identidad.id)
+        .animation(Movimiento.seleccion(reducir: reducirMovimiento), value: paletaAbierta)
         .contextMenu {
             if let abrirAjustes = coordinador.alAbrirAjustes {
                 Button("Ajustes…", action: abrirAjustes)
@@ -93,6 +98,8 @@ struct BarraDeTarjetas: View {
                 TimelineView(.periodic(from: .now, by: 30)) { _ in
                     if let insignia = modulo?.insignia {
                         Text("\(insignia)")
+                            .contentTransition(.numericText(value: Double(insignia)))
+                            .animation(Movimiento.seleccion(reducir: reducirMovimiento), value: insignia)
                             .font(.system(size: 9, weight: .bold).monospacedDigit())
                             .foregroundStyle(Paleta.fondo)
                             .padding(.horizontal, 4)
@@ -104,13 +111,16 @@ struct BarraDeTarjetas: View {
             .foregroundStyle(activa ? Paleta.texto : Paleta.textoDeApoyo)
             .frame(maxWidth: .infinity)
             .frame(height: 22)
-            .background(
-                activa ? (reducirTransparencia ? Paleta.superficieAltaSolida : Paleta.superficieAlta) : Color.clear,
-                in: Capsule()
-            )
+            .background {
+                if activa {
+                    Capsule()
+                        .fill(reducirTransparencia ? Paleta.superficieAltaSolida : Paleta.superficieAlta)
+                        .matchedGeometryEffect(id: "seleccion", in: indicador)
+                }
+            }
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .disabled(modulo == nil)
         .opacity(modulo == nil ? 0.4 : 1)
         .help(modulo == nil ? "\(pestana.nombre) está apagado en Ajustes" : pestana.nombre)
@@ -135,10 +145,16 @@ struct BarraDeTarjetas: View {
             .foregroundStyle(paletaAbierta ? Paleta.texto : Paleta.textoDeApoyo)
             .frame(maxWidth: .infinity)
             .frame(height: 22)
-            .background(paletaAbierta ? Paleta.superficieAlta : Color.clear, in: Capsule())
+            .background {
+                if paletaAbierta {
+                    Capsule()
+                        .fill(Paleta.superficieAlta)
+                        .matchedGeometryEffect(id: "seleccion", in: indicador)
+                }
+            }
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .keyboardShortcut("k", modifiers: .command)
         .help("Buscar módulo (⌘K)")
         .accessibilityLabel("Buscar módulo")
@@ -235,7 +251,7 @@ struct PaletaDeModulos: View {
                 .background(
                     seleccionada ? Paleta.superficie : Color.clear, in: RoundedRectangle(cornerRadius: 9))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .accessibilityLabel("Abrir \(modulo.nombre)")
     }
 
@@ -246,7 +262,7 @@ struct PaletaDeModulos: View {
         } label: {
             contenidoDeCelda(simbolo: "gearshape.fill", color: Paleta.textoDeApoyo, nombre: "Ajustes")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.presion)
         .accessibilityLabel("Abrir Ajustes")
     }
 
