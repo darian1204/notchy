@@ -57,6 +57,21 @@ import Testing
         #expect(otra.accesosRapidos == ["colorpicker", "clima", "grabadora"])
     }
 
+    @Test func vidrioPorDefectoApagadoYPersiste() {
+        let almacen = AlmacenEnMemoria()
+        let ajustes = Ajustes(almacen: almacen)
+        #expect(ajustes.vidrio == .apagado)
+        ajustes.vidrio = .pildorasYTarjetas
+        #expect(Ajustes(almacen: almacen).vidrio == .pildorasYTarjetas)
+    }
+
+    @Test func cadaNivelDeVidrioIncluyeAlAnterior() {
+        #expect(!EstiloDeVidrio.apagado.pildoras)
+        #expect(EstiloDeVidrio.pildoras.pildoras && !EstiloDeVidrio.pildoras.tarjetas)
+        #expect(EstiloDeVidrio.pildorasYTarjetas.tarjetas && !EstiloDeVidrio.pildorasYTarjetas.fondo)
+        #expect(EstiloDeVidrio.completo.pildoras && EstiloDeVidrio.completo.tarjetas && EstiloDeVidrio.completo.fondo)
+    }
+
     @Test func cambiarAUnAccesoRepetidoIntercambia() {
         let ajustes = Ajustes(almacen: AlmacenEnMemoria())
         ajustes.cambiarAcceso(en: 0, por: "grabadora")
@@ -107,6 +122,7 @@ import Testing
         ajustes.iniciarAlAbrirSesion = false
         ajustes.temaPanel = .bosque
         ajustes.estiloDeIsla = .tarjetas
+        ajustes.vidrio = .completo
         ajustes.rutaVaultObsidian = "/Users/secreto/MiVault"
         ajustes.activar("agenda", false)
 
@@ -118,6 +134,7 @@ import Testing
         #expect(ajustes.iniciarAlAbrirSesion == true)
         #expect(ajustes.temaPanel == .obsidiana)
         #expect(ajustes.estiloDeIsla == .clasico)
+        #expect(ajustes.vidrio == .apagado)
         #expect(ajustes.rutaVaultObsidian == Ajustes.rutaVaultPorDefecto)
         #expect(ajustes.estaActivo("agenda"))
     }

@@ -232,6 +232,7 @@ public final class ModeloDeAjustesYDiagnostico {
             modulos: modulosExportados,
             ajustes: AjustesNoSensiblesExportados(
                 estiloDeIsla: ajustes.estiloDeIsla.rawValue,
+                vidrio: ajustes.vidrio.rawValue,
                 temaPanel: ajustes.temaPanel.rawValue,
                 temaBarra: ajustes.temaBarra.rawValue,
                 pantalla: ajustes.pantalla.rawValue,
@@ -296,6 +297,7 @@ private struct ModuloExportado: Codable, Sendable {
 
 private struct AjustesNoSensiblesExportados: Codable, Sendable {
     let estiloDeIsla: String
+    let vidrio: String
     let temaPanel: String
     let temaBarra: String
     let pantalla: String

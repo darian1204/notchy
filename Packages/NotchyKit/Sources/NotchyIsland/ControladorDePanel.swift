@@ -46,6 +46,8 @@ public final class ControladorDePanel {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        // El texto de la isla es blanco: el liquid glass debe pintarse en su variante oscura.
+        panel.appearance = NSAppearance(named: .darkAqua)
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
         panel.isMovable = false

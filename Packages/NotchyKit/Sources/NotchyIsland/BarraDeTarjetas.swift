@@ -43,6 +43,7 @@ struct BarraDeTarjetas: View {
     let paletaAbierta: Bool
     let alBuscar: @MainActor () -> Void
     @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
+    @Environment(\.vidrioDeIsla) private var vidrio
 
     var body: some View {
         HStack(spacing: 0) {
@@ -74,11 +75,8 @@ struct BarraDeTarjetas: View {
         HStack(spacing: 2) { contenido() }
             .padding(2)
             .frame(width: Medidas.anchoDePestanas)
-            .background(
-                reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie,
-                in: Capsule()
-            )
-            .overlay(Capsule().strokeBorder(Paleta.bordeSuave))
+            .superficieDeIsla(.pildora, en: Capsule())
+            .overlay(Capsule().strokeBorder(vidrio.pildoras ? Color.clear : Paleta.bordeSuave))
     }
 
     private func pestana(_ pestana: PestanaDeTarjetas) -> some View {

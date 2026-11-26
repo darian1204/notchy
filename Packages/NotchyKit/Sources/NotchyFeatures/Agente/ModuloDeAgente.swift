@@ -444,7 +444,6 @@ struct VistaDeAgente: View {
     @Bindable var modelo: ModeloDeAgente
     @FocusState private var campoEnfocado: Bool
     @Environment(\.accessibilityReduceMotion) private var reducirMovimiento
-    @Environment(\.accessibilityReduceTransparency) private var reducirTransparencia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -683,11 +682,10 @@ struct VistaDeAgente: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                esUsuario
-                    ? Paleta.agente.opacity(0.28)
-                    : (reducirTransparencia ? Paleta.superficieSolida : Paleta.superficie),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .superficieDeIsla(
+                .tarjeta,
+                en: RoundedRectangle(cornerRadius: 10, style: .continuous),
+                tinte: esUsuario ? Paleta.agente.opacity(0.28) : nil
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
