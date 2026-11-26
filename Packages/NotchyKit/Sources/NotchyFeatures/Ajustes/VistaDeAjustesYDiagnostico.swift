@@ -61,6 +61,50 @@ public struct VistaDeAjustesYDiagnostico: View {
         )
     }
 
+    private func filaDeTarjeta(_ elegida: TarjetaDeInicioElegida, indice: Int) -> some View {
+        let ajustes = modelo.ajustes
+        let tarjeta = elegida.tarjeta
+        return HStack {
+            Label(tarjeta.nombre, systemImage: tarjeta.icono)
+            Spacer()
+            Picker(
+                "Ancho",
+                selection: Binding(
+                    get: { elegida.ancho },
+                    set: { ajustes.cambiarAncho(de: tarjeta, a: $0) }
+                )
+            ) {
+                ForEach(AnchoDeTarjeta.allCases) { ancho in
+                    Text(ancho.nombre).tag(ancho)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+            Button {
+                ajustes.moverTarjeta(tarjeta, -1)
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .disabled(indice == 0)
+            .help("Mover antes")
+            Button {
+                ajustes.moverTarjeta(tarjeta, 1)
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .disabled(indice == ajustes.tarjetasDeInicio.count - 1)
+            .help("Mover después")
+            Button {
+                ajustes.quitarTarjeta(tarjeta)
+            } label: {
+                Image(systemName: "minus.circle")
+            }
+            .disabled(!ajustes.puedeQuitarTarjeta)
+            .help("Quitar")
+        }
+        .buttonStyle(.borderless)
+    }
+
     private func pestanaTemas(ajustes: Bindable<Ajustes>) -> some View {
         let columnasPanel = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
         let columnasBarra = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
@@ -99,6 +143,30 @@ public struct VistaDeAjustesYDiagnostico: View {
                         Text("También desde la isla: pasa el cursor por un acceso y toca el lápiz.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Text("TARJETAS DEL INICIO")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        ForEach(Array(modelo.ajustes.tarjetasDeInicio.enumerated()), id: \.element.id) {
+                            indice, elegida in
+                            filaDeTarjeta(elegida, indice: indice)
+                        }
+                        Menu("Agregar tarjeta") {
+                            ForEach(modelo.ajustes.tarjetasDisponibles) { tarjeta in
+                                Button {
+                                    modelo.ajustes.agregarTarjeta(tarjeta)
+                                } label: {
+                                    Label(tarjeta.nombre, systemImage: tarjeta.icono)
+                                }
+                            }
+                        }
+                        .disabled(!modelo.ajustes.puedeAgregarTarjeta || modelo.ajustes.tarjetasDisponibles.isEmpty)
+                        .fixedSize()
+                        Text(
+                            "Hasta \(Ajustes.maximoDeTarjetas). También desde la isla: clic derecho en las tarjetas → Editar Inicio."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 4)

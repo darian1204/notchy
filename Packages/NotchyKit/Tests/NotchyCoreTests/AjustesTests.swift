@@ -72,6 +72,40 @@ import Testing
         #expect(EstiloDeVidrio.completo.pildoras && EstiloDeVidrio.completo.tarjetas && EstiloDeVidrio.completo.fondo)
     }
 
+    @Test func tarjetasDeInicioPorDefectoYPersisten() {
+        let almacen = AlmacenEnMemoria()
+        let ajustes = Ajustes(almacen: almacen)
+        #expect(ajustes.tarjetasDeInicio.map(\.tarjeta) == [.musica, .inbox, .bandeja])
+        ajustes.agregarTarjeta(.agenda, ancho: .angosta)
+        ajustes.moverTarjeta(.agenda, -1)
+        ajustes.cambiarAncho(de: .musica, a: .media)
+        let otra = Ajustes(almacen: almacen)
+        #expect(otra.tarjetasDeInicio.map(\.tarjeta) == [.musica, .inbox, .agenda, .bandeja])
+        #expect(otra.tarjetasDeInicio.first?.ancho == .media)
+    }
+
+    @Test func tarjetasDeInicioEntreUnaYCuatroSinRepetir() {
+        let ajustes = Ajustes(almacen: AlmacenEnMemoria())
+        ajustes.agregarTarjeta(.agenda)
+        ajustes.agregarTarjeta(.monitor)
+        #expect(ajustes.tarjetasDeInicio.count == 4)
+        #expect(!ajustes.puedeAgregarTarjeta)
+        ajustes.agregarTarjeta(.portapapeles)
+        #expect(ajustes.tarjetasDeInicio.count == 4)
+        ajustes.agregarTarjeta(.musica)
+        #expect(ajustes.tarjetasDeInicio.filter { $0.tarjeta == .musica }.count == 1)
+        for tarjeta in TarjetaDeInicio.allCases { ajustes.quitarTarjeta(tarjeta) }
+        #expect(ajustes.tarjetasDeInicio.count == 1)
+        ajustes.tarjetasDeInicio = []
+        #expect(ajustes.tarjetasDeInicio == Ajustes.tarjetasPorDefecto)
+    }
+
+    @Test func losAnchosPorDefectoLlenanLaFila() {
+        // 680 de la isla − 24 de márgenes − 38 de accesos − 8 de separación − 2 × 8 entre tarjetas.
+        let pesos = Ajustes.tarjetasPorDefecto.map(\.ancho.peso).reduce(0, +)
+        #expect(pesos == 594)
+    }
+
     @Test func cambiarAUnAccesoRepetidoIntercambia() {
         let ajustes = Ajustes(almacen: AlmacenEnMemoria())
         ajustes.cambiarAcceso(en: 0, por: "grabadora")
