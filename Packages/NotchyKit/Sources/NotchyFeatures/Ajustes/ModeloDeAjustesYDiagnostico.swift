@@ -23,6 +23,12 @@ public final class ModeloDeAjustesYDiagnostico {
     @ObservationIgnored private let consultarModulos: @MainActor () -> [DiagnosticoDeModulo]
     @ObservationIgnored private let consultarConteos: @MainActor () -> ConteosDeDiagnostico
     @ObservationIgnored private let bus: BusDeEventos?
+    @ObservationIgnored private let secretos: (any PuertoDeSecretos)?
+    @ObservationIgnored private let notion: ClienteDeNotion
+    /// Hay un token de Notion en el llavero. El token nunca se muestra ni se exporta.
+    public private(set) var hayTokenNotion = false
+    /// Resultado de la última prueba de conexión con Notion, o de guardar el token.
+    public private(set) var estadoDeNotion: String?
     @ObservationIgnored private var ultimoValorInicioAplicado: Bool
 
     public init(
@@ -34,8 +40,13 @@ public final class ModeloDeAjustesYDiagnostico {
         consultarOpenCode: @escaping @MainActor () -> EstadoDeOpenCode,
         consultarModulos: @escaping @MainActor () -> [DiagnosticoDeModulo] = { [] },
         consultarConteos: @escaping @MainActor () -> ConteosDeDiagnostico = { ConteosDeDiagnostico() },
-        bus: BusDeEventos? = nil
+        bus: BusDeEventos? = nil,
+        secretos: (any PuertoDeSecretos)? = nil,
+        notion: ClienteDeNotion = ClienteDeNotion()
     ) {
+        self.secretos = secretos
+        self.notion = notion
+        self.hayTokenNotion = secretos?.existe(ClavesDeSecretos.tokenNotion) ?? false
         self.ajustes = ajustes
         self.modulosDisponibles = modulosDisponibles
         self.proveedorDePermisos = proveedorDePermisos
@@ -55,6 +66,49 @@ public final class ModeloDeAjustesYDiagnostico {
             self?.sincronizarInicioSiCambio()
         }
         refrescar()
+    }
+
+    // MARK: Notion
+
+    public var puedeGuardarSecretos: Bool { secretos != nil }
+
+    /// Guarda el token de Notion en el llavero. Vacío lo borra.
+    public func guardarTokenNotion(_ token: String) {
+        let limpio = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let secretos else {
+            estadoDeNotion = "No hay llavero disponible"
+            return
+        }
+        do {
+            try secretos.guardar(limpio.isEmpty ? nil : limpio, en: ClavesDeSecretos.tokenNotion)
+            hayTokenNotion = !limpio.isEmpty
+            estadoDeNotion = limpio.isEmpty ? "Token borrado" : "Token guardado en el llavero"
+        } catch {
+            estadoDeNotion = (error as? NotchyError)?.errorDescription ?? "No se pudo guardar el token"
+        }
+    }
+
+    public func borrarTokenNotion() {
+        guardarTokenNotion("")
+    }
+
+    /// Pide la página a Notion para comprobar el token y que la página esté compartida.
+    public func probarNotion() async {
+        guard let pagina = Notion.idDePagina(ajustes.paginaNotion) else {
+            estadoDeNotion = "El enlace o ID de la página no es válido"
+            return
+        }
+        guard let token = secretos?.leer(ClavesDeSecretos.tokenNotion), !token.isEmpty else {
+            estadoDeNotion = "Falta el token"
+            return
+        }
+        estadoDeNotion = "Probando…"
+        do {
+            try await notion.comprobar(pagina: pagina, token: token)
+            estadoDeNotion = "Conectado: la integración ve la página. Revisa que tenga \"Insertar contenido\"."
+        } catch {
+            estadoDeNotion = (error as? NotchyError)?.errorDescription ?? "No se pudo conectar con Notion"
+        }
     }
 
     /// Relee permisos, salud de la base, estado de OpenCode, módulos, inicio de sesión y conteos.
@@ -233,6 +287,7 @@ public final class ModeloDeAjustesYDiagnostico {
             ajustes: AjustesNoSensiblesExportados(
                 estiloDeIsla: ajustes.estiloDeIsla.rawValue,
                 vidrio: ajustes.vidrio.rawValue,
+                destinoDeInbox: ajustes.destinoDeInbox.rawValue,
                 temaPanel: ajustes.temaPanel.rawValue,
                 temaBarra: ajustes.temaBarra.rawValue,
                 pantalla: ajustes.pantalla.rawValue,
@@ -298,6 +353,7 @@ private struct ModuloExportado: Codable, Sendable {
 private struct AjustesNoSensiblesExportados: Codable, Sendable {
     let estiloDeIsla: String
     let vidrio: String
+    let destinoDeInbox: String
     let temaPanel: String
     let temaBarra: String
     let pantalla: String

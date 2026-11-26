@@ -83,7 +83,7 @@ public final class ModeloDeGrabadora {
     @ObservationIgnored private let transcripcion: any PuertoDeTranscripcion
     @ObservationIgnored private let diarizacion: (any PuertoDeDiarizacion)?
     @ObservationIgnored private let resumenDeTexto: (any PuertoDeResumenDeTexto)?
-    @ObservationIgnored private let escribirEnInbox: (@MainActor (String) -> Bool)?
+    @ObservationIgnored private let escribirEnInbox: (@MainActor (String) async -> Bool)?
     @ObservationIgnored private let repositorio: RepositorioDeGrabadoraYReuniones?
     @ObservationIgnored private let carpetaAudio: URL
     @ObservationIgnored private let ajustes: Ajustes
@@ -103,7 +103,7 @@ public final class ModeloDeGrabadora {
         transcripcion: any PuertoDeTranscripcion,
         diarizacion: (any PuertoDeDiarizacion)? = nil,
         resumenDeTexto: (any PuertoDeResumenDeTexto)? = nil,
-        escribirEnInbox: (@MainActor (String) -> Bool)? = nil,
+        escribirEnInbox: (@MainActor (String) async -> Bool)? = nil,
         repositorio: RepositorioDeGrabadoraYReuniones? = nil,
         carpetaAudio: URL? = nil,
         ajustes: Ajustes? = nil,
@@ -810,7 +810,7 @@ public final class ModeloDeGrabadora {
                     duracionMinutos: minutos,
                     resumen: markdown
                 )
-                _ = escribirEnInbox?(bloqueInbox)
+                _ = await escribirEnInbox?(bloqueInbox)
             }
             return nota
         } catch {

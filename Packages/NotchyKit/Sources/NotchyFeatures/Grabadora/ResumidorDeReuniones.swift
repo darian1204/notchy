@@ -16,7 +16,7 @@ public final class ResumidorDeReuniones {
     private let repositorio: RepositorioDeGrabadoraYReuniones?
     private let segmentosDe: @MainActor (String) -> [SegmentoDeTranscripcion]
     private let nombresDeHablantesDe: @MainActor (String) -> [String: String]
-    private let escribirEnInbox: @MainActor (String) -> Bool
+    private let escribirEnInbox: @MainActor (String) async -> Bool
     private let alGuardarNota: (@MainActor (NotaDeReunion) -> Void)?
     private let log = Registro.de(.grabadora)
     private var tarea: Task<Void, Never>?
@@ -28,7 +28,7 @@ public final class ResumidorDeReuniones {
         repositorio: RepositorioDeGrabadoraYReuniones? = nil,
         segmentosDe: @escaping @MainActor (String) -> [SegmentoDeTranscripcion],
         nombresDeHablantesDe: (@MainActor (String) -> [String: String])? = nil,
-        escribirEnInbox: @escaping @MainActor (String) -> Bool,
+        escribirEnInbox: @escaping @MainActor (String) async -> Bool,
         alGuardarNota: (@MainActor (NotaDeReunion) -> Void)? = nil
     ) {
         self.bus = bus
@@ -95,7 +95,7 @@ public final class ResumidorDeReuniones {
                 duracionMinutos: minutos,
                 resumen: resumen
             )
-            return escribirEnInbox(nota) ? nota : resumen
+            return await escribirEnInbox(nota) ? nota : resumen
         } catch {
             log.error("No se pudo resumir la reunión: \(error.localizedDescription, privacy: .public)")
             return nil

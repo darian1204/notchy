@@ -402,7 +402,7 @@ public actor ServidorMCPDeNotchy {
                     herramienta: "inbox_agregar",
                     argumentos: ["texto": texto]
                 ) {
-                    try herramientas.inboxAgregar(texto: texto)
+                    try await herramientas.inboxAgregar(texto: texto)
                 }
                 return CallTool.Result(
                     content: [.text(text: mensaje, annotations: nil, _meta: nil)],

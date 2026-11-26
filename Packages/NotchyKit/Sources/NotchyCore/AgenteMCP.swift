@@ -286,7 +286,7 @@ public protocol PuertoDeHerramientasDelAgente: AnyObject, Sendable {
     func bandejaArchivos() -> [String]
     func reunionesRecientes(limite: Int) -> [ReunionRecienteAgente]
     func ahoraSuena() -> AhoraSuenaAgente?
-    func inboxAgregar(texto: String) throws -> String
+    func inboxAgregar(texto: String) async throws -> String
     func portapapelesCopiar(texto: String) throws -> String
     func recordatorioCrear(titulo: String, fechaISO8601: String?) async throws -> String
 }

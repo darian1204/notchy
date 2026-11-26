@@ -6,25 +6,41 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Gestiona la nota rápida del Home conectada directamente a `00-inbox/inbox.md` del vault de Obsidian.
+/// Gestiona la nota rápida del Home. Escribe en `00-inbox/inbox.md` del vault de Obsidian o, si el
+/// usuario lo elige en Ajustes, al final de una página de Notion.
 @MainActor
 @Observable
 public final class GestorDeInboxObsidian {
     public var borrador = ""
     public private(set) var lineasRecientes: [String] = []
     public private(set) var mensajeEstado: String?
+    /// Lo enviado a Notion en esta sesión, lo más nuevo primero. Notion no se lee de vuelta.
+    private var enviadasANotion: [String] = []
+    /// Último envío a Notion en la fila; el siguiente espera a que termine.
+    @ObservationIgnored private var colaDeNotion: Task<String, any Error>?
 
     @ObservationIgnored private let ajustes: Ajustes
     @ObservationIgnored private let alAbrirURL: (@MainActor (URL) -> Void)?
+    @ObservationIgnored private let secretos: (any PuertoDeSecretos)?
+    @ObservationIgnored private let notion: ClienteDeNotion
 
     public init(
         ajustes: Ajustes,
-        alAbrirURL: (@MainActor (URL) -> Void)? = nil
+        alAbrirURL: (@MainActor (URL) -> Void)? = nil,
+        secretos: (any PuertoDeSecretos)? = nil,
+        notion: ClienteDeNotion = ClienteDeNotion()
     ) {
         self.ajustes = ajustes
         self.alAbrirURL = alAbrirURL
+        self.secretos = secretos
+        self.notion = notion
         recargar()
     }
+
+    public var destino: DestinoDeInbox { ajustes.destinoDeInbox }
+
+    /// Texto de ayuda para el campo y los botones: "Obsidian" o "Notion".
+    public var nombreDelDestino: String { destino.nombre }
 
     public var urlCarpetaInbox: URL {
         ajustes.urlCarpetaInboxObsidian
@@ -35,6 +51,10 @@ public final class GestorDeInboxObsidian {
     }
 
     public func recargar() {
+        if destino == .notion {
+            lineasRecientes = Array(enviadasANotion.prefix(4))
+            return
+        }
         let url = urlNotaInbox
         guard let texto = try? String(contentsOf: url, encoding: .utf8) else {
             lineasRecientes = []
@@ -43,21 +63,77 @@ public final class GestorDeInboxObsidian {
         lineasRecientes = Self.extraerLineasCapturadas(de: texto)
     }
 
+    /// Manda el borrador al inbox. Lo vacía al instante; si el envío falla, vuelve al campo.
     @discardableResult
     public func guardarBorrador() -> Bool {
         let limpio = borrador.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !limpio.isEmpty else { return false }
-        let ok = agregarLinea(limpio)
-        if ok {
-            borrador = ""
+        if destino == .obsidian {
+            let ok = escribirEnObsidian(limpio)
+            if ok { borrador = "" }
+            return ok
         }
-        return ok
+        borrador = ""
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await agregar(limpio)
+            } catch {
+                if borrador.isEmpty { borrador = limpio }
+            }
+        }
+        return true
     }
 
+    /// Agrega una línea al destino elegido y espera a que quede guardada. Los envíos a Notion van en
+    /// fila, en el orden en que llegan. Devuelve el mensaje para mostrar.
     @discardableResult
-    public func agregarLinea(_ linea: String) -> Bool {
+    public func agregar(_ linea: String) async throws -> String {
         let limpia = linea.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !limpia.isEmpty else { return false }
+        guard !limpia.isEmpty else { throw NotchyError.datos("La nota está vacía") }
+        switch destino {
+        case .obsidian:
+            guard escribirEnObsidian(limpia) else {
+                throw NotchyError.datos(mensajeEstado ?? "No se pudo escribir en inbox.md")
+            }
+            return "Guardado en inbox.md"
+        case .notion:
+            let anterior = colaDeNotion
+            let envio = Task { [weak self] () throws -> String in
+                _ = await anterior?.result
+                guard let self else { throw CancellationError() }
+                return try await enviarANotion(limpia)
+            }
+            colaDeNotion = envio
+            return try await envio.value
+        }
+    }
+
+    private func enviarANotion(_ texto: String) async throws -> String {
+        guard let pagina = Notion.idDePagina(ajustes.paginaNotion) else {
+            mensajeEstado = "Falta la página de Notion en Ajustes"
+            throw NotchyError.datos(mensajeEstado ?? "")
+        }
+        guard let token = secretos?.leer(ClavesDeSecretos.tokenNotion), !token.isEmpty else {
+            mensajeEstado = "Falta el token de Notion en Ajustes"
+            throw NotchyError.datos(mensajeEstado ?? "")
+        }
+        mensajeEstado = "Enviando a Notion…"
+        do {
+            try await notion.agregar(texto, aPagina: pagina, token: token)
+        } catch {
+            mensajeEstado = (error as? NotchyError)?.errorDescription ?? "No se pudo enviar a Notion"
+            throw NotchyError.datos(mensajeEstado ?? "")
+        }
+        let primera = texto.components(separatedBy: .newlines).first ?? texto
+        enviadasANotion.insert(primera, at: 0)
+        enviadasANotion = Array(enviadasANotion.prefix(4))
+        mensajeEstado = "Guardado en Notion"
+        recargar()
+        return "Enviado al inbox de Notion"
+    }
+
+    private func escribirEnObsidian(_ limpia: String) -> Bool {
         let carpeta = urlCarpetaInbox
         let archivo = urlNotaInbox
         do {
@@ -78,6 +154,17 @@ public final class GestorDeInboxObsidian {
             mensajeEstado = "Error al escribir en inbox.md"
             return false
         }
+    }
+
+    /// Abre el inbox en su app: la nota en Obsidian o la página en Notion.
+    public func abrirInbox() {
+        if destino == .notion {
+            if let id = Notion.idDePagina(ajustes.paginaNotion), let url = Notion.urlDePagina(id) {
+                alAbrirURL?(url)
+            }
+            return
+        }
+        abrirEnObsidian()
     }
 
     public func abrirEnObsidian() {
@@ -525,7 +612,7 @@ private struct ColumnaNotasInboxInicio: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(gestor.borrador.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .help("Guardar en 00-inbox/inbox.md")
+                    .help("Guardar en el inbox de \(gestor.nombreDelDestino)")
                     .accessibilityLabel("Guardar en el inbox")
                 }
                 .padding(.horizontal, 8)
@@ -541,7 +628,7 @@ private struct ColumnaNotasInboxInicio: View {
                         Image(systemName: "note.text")
                             .font(.system(size: 24))
                             .foregroundStyle(Paleta.portapapeles.opacity(0.85))
-                        Text("Escribe arriba para guardar en 00-inbox")
+                        Text("Escribe arriba para guardar en el inbox de \(inbox.nombreDelDestino)")
                             .font(.system(size: 10))
                             .foregroundStyle(Paleta.textoDeApoyo)
                             .multilineTextAlignment(.center)
