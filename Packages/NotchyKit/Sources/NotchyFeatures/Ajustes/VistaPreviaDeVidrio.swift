@@ -74,21 +74,23 @@ struct VistaPreviaDeVidrio: View {
     @ViewBuilder private func fondoDeIsla(_ forma: UnevenRoundedRectangle) -> some View {
         let color = colorDePanel
         if vidrio.fondo {
-            ZStack {
-                forma.fill(vidrio.capa(color, minimo: 0.12))
-                forma.fill(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.1),
-                            .init(color: .black.opacity(0), location: 0.25),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-            .glassEffect(vidrio.material(), in: forma)
+            let velo = LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.1),
+                    .init(color: .black.opacity(0.75), location: 0.14),
+                    .init(color: .black.opacity(0.35), location: 0.2),
+                    .init(color: .black.opacity(0), location: 0.28),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            forma.fill(vidrio.capa(color, minimo: 0.12))
+                .glassEffect(vidrio.material(), in: forma)
+                .overlay {
+                    forma.fill(velo)
+                    forma.stroke(velo, lineWidth: 3)
+                }
         } else {
             forma.fill(LinearGradient(colors: [.black, color], startPoint: .top, endPoint: .bottom))
         }

@@ -125,29 +125,44 @@ public struct VistaDeIsla: View {
     /// Liquid glass con la forma de la isla. Encima lleva el color del tema según el tintado y un velo
     /// negro solo a la altura del notch, para que no se note.
     @ViewBuilder private var siluetaVidrio: some View {
-        let alto = max(coordinador.tamano.height, 1)
-        let notch = coordinador.geometria.tieneNotch ? coordinador.geometria.tamanoDeReposo.height / alto : 0
-        let velo = LinearGradient(
-            stops: [
-                .init(color: Paleta.fondo, location: 0),
-                .init(color: Paleta.fondo, location: min(0.9, notch)),
-                .init(color: Paleta.fondo.opacity(0), location: min(1, notch + 28 / alto)),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
         let tema = vidrio.capa(colorDePanel, minimo: 0.12)
         if coordinador.geometria.tieneNotch {
             let forma = FormaDeIsla(radioInferior: radio, hombro: hombro)
-            ZStack {
-                forma.fill(tema)
-                forma.fill(velo)
-            }
-            .glassEffect(vidrio.material(), in: forma)
+            let velo = Self.veloDelNotch(
+                altoDelNotch: coordinador.geometria.tamanoDeReposo.height,
+                altoDeLaIsla: coordinador.tamano.height
+            )
+            forma.fill(tema)
+                .glassEffect(vidrio.material(), in: forma)
+                // El velo va encima del vidrio y no dentro: así tapa también el brillo que el vidrio
+                // pinta en su contorno, que arriba se veía como una línea separando el notch.
+                .overlay {
+                    forma.fill(velo)
+                    forma.stroke(velo, lineWidth: 3)
+                }
         } else {
             let forma = RoundedRectangle(cornerRadius: min(radio, coordinador.tamano.height / 2))
             forma.fill(tema).glassEffect(vidrio.material(), in: forma)
         }
+    }
+
+    /// Negro puro a la altura del notch físico y luego un desvanecido largo con curva suave, para que no
+    /// se note dónde termina el notch.
+    static func veloDelNotch(altoDelNotch: CGFloat, altoDeLaIsla: CGFloat) -> LinearGradient {
+        let alto = max(altoDeLaIsla, 1)
+        let notch = min(0.85, altoDelNotch / alto)
+        let caida = 56 / alto
+        return LinearGradient(
+            stops: [
+                .init(color: Paleta.fondo, location: 0),
+                .init(color: Paleta.fondo, location: notch),
+                .init(color: Paleta.fondo.opacity(0.75), location: min(1, notch + caida * 0.25)),
+                .init(color: Paleta.fondo.opacity(0.35), location: min(1, notch + caida * 0.6)),
+                .init(color: Paleta.fondo.opacity(0), location: min(1, notch + caida)),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     @ViewBuilder private func contenido(de modulo: any ModuloDeIsla) -> some View {
