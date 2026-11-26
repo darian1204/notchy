@@ -65,6 +65,19 @@ import Testing
         #expect(Ajustes(almacen: almacen).vidrio == .pildorasYTarjetas)
     }
 
+    @Test func tintadoDelVidrioPersisteYSeLimita() {
+        let almacen = AlmacenEnMemoria()
+        let ajustes = Ajustes(almacen: almacen)
+        #expect(ajustes.tintadoDelVidrio == Ajustes.tintadoPorDefecto)
+        ajustes.tintadoDelVidrio = 0.8
+        #expect(Ajustes(almacen: almacen).tintadoDelVidrio == 0.8)
+        #expect(Ajustes.limitarTintado(1.7) == 1)
+        #expect(Ajustes.limitarTintado(-3) == 0)
+        #expect(Ajustes.limitarTintado(.nan) == Ajustes.tintadoPorDefecto)
+        ajustes.restablecerValoresPorDefecto()
+        #expect(ajustes.tintadoDelVidrio == Ajustes.tintadoPorDefecto)
+    }
+
     @Test func cadaNivelDeVidrioIncluyeAlAnterior() {
         #expect(!EstiloDeVidrio.apagado.pildoras)
         #expect(EstiloDeVidrio.pildoras.pildoras && !EstiloDeVidrio.pildoras.tarjetas)

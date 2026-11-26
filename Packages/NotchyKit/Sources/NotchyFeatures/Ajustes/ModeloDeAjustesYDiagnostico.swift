@@ -287,6 +287,7 @@ public final class ModeloDeAjustesYDiagnostico {
             ajustes: AjustesNoSensiblesExportados(
                 estiloDeIsla: ajustes.estiloDeIsla.rawValue,
                 vidrio: ajustes.vidrio.rawValue,
+                tintadoDelVidrio: Ajustes.limitarTintado(ajustes.tintadoDelVidrio),
                 destinoDeInbox: ajustes.destinoDeInbox.rawValue,
                 temaPanel: ajustes.temaPanel.rawValue,
                 temaBarra: ajustes.temaBarra.rawValue,
@@ -353,6 +354,7 @@ private struct ModuloExportado: Codable, Sendable {
 private struct AjustesNoSensiblesExportados: Codable, Sendable {
     let estiloDeIsla: String
     let vidrio: String
+    let tintadoDelVidrio: Double
     let destinoDeInbox: String
     let temaPanel: String
     let temaBarra: String
