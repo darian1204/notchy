@@ -1,0 +1,30 @@
+#!/bin/zsh
+# Genera el AppIcon de Notchy a partir de Resources/Icono/icono.html (todos los tamaños de macOS).
+set -eu
+source ${0:A:h}/comun.zsh
+TMP=$RAIZ/build/icono
+mkdir -p $TMP
+swiftc -O $RAIZ/scripts/renderizar-html.swift -o $TMP/renderizar 2> /dev/null
+$TMP/renderizar png $RAIZ/Resources/Icono/icono.html $TMP/icono-raw.png 1024
+SET=$RAIZ/App/Sources/Assets.xcassets/AppIcon.appiconset
+for lado in 16 32 64 128 256 512 1024; do
+    sips -z $lado $lado $TMP/icono-raw.png --out $SET/icono-$lado.png > /dev/null
+done
+cat > $SET/Contents.json << 'JSON'
+{
+  "images" : [
+    { "filename" : "icono-16.png", "idiom" : "mac", "scale" : "1x", "size" : "16x16" },
+    { "filename" : "icono-32.png", "idiom" : "mac", "scale" : "2x", "size" : "16x16" },
+    { "filename" : "icono-32.png", "idiom" : "mac", "scale" : "1x", "size" : "32x32" },
+    { "filename" : "icono-64.png", "idiom" : "mac", "scale" : "2x", "size" : "32x32" },
+    { "filename" : "icono-128.png", "idiom" : "mac", "scale" : "1x", "size" : "128x128" },
+    { "filename" : "icono-256.png", "idiom" : "mac", "scale" : "2x", "size" : "128x128" },
+    { "filename" : "icono-256.png", "idiom" : "mac", "scale" : "1x", "size" : "256x256" },
+    { "filename" : "icono-512.png", "idiom" : "mac", "scale" : "2x", "size" : "256x256" },
+    { "filename" : "icono-512.png", "idiom" : "mac", "scale" : "1x", "size" : "512x512" },
+    { "filename" : "icono-1024.png", "idiom" : "mac", "scale" : "2x", "size" : "512x512" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}
+JSON
+print -- "AppIcon generado en $SET"
