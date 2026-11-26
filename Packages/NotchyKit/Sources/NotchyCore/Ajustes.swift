@@ -85,6 +85,14 @@ public final class Ajustes {
             alCambiar(tarjetasDeInicio, oldValue, .tarjetasDeInicio)
         }
     }
+    /// A dónde van las notas del inbox: Obsidian o Notion.
+    public var destinoDeInbox: DestinoDeInbox {
+        didSet { alCambiar(destinoDeInbox, oldValue, .destinoDeInbox) }
+    }
+    /// Enlace o ID de la página de Notion que hace de inbox. El token va en el llavero, no aquí.
+    public var paginaNotion: String {
+        didSet { alCambiar(paginaNotion, oldValue, .paginaNotion) }
+    }
     /// Liquid glass en la isla: apagado, píldoras, píldoras y tarjetas, o completo.
     public var vidrio: EstiloDeVidrio {
         didSet { alCambiar(vidrio, oldValue, .vidrio) }
@@ -164,6 +172,8 @@ public final class Ajustes {
         temaBarra = Self.leer(.temaBarra, de: almacen) ?? .clasico
         estiloDeIsla = Self.leer(.estiloDeIsla, de: almacen) ?? .clasico
         vidrio = Self.leer(.vidrio, de: almacen) ?? .apagado
+        destinoDeInbox = Self.leer(.destinoDeInbox, de: almacen) ?? .obsidian
+        paginaNotion = Self.leer(.paginaNotion, de: almacen) ?? ""
         tarjetasDeInicio = Self.normalizarTarjetas(
             Self.leer(.tarjetasDeInicio, de: almacen) ?? Self.tarjetasPorDefecto)
         accesosRapidos = Self.normalizarAccesos(Self.leer(.accesosRapidos, de: almacen) ?? Self.accesosPorDefecto)
@@ -223,7 +233,7 @@ public final class Ajustes {
         case diasRetencionAudioReuniones, guardarAudioReuniones, idiomaTranscripcionPorDefecto
         case preferirMicrofonoInternoConBluetooth, resumirReunionesEnInbox, separarVocesEnReuniones
         case estiloDeIsla, accesosRapidos, herramientasAgenteSiemprePermitidas, vidrio
-        case tarjetasDeInicio
+        case tarjetasDeInicio, destinoDeInbox, paginaNotion
     }
 
     /// Restaura todas las preferencias a sus valores por defecto y limpia el almacén.
@@ -246,6 +256,8 @@ public final class Ajustes {
         temaBarra = .clasico
         estiloDeIsla = .clasico
         vidrio = .apagado
+        destinoDeInbox = .obsidian
+        paginaNotion = ""
         tarjetasDeInicio = Self.tarjetasPorDefecto
         accesosRapidos = Self.accesosPorDefecto
         hudSistemaActivo = true

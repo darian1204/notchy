@@ -13,6 +13,7 @@ public struct VistaDeAjustesYDiagnostico: View {
     private let alExportarDiagnostico: (@MainActor (String) -> Void)?
     private let alSalir: (@MainActor () -> Void)?
     @State private var confirmarBorradoGlobal = false
+    @State private var tokenNotion = ""
 
     public init(
         modelo: ModeloDeAjustesYDiagnostico,
@@ -328,6 +329,68 @@ public struct VistaDeAjustesYDiagnostico: View {
                 .accessibilityLabel("Atajo global para abrir o cerrar")
             }
 
+            Section("Inbox") {
+                Picker("Guardar las notas del inbox en", selection: ajustes.destinoDeInbox) {
+                    ForEach(DestinoDeInbox.allCases) { destino in
+                        Text(destino.nombre).tag(destino)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(
+                    "La nota rápida del Inicio, el resumen de cada reunión y la herramienta del agente escriben aquí."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                switch modelo.ajustes.destinoDeInbox {
+                case .obsidian:
+                    TextField("Carpeta del vault", text: ajustes.rutaVaultObsidian)
+                    Text("Notchy escribe al final de 00-inbox/inbox.md dentro de esta carpeta.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .notion:
+                    TextField("Página de Notion (enlace o ID)", text: ajustes.paginaNotion)
+                    if !modelo.ajustes.paginaNotion.isEmpty && Notion.idDePagina(modelo.ajustes.paginaNotion) == nil {
+                        Text("No encuentro un ID de página en ese enlace.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    HStack {
+                        SecureField(
+                            modelo.hayTokenNotion
+                                ? "Token guardado (escribe otro para cambiarlo)" : "Token de la integración",
+                            text: $tokenNotion
+                        )
+                        Button("Guardar") {
+                            modelo.guardarTokenNotion(tokenNotion)
+                            tokenNotion = ""
+                        }
+                        .disabled(
+                            tokenNotion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                || !modelo.puedeGuardarSecretos)
+                        if modelo.hayTokenNotion {
+                            Button("Borrar", role: .destructive) { modelo.borrarTokenNotion() }
+                        }
+                    }
+                    HStack {
+                        Button("Probar conexión") {
+                            Task { await modelo.probarNotion() }
+                        }
+                        .disabled(!modelo.hayTokenNotion || Notion.idDePagina(modelo.ajustes.paginaNotion) == nil)
+                        if let estado = modelo.estadoDeNotion {
+                            Text(estado)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(
+                        "Crea una integración interna en notion.so/my-integrations, copia su token y comparte la página con ella (••• → Conexiones). El token se guarda en el llavero de este Mac; las notas salen a Notion por internet."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Portapapeles") {
                 Picker("Borrar copias después de", selection: ajustes.horasRetencionPortapapeles) {
                     Text("1 hora").tag(1)
@@ -366,10 +429,15 @@ public struct VistaDeAjustesYDiagnostico: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                Toggle("Resumir cada reunión en el inbox de Obsidian", isOn: ajustes.resumirReunionesEnInbox)
-                    .accessibilityLabel("Resumir cada reunión en el inbox de Obsidian")
+                Toggle(
+                    "Resumir cada reunión en el inbox de \(modelo.ajustes.destinoDeInbox.nombre)",
+                    isOn: ajustes.resumirReunionesEnInbox
+                )
+                .accessibilityLabel("Resumir cada reunión en el inbox de \(modelo.ajustes.destinoDeInbox.nombre)")
                 Text(
-                    "Al detener una reunión, Apple Intelligence la resume en tu Mac y agrega el resumen a 00-inbox/inbox.md."
+                    modelo.ajustes.destinoDeInbox == .notion
+                        ? "Al detener una reunión, Apple Intelligence la resume en tu Mac y el resumen se envía por internet a tu página de Notion."
+                        : "Al detener una reunión, Apple Intelligence la resume en tu Mac y agrega el resumen a 00-inbox/inbox.md."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

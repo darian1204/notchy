@@ -223,15 +223,15 @@ private struct TarjetaInbox: View {
                     .labelStyle(IconoDeColor(color: Paleta.portapapeles))
                 Spacer(minLength: 0)
                 Button {
-                    fuentes.inbox?.abrirEnObsidian()
+                    fuentes.inbox?.abrirInbox()
                 } label: {
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Paleta.textoDeApoyo)
                 }
                 .buttonStyle(.plain)
-                .help("Abrir 00-inbox/inbox.md en Obsidian")
-                .accessibilityLabel("Abrir inbox en Obsidian")
+                .help("Abrir el inbox en \(fuentes.inbox?.nombreDelDestino ?? "Obsidian")")
+                .accessibilityLabel("Abrir inbox en \(fuentes.inbox?.nombreDelDestino ?? "Obsidian")")
             }
 
             campo
@@ -260,7 +260,7 @@ private struct TarjetaInbox: View {
         if let inbox = fuentes.inbox {
             @Bindable var gestor = inbox
             HStack(spacing: 5) {
-                TextField("Nota rápida a Obsidian…", text: $gestor.borrador)
+                TextField("Nota rápida a \(gestor.nombreDelDestino)…", text: $gestor.borrador)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(Paleta.texto)

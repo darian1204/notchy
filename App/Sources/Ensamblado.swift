@@ -66,9 +66,11 @@ final class Ensamblado {
         let adaptadorDeResumen = AdaptadorDeResumenLocal()
         let adaptadorDeDiarizacion = AdaptadorDeDiarizacion(carpetaModelos: rutasAbiertas?.modelos)
         let repositorioDeGrabadora = baseAbierta.map(RepositorioDeGrabadoraYReuniones.init)
+        let llavero = AdaptadorDeLlavero()
         gestorDeInbox = GestorDeInboxObsidian(
             ajustes: ajustes,
-            alAbrirURL: abrirURL
+            alAbrirURL: abrirURL,
+            secretos: llavero
         )
         let inboxParaResumen = gestorDeInbox
 
@@ -84,7 +86,7 @@ final class Ensamblado {
             transcripcion: adaptadorDeTranscripcion,
             diarizacion: adaptadorDeDiarizacion,
             resumenDeTexto: adaptadorDeResumen,
-            escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) },
+            escribirEnInbox: { nota in (try? await inboxParaResumen.agregar(nota)) != nil },
             repositorio: repositorioDeGrabadora,
             carpetaAudio: rutasAbiertas?.audio,
             ajustes: ajustes,
@@ -188,7 +190,7 @@ final class Ensamblado {
             ajustes: ajustes,
             repositorio: repositorioDeGrabadora,
             segmentosDe: { id in (try? repositorioDeGrabadora?.listarSegmentos(reunionID: id)) ?? [] },
-            escribirEnInbox: { nota in inboxParaResumen.agregarLinea(nota) },
+            escribirEnInbox: { nota in (try? await inboxParaResumen.agregar(nota)) != nil },
             alGuardarNota: { _ in grabadora.recargarNotaDeReunionSeleccionada() }
         )
 
@@ -281,7 +283,8 @@ final class Ensamblado {
                     notasDeVoz: grabadoraCapturada.notasDeVoz.count
                 )
             },
-            bus: bus
+            bus: bus,
+            secretos: llavero
         )
 
         let modeloCapturado = modeloDeAjustes
@@ -303,6 +306,7 @@ final class Ensamblado {
                         notificacionesCapturadas.limpiarTodas()
                         traductorCapturado.limpiar()
                         ajustesCapturados.restablecerValoresPorDefecto()
+                        modeloCapturado.borrarTokenNotion()
                         modeloCapturado.refrescar()
                     }
                 },
@@ -459,11 +463,8 @@ final class AdaptadorHerramientasDelAgente: PuertoDeHerramientasDelAgente {
         )
     }
 
-    func inboxAgregar(texto: String) throws -> String {
-        guard inbox.agregarLinea(texto) else {
-            throw NotchyError.datos("No se pudo escribir en inbox.md")
-        }
-        return "Guardado en inbox.md"
+    func inboxAgregar(texto: String) async throws -> String {
+        try await inbox.agregar(texto)
     }
 
     func portapapelesCopiar(texto: String) throws -> String {
