@@ -313,6 +313,11 @@ final class Ensamblado {
                 alSalir: salir
             )
         }
+        // Con Ajustes abiertos la isla se queda abierta para ver los cambios al momento, y la ventana
+        // sale debajo de ella para no taparla.
+        let coordinadorDeAjustes = coordinador
+        ventana.alCambiarVisibilidad = { visible in coordinadorDeAjustes.recibir(.fijar(visible)) }
+        ventana.marcoDeLaIsla = { coordinadorDeAjustes.geometria.zona(coordinadorDeAjustes.tamano) }
         ventanaDeAjustes = ventana
 
         let abrirAjustes: @MainActor () -> Void = { [weak self] in
