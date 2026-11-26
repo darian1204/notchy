@@ -44,6 +44,9 @@ public struct VistaDeIsla: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.vidrioDeIsla, vidrio)
+        // La isla nunca está "en segundo plano": sin esto el vidrio y los acentos se apagan cuando
+        // el panel no tiene el foco del teclado.
+        .environment(\.appearsActive, true)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.estado)
         .animation(Movimiento.cambioDeEstado(reducir: reducirMovimiento), value: coordinador.hudActual)
         .onChange(of: coordinador.estado) { paletaAbierta = false }

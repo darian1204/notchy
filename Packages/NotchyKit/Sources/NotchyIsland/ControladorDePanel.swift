@@ -8,6 +8,15 @@ import SwiftUI
 final class PanelDeIsla: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    // La isla nunca está "en segundo plano". AppKit decide con estos selectores si dibuja la ventana
+    // activa; sin ellos el liquid glass pierde el brillo de los bordes cuando el panel no tiene el
+    // foco. No son públicos: si una versión de macOS deja de llamarlos, solo vuelve el aspecto
+    // inactivo; el foco del teclado sigue dependiendo de `isKeyWindow`, que no se toca.
+    @objc func _hasActiveAppearance() -> Bool { true }
+    @objc func _hasActiveAppearanceIgnoringKeyFocus() -> Bool { true }
+    @objc func _hasKeyAppearance() -> Bool { true }
+    @objc func hasKeyAppearance() -> Bool { true }
 }
 
 /// Deja que el primer clic llegue a los botones y campos de texto aunque la app no esté activa.
