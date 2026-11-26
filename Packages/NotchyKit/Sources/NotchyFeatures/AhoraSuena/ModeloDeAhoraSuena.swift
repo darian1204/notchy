@@ -35,7 +35,6 @@ public final class ModeloDeAhoraSuena {
         puerto.iniciar { [weak self] nuevo in
             self?.aplicar(nuevo)
         }
-        iniciarMedidorDeEspectro()
         Task { [weak self] in
             guard let self else { return }
             let ok = await self.puerto.probarAdaptador()
@@ -130,6 +129,13 @@ public final class ModeloDeAhoraSuena {
 
         if anterior?.reproduciendo != nuevo?.reproduciendo {
             actualizarEspectro()
+            // El espectro solo se anima mientras suena: en pausa no hay nada que despertar.
+            if nuevo?.reproduciendo == true {
+                iniciarMedidorDeEspectro()
+            } else {
+                tareaEspectro?.cancel()
+                tareaEspectro = nil
+            }
         }
     }
 
@@ -146,7 +152,8 @@ public final class ModeloDeAhoraSuena {
 
     private func actualizarEspectro() {
         guard let estado = estadoActual, estado.reproduciendo else {
-            nivelesEspectro = Array(repeating: 0.22, count: 12)
+            let reposo = Array(repeating: 0.22, count: 12)
+            if nivelesEspectro != reposo { nivelesEspectro = reposo }
             return
         }
         let ahora = Date.now

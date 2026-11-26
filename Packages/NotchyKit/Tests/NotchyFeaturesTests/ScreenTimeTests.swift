@@ -101,4 +101,31 @@ struct ScreenTimeTests {
         modelo.tic()
         #expect(modelo.usosPorApp.reduce(0) { $0 + $1.segundos } == 10)
     }
+
+    @Test func guardaEnDiscoComoMuchoUnaVezPorMinuto() throws {
+        let (defaults, nombre) = defaultsDePrueba()
+        defer { defaults.removePersistentDomain(forName: nombre) }
+        let mundo = Mundo(fecha(26, 11))
+        let modelo = modelo(mundo, defaults)
+        let clave = "notchy.screentime.2026-11-26"
+        func guardado() throws -> TimeInterval {
+            guard let datos = defaults.data(forKey: clave) else { return 0 }
+            return try JSONDecoder().decode([UsoDeAppScreenTime].self, from: datos).reduce(0) { $0 + $1.segundos }
+        }
+        modelo.tic()
+        for _ in 0..<3 {
+            mundo.ahora += 10
+            modelo.tic()
+        }
+        #expect(try guardado() == 10)
+        for _ in 0..<6 {
+            mundo.ahora += 10
+            modelo.tic()
+        }
+        #expect(try guardado() == 70)
+        mundo.ahora += 10
+        modelo.tic()
+        modelo.detener()
+        #expect(try guardado() == 100)
+    }
 }

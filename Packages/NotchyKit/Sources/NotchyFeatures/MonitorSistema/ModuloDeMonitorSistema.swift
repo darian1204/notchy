@@ -12,15 +12,43 @@ public final class ModeloDeMonitorSistema {
 
     @ObservationIgnored private let puerto: any PuertoMonitorDelSistema
     @ObservationIgnored private var tareaRefresco: Task<Void, Never>?
+    @ObservationIgnored private var tareaEventosIsla: Task<Void, Never>?
+    @ObservationIgnored private let bus: BusDeEventos?
 
-    public init(puerto: any PuertoMonitorDelSistema) {
+    /// Con `bus`, solo se refresca mientras la isla está abierta (las métricas solo se ven ahí).
+    /// Sin `bus`, refresca siempre.
+    public init(puerto: any PuertoMonitorDelSistema, bus: BusDeEventos? = nil) {
         self.puerto = puerto
+        self.bus = bus
         self.metricas = puerto.leerMetricas()
     }
 
     public func iniciar() {
         detener()
         actualizar()
+        guard let bus else {
+            refrescarCadaDosSegundos()
+            return
+        }
+        tareaEventosIsla = Task { [weak self] in
+            let flujo = await bus.suscribir(a: IslaCambioDeEstado.self)
+            for await cambio in flujo {
+                guard !Task.isCancelled, let self else { break }
+                if cambio.moduloAbierto != nil {
+                    if self.tareaRefresco == nil {
+                        self.actualizar()
+                        self.refrescarCadaDosSegundos()
+                    }
+                } else {
+                    self.tareaRefresco?.cancel()
+                    self.tareaRefresco = nil
+                }
+            }
+        }
+    }
+
+    private func refrescarCadaDosSegundos() {
+        tareaRefresco?.cancel()
         tareaRefresco = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
@@ -33,6 +61,8 @@ public final class ModeloDeMonitorSistema {
     public func detener() {
         tareaRefresco?.cancel()
         tareaRefresco = nil
+        tareaEventosIsla?.cancel()
+        tareaEventosIsla = nil
     }
 
     public func actualizar() {
